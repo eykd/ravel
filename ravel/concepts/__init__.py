@@ -1,3 +1,6 @@
+from ..utils.strings import get_text
+
+
 _HANDLERS = {}
 
 
@@ -20,7 +23,7 @@ def handler(concept):
 def _dummy_handler(concept, rule_name, baggage):
     """Return the baggage as-is.
     """
-    return baggage
+    return [get_text(b) for b in baggage]
 
 
 def get_handler_for(concept):

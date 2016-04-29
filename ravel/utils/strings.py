@@ -1,3 +1,11 @@
+from ..types import Source
+
+
+def get_text(text_or_source):
+    if isinstance(text_or_source, Source):
+        return text_or_source.text
+    else:
+        return text_or_source
 
 
 def strip_outer_whitespace(text):

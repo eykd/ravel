@@ -3,10 +3,8 @@ import textwrap
 
 from parsimonious import NodeVisitor, Grammar, VisitationError
 
+from .exceptions import OutOfContextNodeError
 from .types import Pos, Source
-
-
-class OutOfContextNodeError(ValueError): pass
 
 
 def get_text_source(text, substring):

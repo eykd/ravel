@@ -1,18 +1,29 @@
-from collections import namedtuple
 import logging
-import operator as op
-import re
 
-from pydash import partial_right
+from parsimonious import ParseError, VisitationError
 
+from .exceptions import ComparisonParseError
 from . import parsers
-from .types import Comparison, Predicate
+from .types import Predicate, Source
+from .utils.strings import get_text
 
 logger = logging.getLogger('predicates')
 
 
 def get_predicate(target):
-    comparison = parsers.ComparisonParser().parse(target)
+    try:
+        comparison = parsers.ComparisonParser().parse(get_text(target))
+    except (ParseError, VisitationError):
+        if isinstance(target, Source):
+            raise ComparisonParseError(
+                "Line %s, Column %s:\n%s" % (target.start.line, target.start.column, target.text),
+                target
+            )
+        else:
+            raise ComparisonParseError(
+                "Could not determine source position:\n%s" % target,
+                target
+            )
     return Predicate(comparison.quality, comparison)
 
 

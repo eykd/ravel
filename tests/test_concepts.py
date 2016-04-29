@@ -29,4 +29,4 @@ class Test_DummyHandler(TestCase):
     def test_it_should_perform_no_op_on_baggage(self):
         value = ['foo']
         (ensure(concepts._dummy_handler)
-         .called_with('concep', 'rule name', value).is_(value))
+         .called_with('concept', 'rule name', value).equals(value))
