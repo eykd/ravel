@@ -1,14 +1,15 @@
-from collections import defaultdict, namedtuple, Mapping, Sequence
-import logging
+from collections import defaultdict, namedtuple
 
 from straight import plugin
 
 from . import concepts
 from . import predicates
-from .types import Rule
 from .utils.strings import get_text
 
-logger = logging.getLogger('ravel.compilers')
+
+class Rule(namedtuple('RuleBase', ['name', 'predicates', 'baggage'])):
+    __slots__ = ()
+
 
 plugin.load('ravel.concepts')
 
@@ -17,12 +18,18 @@ def compile_rulebook(rulebook):
     """Compile a rulebook declaration
     """
     rules = defaultdict(list)
-    for rule_name, (concept, ruleset, *baggage) in rulebook.items():
+
+    common_predicates = []
+
+    rulesets = list(rulebook.items())
+    if rulesets and get_text(rulesets[0][0]) == 'when':
+        _, common_predicates = rulesets.pop(0)
+
+    for rule_name, (concept, ruleset, *baggage) in rulesets:
         rule_name = get_text(rule_name)
         concept = get_text(concept)
-        _, when = list(ruleset.items())[0]
+        _, ruleset_predicates = list(list(ruleset.items())[0])
         assert _.text == 'when'
-        assert isinstance(when, Sequence)
 
         rules[concept].append(
             Rule(
@@ -30,7 +37,7 @@ def compile_rulebook(rulebook):
                 predicates.compile_ruleset(
                     concept,
                     rule_name,
-                    when
+                    common_predicates + ruleset_predicates
                 ),
                 compile_baggage(concept, rule_name, baggage),
             )

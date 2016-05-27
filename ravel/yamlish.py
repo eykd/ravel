@@ -1,40 +1,11 @@
-import re
-import textwrap
+from collections import OrderedDict
 
 from parsimonious import NodeVisitor, Grammar, VisitationError
 
 from .exceptions import OutOfContextNodeError
-from .types import Pos, Source
-
-
-def get_text_source(text, substring):
-    match = re.search(substring, text)
-    return Source(
-        start = get_coords_of_str_index(text, match.start()),
-        end = get_coords_of_str_index(text, match.end()),
-        text = match.group()
-    )
-
-
-def get_coords_of_str_index(s, index):
-    """Get (line_number, col) of `index` in `string`.
-
-    Based on http://stackoverflow.com/a/24495900
-    """
-    lines = s.splitlines(True)
-    curr_pos = 0
-    for linenum, line in enumerate(lines):
-        if curr_pos + len(line) > index:
-            return Pos(index, linenum + 1, index - curr_pos)
-        curr_pos += len(line)
-    return Pos(len(s), linenum + 1, 0)
-
-
-def get_line(s, line_number):
-    try:
-        return s.splitlines(True)[line_number - 1]
-    except IndexError:
-        return ''
+from . import grammars
+from .types import Source
+from .utils.strings import get_coords_of_str_index, get_line
 
 
 class YamlNode:
@@ -214,7 +185,7 @@ class Mapping(ParentNode):
         )
 
     def as_data(self):
-        return {c.key.as_data(): c.as_data() for c in self.children}
+        return OrderedDict([(c.key.as_data(), c.as_data()) for c in self.children])
 
 
 class KeyValue(ContainerNode):
@@ -225,37 +196,32 @@ class KeyValue(ContainerNode):
 
 class LeafNode(YamlNode):
     def __init__(self, pnode, value=None, **kwargs):
-        self.value = value
+        self.value = [(pnode, value)] if value is not None else []
         super().__init__(pnode, **kwargs)
 
     def as_data(self):
-        start = get_coords_of_str_index(self.pnode.full_text, self.pnode.start)
-        end = get_coords_of_str_index(self.pnode.full_text, self.pnode.end)
-        return Source(start, end, self.value)
+        start_pnode = self.value[0][0]
+        end_pnode = self.value[-1][0]
+        start = get_coords_of_str_index(start_pnode.full_text, start_pnode.start)
+        end = get_coords_of_str_index(end_pnode.full_text, end_pnode.end)
+        return Source(start, end, ' '.join([v[1] for v in self.value]))
+
+    def can_add_node(self, node):
+        return (
+            isinstance(node, LeafNode)
+            and (
+                node.level is None
+                or node.level >= self.level
+            )
+        )
+
+    def add_node(self, node):
+        self.value.extend(node.value)
+        return self.get_tip()
 
 
 class YamlParser(NodeVisitor):
-    grammar = Grammar(textwrap.dedent(r"""
-        lines       = line*
-        line        = indent (comment / list_item / key_value / section / blank) &eol
-
-        indent      = ~"\s*"
-
-        blank       = &eol
-        comment     = ~"(#|//+)+" text?
-
-        list_item   = "-" ws value
-
-        key_value   = key ":" ws value
-        section     = key ":"
-        key         = ~"[^\s:]+"
-
-        value       = list_item / key_value / section / text
-
-        eol         = "\n" / ~"$"
-        ws          = ~"[ \t]+"
-        text        = ~".+"
-    """))
+    grammar = Grammar(grammars.yamlish_grammar)
 
     def reduce_children(self, children):
         children = [c for c in children if c is not None]
@@ -327,3 +293,7 @@ class YamlParser(NodeVisitor):
                 raise OutOfContextNodeError(msg)
             else:
                 raise
+
+
+def parse(*args, **kwargs):
+    return YamlParser().parse(*args, **kwargs)

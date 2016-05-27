@@ -2,6 +2,8 @@
 from unittest import TestCase
 from ensure import ensure
 
+from ravel.expressions import Expression, VALUE
+from ravel.operations import Operation
 from ravel import effects
 from ravel import types
 
@@ -13,7 +15,7 @@ class TestCompileEffect(TestCase):
             'Quality += 1'
         )
         (ensure(effect)
-         .equals(types.Operation('Quality', '+=', 1, None)))
+         .equals(Operation('Quality', '+=', 1, None)))
 
     def test_it_should_parse_an_effect_with_complex_expression(self):
         effect = effects.compile_effect(
@@ -22,9 +24,9 @@ class TestCompileEffect(TestCase):
         )
         (ensure(effect)
          .equals(
-             types.Operation(
+             Operation(
                  'Quality', '+=',
-                 types.Expression(types.VALUE, '*', 2),
+                 Expression(VALUE, '*', 2),
                  None,
              )))
 
@@ -40,6 +42,6 @@ class TestCompileEffects(TestCase):
         )
         (ensure(effect)
          .equals([
-             types.Operation('Quality', '+=', 1, None),
-             types.Operation('Other Quality', '+=', 5, None),
+             Operation('Quality', '+=', 1, None),
+             Operation('Other Quality', '+=', 5, None),
          ]))

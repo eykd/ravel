@@ -3,14 +3,14 @@ from copy import deepcopy
 from functools import wraps
 import logging
 
-from . import parsers
+from .operations import OperationParser
 
 logger = logging.getLogger('effects')
 
 
 def compile_effect(concept, parent_rule, effect):
     logger.debug('Compiling effect for %s:%s:\n%r', concept, parent_rule, effect)
-    return parsers.OperationParser().parse(effect)
+    return OperationParser().parse(effect)
 
 
 def compile_effects(concept, parent_rule, raw_effects):

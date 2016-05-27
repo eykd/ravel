@@ -1,0 +1,10 @@
+
+
+intro:
+  - Situation
+  - when:
+    - Intro == 0
+
+  - It was raining steadily by the time I dropped my last rider off.[] I swung by the post office on my way home.
+  - choice:
+    - The post office was closed[.], but I let myself in to the PO box room.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import re
+from collections import OrderedDict
 from unittest import TestCase
 from unittest.mock import Mock
 import textwrap
@@ -7,69 +7,11 @@ import textwrap
 import ensure
 
 from ravel import yamlish as ish
-from ravel.types import Pos
+from ravel.utils.strings import get_text_source
 
 ensure.unittest_case.maxDiff = None
 
 ensure = ensure.ensure
-
-
-class GetLineTests(TestCase):
-    def setUp(self):
-        self.text = textwrap.dedent("""
-
-        foo
-            bar
-                baz blah blargh
-        boo
-        """)
-
-    def test_it_should_get_the_line(self):
-        (ensure(ish.get_line)
-         .called_with(self.text, 5)
-         .equals("        baz blah blargh\n"))
-
-    def test_it_should_get_a_blank_str_for_bad_line(self):
-        (ensure(ish.get_line)
-         .called_with(self.text, 99)
-         .equals(""))
-
-
-class GetCoordsOfStrIndexTests(TestCase):
-    def setUp(self):
-        self.text = textwrap.dedent("""
-
-        foo
-            bar
-                baz blah blargh
-        boo
-        """)
-
-    def test_returns_line_and_column_at_start_of_line(self):
-        match = re.search('foo', self.text)
-        start = match.start()
-        (ensure(ish.get_coords_of_str_index)
-         .called_with(self.text, start)
-         .equals(Pos(start, 3, 0)))
-
-    def test_returns_line_and_column_of_indented_text(self):
-        match = re.search('bar', self.text)
-        start = match.start()
-        (ensure(ish.get_coords_of_str_index)
-         .called_with(self.text, start)
-         .equals(Pos(start, 4, 4)))
-
-    def test_returns_line_and_column_of_midline_text(self):
-        match = re.search('blah', self.text)
-        start = match.start()
-        (ensure(ish.get_coords_of_str_index)
-         .called_with(self.text, start)
-         .equals(Pos(start, 5, 12)))
-
-    def test_returns_last_line_and_first_column_of_bad_index(self):
-        (ensure(ish.get_coords_of_str_index)
-         .called_with(self.text, len(self.text) + 5)
-         .equals(Pos(len(self.text), 6, 0)))
 
 
 class RootTests(TestCase):
@@ -304,9 +246,21 @@ class YamlParserTests(TestCase):
         """)
         result = self.parser.parse(text)
         ensure(result.as_data()).equals([
-            ish.get_text_source(text, 'foo'),
-            ish.get_text_source(text, 'bar'),
-            ish.get_text_source(text, 'baz'),
+            get_text_source(text, 'foo'),
+            get_text_source(text, 'bar'),
+            get_text_source(text, 'baz'),
+        ])
+
+    def test_it_should_parse_a_list_with_multiline_values(self):
+        text = textwrap.dedent("""
+            - foo
+            - bar
+              baz
+        """)
+        result = self.parser.parse(text)
+        ensure(result.as_data()).equals([
+            get_text_source(text, 'foo'),
+            get_text_source(text, 'bar\n  baz', 'bar baz')
         ])
 
     def test_it_should_parse_a_simple_mapping(self):
@@ -315,10 +269,10 @@ class YamlParserTests(TestCase):
             baz: boo
         """)
         result = self.parser.parse(text)
-        ensure(result.as_data()).equals({
-            ish.get_text_source(text, 'foo'): ish.get_text_source(text, 'bar'),
-            ish.get_text_source(text, 'baz'): ish.get_text_source(text, 'boo')
-        })
+        ensure(result.as_data()).equals(OrderedDict([
+            (get_text_source(text, 'foo'), get_text_source(text, 'bar')),
+            (get_text_source(text, 'baz'), get_text_source(text, 'boo')),
+        ]))
 
     def test_it_should_parse_a_nested_mapping_with_list(self):
         text = textwrap.dedent("""
@@ -328,13 +282,13 @@ class YamlParserTests(TestCase):
             blah: boo
         """)
         result = self.parser.parse(text)
-        ensure(result.as_data()).equals({
-            ish.get_text_source(text, 'foo'): [
-                ish.get_text_source(text, 'bar'),
-                ish.get_text_source(text, 'baz'),
-            ],
-            ish.get_text_source(text, 'blah'): ish.get_text_source(text, 'boo')
-        })
+        ensure(result.as_data()).equals(OrderedDict([
+            (get_text_source(text, 'foo'), [
+                get_text_source(text, 'bar'),
+                get_text_source(text, 'baz'),
+            ]),
+            (get_text_source(text, 'blah'), get_text_source(text, 'boo')),
+        ]))
 
     def test_it_should_parse_a_nested_list_with_mapping(self):
         text = textwrap.dedent("""
@@ -345,15 +299,15 @@ class YamlParserTests(TestCase):
         """)
         result = self.parser.parse(text)
         ensure(result.as_data()).equals([
-            {
-                ish.get_text_source(text, 'foo'): [
-                    ish.get_text_source(text, 'bar'),
-                    ish.get_text_source(text, 'baz'),
-                ],
-            },
-            {
-                ish.get_text_source(text, 'blah'): ish.get_text_source(text, 'boo')
-            }
+            OrderedDict([
+                (get_text_source(text, 'foo'), [
+                    get_text_source(text, 'bar'),
+                    get_text_source(text, 'baz'),
+                ]),
+            ]),
+            OrderedDict([
+                (get_text_source(text, 'blah'), get_text_source(text, 'boo')),
+            ]),
         ])
 
     def test_it_should_parse_comments_and_blanks(self):
@@ -370,15 +324,16 @@ class YamlParserTests(TestCase):
         """)
         result = self.parser.parse(text)
         ensure(result.as_data()).equals([
-            {
-                ish.get_text_source(text, 'foo'): [
-                    ish.get_text_source(text, 'bar'),
-                    ish.get_text_source(text, 'baz'),
-                ],
-            },
-            {
-                ish.get_text_source(text, 'blah'): ish.get_text_source(text, 'boo # not a comment!')
-            }
+            OrderedDict([
+                (get_text_source(text, 'foo'), [
+                    get_text_source(text, 'bar'),
+                    get_text_source(text, 'baz'),
+                ]),
+            ]),
+            OrderedDict([
+                (get_text_source(text, 'blah'),
+                 get_text_source(text, 'boo # not a comment!'))
+            ]),
         ])
 
     def test_it_fails_parsing_weird_indentations(self):

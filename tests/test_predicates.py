@@ -1,6 +1,7 @@
 from unittest import TestCase
 from ensure import ensure
 
+from ravel.comparisons import Comparison
 from ravel import predicates
 from ravel import types
 
@@ -22,25 +23,25 @@ class TestCompileRuleset(TestCase):
         )
 
         expected = [
-            types.Predicate(
+            predicates.Predicate(
                 name = 'bar',
-                predicate = types.Comparison(
+                predicate = Comparison(
                     quality = 'bar',
                     comparison = '<',
                     expression = 5
                 )
             ),
-            types.Predicate(
+            predicates.Predicate(
                 name = 'blah',
-                predicate = types.Comparison(
+                predicate = Comparison(
                     quality = 'blah',
                     comparison = '==',
                     expression = 'boo'
                 )
             ),
-            types.Predicate(
+            predicates.Predicate(
                 name = 'foo',
-                predicate = types.Comparison(
+                predicate = Comparison(
                     quality = 'foo',
                     comparison = '==',
                     expression = 9
@@ -55,39 +56,39 @@ class TestGetPredicate(TestCase):
     def test_it_should_produce_a_predicate_function_for_exact_match_with_integer(self):
         predicate = predicates.get_predicate(source('"foo" == 9'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '==', 9))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '==', 9))))
 
     def test_it_should_produce_a_predicate_function_for_exact_match_with_float(self):
         predicate = predicates.get_predicate(source('"foo" == 9.0'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '==', 9.0))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '==', 9.0))))
 
     def test_it_should_produce_a_predicate_function_for_exact_match_with_string(self):
         predicate = predicates.get_predicate(source('''"foo" == '"foo"' '''))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '==', '"foo"'))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '==', '"foo"'))))
 
     def test_it_should_produce_a_predicate_function_for_greater_than_comparison(self):
         predicate = predicates.get_predicate(source('"foo" > 9'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '>', 9))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '>', 9))))
 
     def test_it_should_produce_a_predicate_function_for_greater_than_or_equal_to_comparison(self):
         predicate = predicates.get_predicate(source('"foo" >= 9'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '>=', 9))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '>=', 9))))
 
     def test_it_should_produce_a_predicate_function_for_less_than_or_equal_to_comparison(self):
         predicate = predicates.get_predicate(source('"foo" <= 9'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '<=', 9))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '<=', 9))))
 
     def test_it_should_produce_a_predicate_function_for_less_than_comparison(self):
         predicate = predicates.get_predicate(source('"foo" < 9'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '<', 9))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '<', 9))))
 
     def test_it_should_produce_a_predicate_function_for_inequality(self):
         predicate = predicates.get_predicate(source('"foo" != 9'))
         (ensure(predicate)
-         .equals(types.Predicate('foo', types.Comparison('foo', '!=', 9))))
+         .equals(predicates.Predicate('foo', Comparison('foo', '!=', 9))))

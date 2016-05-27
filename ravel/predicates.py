@@ -1,18 +1,19 @@
-import logging
+from collections import namedtuple
 
 from parsimonious import ParseError, VisitationError
 
 from .exceptions import ComparisonParseError
-from . import parsers
-from .types import Predicate, Source
+from .comparisons import ComparisonParser
+from .types import Source
 from .utils.strings import get_text
 
-logger = logging.getLogger('predicates')
+
+Predicate = namedtuple('Predicate', ['name', 'predicate'])
 
 
 def get_predicate(target):
     try:
-        comparison = parsers.ComparisonParser().parse(get_text(target))
+        comparison = ComparisonParser().parse(get_text(target))
     except (ParseError, VisitationError):
         if isinstance(target, Source):
             raise ComparisonParseError(
@@ -30,7 +31,6 @@ def get_predicate(target):
 def compile_ruleset(concept, rule_name, ruleset):
     """Compile a ruleset declaration into a sorted list of Predicates.
     """
-    logger.debug('Compiling predicates for %s:%s:\n%r', concept, rule_name, ruleset)
     return sorted(
         get_predicate(target)
         for target in ruleset
