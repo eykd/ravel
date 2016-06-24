@@ -6,8 +6,10 @@ from . import concepts
 from . import predicates
 from .utils.strings import get_text
 
+RuleBase = namedtuple('Rule', ['name', 'predicates'])
 
-class Rule(namedtuple('RuleBase', ['name', 'predicates', 'baggage'])):
+
+class Rule(RuleBase):
     __slots__ = ()
 
 
@@ -17,7 +19,7 @@ plugin.load('ravel.concepts')
 def compile_rulebook(rulebook):
     """Compile a rulebook declaration
     """
-    rules = defaultdict(list)
+    rules = defaultdict(lambda: {'rules': [], 'locations': {}})
 
     common_predicates = []
 
@@ -31,7 +33,7 @@ def compile_rulebook(rulebook):
         _, ruleset_predicates = list(list(ruleset.items())[0])
         assert _.text == 'when'
 
-        rules[concept].append(
+        rules[concept]['rules'].append(
             Rule(
                 rule_name,
                 predicates.compile_ruleset(
@@ -39,11 +41,12 @@ def compile_rulebook(rulebook):
                     rule_name,
                     common_predicates + ruleset_predicates
                 ),
-                compile_baggage(concept, rule_name, baggage),
             )
         )
+        rules[concept]['locations'].update(compile_baggage(concept, rule_name, baggage))
+
     for ruleset in rules.values():
-        ruleset.sort()
+        ruleset['rules'].sort()
     return dict(rules)
 
 

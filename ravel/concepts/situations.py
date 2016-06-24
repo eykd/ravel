@@ -2,17 +2,19 @@ from collections import namedtuple
 import logging
 
 from parsimonious import Grammar
+from slugify import slugify_unicode
 
 from ravel import concepts
 from ravel import grammars
 from ravel.parsers import BaseParser
 from ravel.comparisons import ComparisonParser
 from ravel import rules
+from ravel.utils.data import merge_dicts
 
 logger = logging.getLogger('situations')
 
 BaseSituation = namedtuple('Situation', ('intro', 'directives'))
-Choice = namedtuple('Choice', ('intro', 'directives'))
+Choice = namedtuple('Choice', ('location'))
 BaseText = namedtuple('Text', ('text', 'sticky', 'predicate'))
 
 
@@ -94,15 +96,20 @@ class PlainTextParser(ComparisonParser):
 def compile_situation_baggage(concept, parent_rule, baggage):
     logger.debug('Compiling situation baggage for %s:%s:\n%r', concept, parent_rule, baggage)
 
-    intro, directives = compile_directives(concept, parent_rule, baggage)
-    return Situation(intro, directives)
+    intro, directives, subsituations = compile_directives(concept, parent_rule, baggage)
+    return {
+        parent_rule: Situation(intro, directives),
+        **merge_dicts(*subsituations),
+    }
 
 
 def compile_directives(concept, parent_rule, raw_directives):
     intro, *the_rest = raw_directives
     intro = IntroTextParser().parse(intro.text)
-    directives = [compile_directive(concept, parent_rule, d) for d in the_rest]
-    return intro, directives
+    directives, subsituations = zip(*(
+        compile_directive(concept, parent_rule, d) for d in the_rest)
+    )
+    return intro, directives, subsituations
 
 
 def compile_directive(concept, parent_rule, raw_directive):
@@ -113,13 +120,17 @@ def compile_directive(concept, parent_rule, raw_directive):
             return compile_choice(concept, parent_rule, directive)
 
     else:
-        return PlainTextParser().parse(raw_directive.text)
+        return PlainTextParser().parse(raw_directive.text), {}
 
 
 def compile_choice(concept, parent_rule, directives):
     logger.debug('Compiling choice for %s:%s:\n%r', concept, parent_rule, directives)
-    intro, directives = compile_directives(concept, parent_rule, directives)
-    return Choice(intro, directives)
+    intro, directives, subsituations = compile_directives(concept, parent_rule, directives)
+    subrule = '%s::%s' % (parent_rule, slugify_unicode(intro[0].text, to_lower=True))
+    return (
+        Choice(subrule),
+        {subrule: Situation(intro, directives), **merge_dicts(*subsituations)}
+    )
 
 
 tag_replace = [

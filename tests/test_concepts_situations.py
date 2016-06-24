@@ -1,7 +1,11 @@
 from unittest import TestCase
-import ensure
 
+from pprint import pprint
 import textwrap
+
+import ensure
+from ensure import EnsureError
+from deepdiff import DeepDiff
 
 from ravel.comparisons import Comparison
 from ravel.predicates import Predicate
@@ -10,7 +14,6 @@ from ravel import yamlish
 from ravel.concepts import situations
 
 ensure.unittest_case.maxDiff = None
-
 ensure = ensure.ensure
 
 
@@ -90,9 +93,12 @@ class CompileSituationRulebookTests(TestCase):
     def test_it_should_compile_a_situation_rulebook(self):
         rulebook = yamlish.YamlParser().parse(TEST_RULEBOOK_YAMLISH).as_data()
         compiled = rules.compile_rulebook(rulebook)
-        (ensure(compiled)
-         .equals(EXPECTED_COMPILED_RULEBOOK))
-
+        try:
+            (ensure(compiled)
+             .equals(EXPECTED_COMPILED_RULEBOOK))
+        except EnsureError:
+            pprint(DeepDiff(EXPECTED_COMPILED_RULEBOOK, compiled))
+            raise
 
 TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
     intro:
@@ -100,7 +106,7 @@ TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
       - when:
         - Intro == 0
 
-      - It was raining steadily by the time I dropped my last rider off and swung by the post office on my way home.
+      - It was raining steadily by the time I dropped my last rider off[...] and swung by the post office on my way home.
       - choice:
         - The post office was closed[.], but I let myself in to the PO box room.
         - The fluorescent glare hurt my eyes after the evening of headlight
@@ -109,48 +115,100 @@ TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
 """)
 
 
+# EXPECTED_COMPILED_RULEBOOK = {
+#     'Situation': [
+#         rules.Rule(
+#             name = 'intro',
+#             predicates = [
+#                 Predicate(
+#                     name = 'Intro',
+#                     predicate = Comparison(
+#                         quality = 'Intro',
+#                         comparison = '==',
+#                         expression = 0,
+#                     )
+#                 ),
+#             ],
+#             baggage = situations.Situation(
+#                 intro = [
+#                     situations.Text(
+#                         'It was raining steadily by the time I dropped my last rider '
+#                         'off and swung by the post office on my way home.'
+#                     ),
+#                     situations.Text(
+#                         'It was raining steadily by the time I dropped my last rider '
+#                         'off and swung by the post office on my way home.'
+#                     ),
+#                 ],
+#                 directives = [
+#                     situations.Choice(
+#                         intro = [
+#                             situations.Text('The post office was closed.'),
+#                             situations.Text('The post office was closed, '
+#                                             'but I let myself in to the PO box room.')
+#                         ],
+#                         directives = [
+#                             situations.Text(
+#                                 'The fluorescent glare hurt my eyes after '
+#                                 'the evening of headlight glare.'
+#                             ),
+#                         ]
+#                     ),
+#                     situations.Text('I found my box, lucky 1313.')
+#                 ],
+#             )
+#         ),
+#     ],
+# }
+
+
 EXPECTED_COMPILED_RULEBOOK = {
-    'Situation': [
-        rules.Rule(
-            name = 'intro',
-            predicates = [
-                Predicate(
-                    name = 'Intro',
-                    predicate = Comparison(
-                        quality = 'Intro',
-                        comparison = '==',
-                        expression = 0,
-                    )
-                ),
-            ],
-            baggage = situations.Situation(
-                intro = [
-                    situations.Text(
-                        'It was raining steadily by the time I dropped my last rider '
-                        'off and swung by the post office on my way home.'
+    'Situation': {
+        'rules': [
+            rules.Rule(
+                name = 'intro',
+                predicates = [
+                    Predicate(
+                        name = 'Intro',
+                        predicate = Comparison(
+                            quality = 'Intro',
+                            comparison = '==',
+                            expression = 0,
+                        )
                     ),
-                    situations.Text(
-                        'It was raining steadily by the time I dropped my last rider '
-                        'off and swung by the post office on my way home.'
-                    ),
-                ],
-                directives = [
-                    situations.Choice(
-                        intro = [
-                            situations.Text('The post office was closed.'),
-                            situations.Text('The post office was closed, '
-                                            'but I let myself in to the PO box room.')
-                        ],
-                        directives = [
-                            situations.Text(
-                                'The fluorescent glare hurt my eyes after '
-                                'the evening of headlight glare.'
-                            ),
-                        ]
-                    ),
-                    situations.Text('I found my box, lucky 1313.')
                 ],
             )
-        ),
-    ],
+        ],
+        'locations': {
+            'intro': situations.Situation(
+                intro = [
+                    situations.Text(
+                        'It was raining steadily by the time I dropped my last rider off...'
+                    ),
+                    situations.Text(
+                        'It was raining steadily by the time I dropped my last rider '
+                        'off and swung by the post office on my way home.'
+                    ),
+                ],
+                directives = (
+                    situations.Choice(location='intro::the-post-office-was-closed'),
+                    situations.Text('I found my box, lucky 1313.'),
+                ),
+            ),
+            'intro::the-post-office-was-closed': situations.Situation(
+                intro = [
+                    situations.Text(
+                        'The post office was closed.'
+                    ),
+                    situations.Text(
+                        'The post office was closed, but I let myself in to the PO box room.'
+                    ),
+                ],
+                directives = (
+                    situations.Text('The fluorescent glare hurt my eyes after the evening '
+                                    'of headlight glare.'),
+                ),
+            ),
+        },
+    },
 }

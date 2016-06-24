@@ -23,7 +23,7 @@ def handler(concept):
 def _dummy_handler(concept, rule_name, baggage):
     """Return the baggage as-is.
     """
-    return [get_text(b) for b in baggage]
+    return {rule_name: [get_text(b) for b in baggage]}
 
 
 def get_handler_for(concept):

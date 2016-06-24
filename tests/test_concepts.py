@@ -27,6 +27,7 @@ class TestHandlerDecorator(TestCase):
 
 class Test_DummyHandler(TestCase):
     def test_it_should_perform_no_op_on_baggage(self):
-        value = ['foo']
+        rule_name = 'foo'
+        value = ['bar']
         (ensure(concepts._dummy_handler)
-         .called_with('concept', 'rule name', value).equals(value))
+         .called_with('concept', rule_name, value).equals({rule_name: value}))

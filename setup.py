@@ -15,12 +15,8 @@ setup(
         'parsimonious==0.6.2',
         'pydash==3.4.1',
         'straight.plugin==1.4.1',
+        'awesome-slugify==1.6.5',
     ],
-    tests_require = [
-        'nose',
-        'ensure',
-    ],
-    test_suite = 'nose.collector',
     entry_points = dict(
         console_scripts = [
             'ravel = ravel.cli:main',

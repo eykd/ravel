@@ -54,74 +54,78 @@ TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
 
 
 EXPECTED_COMPILED_RULEBOOK = {
-    'onTest': [
-        rules.Rule(
-            name = 'baz-barf-blah-boo',
-            predicates = [
-                Predicate(
-                    name = 'baz',
-                    predicate = Comparison(
-                        quality = 'baz',
-                        comparison = '==',
-                        expression = 'barf',
-                    )
-                ),
-                Predicate(
-                    name = 'blah',
-                    predicate = Comparison(
-                        quality = 'blah',
-                        comparison = '==',
-                        expression = 'boo',
-                    )
-                ),
-                Predicate(
-                    name = 'blark',
-                    predicate = Comparison(
-                        quality = 'blark',
-                        comparison = '==',
-                        expression = 'floogle',
-                    )
-                ),
-                Predicate(
-                    name = 'blue',
-                    predicate = Comparison(
-                        quality = 'blue',
-                        comparison = '==',
-                        expression = 'blargh',
-                    )
-                ),
-            ],
-            baggage = ['baloney']
-        ),
-        rules.Rule(
-            name = 'foo-bar',
-            predicates = [
-                Predicate(
-                    name = 'blark',
-                    predicate = Comparison(
-                        quality = 'blark',
-                        comparison = '==',
-                        expression = 'floogle',
-                    )
-                ),
-                Predicate(
-                    name = 'blue',
-                    predicate = Comparison(
-                        quality = 'blue',
-                        comparison = '==',
-                        expression = 'blargh',
-                    )
-                ),
-                Predicate(
-                    name = 'foo',
-                    predicate = Comparison(
-                        quality = 'foo',
-                        comparison = '==',
-                        expression = 'bar'
-                    )
-                ),
-            ],
-            baggage = ['balogna']
-        ),
-    ],
+    'onTest': {
+        'rules': [
+            rules.Rule(
+                name = 'baz-barf-blah-boo',
+                predicates = [
+                    Predicate(
+                        name = 'baz',
+                        predicate = Comparison(
+                            quality = 'baz',
+                            comparison = '==',
+                            expression = 'barf',
+                        )
+                    ),
+                    Predicate(
+                        name = 'blah',
+                        predicate = Comparison(
+                            quality = 'blah',
+                            comparison = '==',
+                            expression = 'boo',
+                        )
+                    ),
+                    Predicate(
+                        name = 'blark',
+                        predicate = Comparison(
+                            quality = 'blark',
+                            comparison = '==',
+                            expression = 'floogle',
+                        )
+                    ),
+                    Predicate(
+                        name = 'blue',
+                        predicate = Comparison(
+                            quality = 'blue',
+                            comparison = '==',
+                            expression = 'blargh',
+                        )
+                    ),
+                ],
+            ),
+            rules.Rule(
+                name = 'foo-bar',
+                predicates = [
+                    Predicate(
+                        name = 'blark',
+                        predicate = Comparison(
+                            quality = 'blark',
+                            comparison = '==',
+                            expression = 'floogle',
+                        )
+                    ),
+                    Predicate(
+                        name = 'blue',
+                        predicate = Comparison(
+                            quality = 'blue',
+                            comparison = '==',
+                            expression = 'blargh',
+                        )
+                    ),
+                    Predicate(
+                        name = 'foo',
+                        predicate = Comparison(
+                            quality = 'foo',
+                            comparison = '==',
+                            expression = 'bar'
+                        )
+                    ),
+                ],
+            ),
+        ],
+        'locations': {
+            'baz-barf-blah-boo': ['baloney'],
+            'foo-bar': ['balogna'],
+        }
+    }
 }

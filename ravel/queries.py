@@ -40,11 +40,12 @@ def query_ruleset(q, rules):
     if isinstance(q, collections.Mapping):
         q = q.items()
     q = sorted(q)
-    for rname, predicates, results in rules:
+    locations = rules['locations']
+    for rname, predicates in rules['rules']:
         logger.debug("Against rule %s: %r", rname, predicates)
         if query_predicates(q, predicates):
             logger.debug("Rule %s accepted", rname)
-            yield (len(predicates), random.random(), rname, results)
+            yield (len(predicates), random.random(), rname, locations[rname])
         else:
             logger.debug("Rule %s rejected", rname)
 
