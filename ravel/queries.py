@@ -20,25 +20,23 @@ def query_predicates(query, predicates):
                     logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
                 break
         else:
-            if rkey not in qkeys:
-                try:
-                    matched = predicate(0)
-                except TypeError:
-                    matched = False
-                if matched:
-                    logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
-                    matches.append(True)
-                else:
-                    logger.debug("Could not match rule for `%s %r`", rkey, predicate)
-                    matches.append(False)
-                    break
+            assert rkey not in qkeys
+            try:
+                matched = predicate(0)
+            except TypeError:
+                matched = False
+            if matched:
+                logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
+                matches.append(True)
+            else:
+                logger.debug("Could not match rule for `%s %r`", rkey, predicate)
+                matches.append(False)
+                break
 
     return all(matches)
 
 
 def query_ruleset(q, rules):
-    if isinstance(q, collections.Mapping):
-        q = q.items()
     q = sorted(q)
     locations = rules['locations']
     for rname, predicates in rules['rules']:

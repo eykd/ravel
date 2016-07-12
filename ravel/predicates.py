@@ -2,29 +2,27 @@ from collections import namedtuple
 
 from parsimonious import ParseError, VisitationError
 
-from .exceptions import ComparisonParseError
+from . import exceptions
 from .comparisons import ComparisonParser
 from .types import Source
 from .utils.strings import get_text
 
 
-Predicate = namedtuple('Predicate', ['name', 'predicate'])
+BasePredicate = namedtuple('Predicate', ['name', 'predicate'])
+
+
+class Predicate(BasePredicate):
+    __slots__ = ()
+
+    def __repr__(self):
+        return '{%s: %r}' % (self.name, self.predicate)
 
 
 def get_predicate(target):
     try:
         comparison = ComparisonParser().parse(get_text(target))
     except (ParseError, VisitationError):
-        if isinstance(target, Source):
-            raise ComparisonParseError(
-                "Line %s, Column %s:\n%s" % (target.start.line, target.start.column, target.text),
-                target
-            )
-        else:
-            raise ComparisonParseError(
-                "Could not determine source position:\n%s" % target,
-                target
-            )
+        exceptions.raise_parse_error(target, exceptions.ComparisonParseError)
     return Predicate(comparison.quality, comparison)
 
 

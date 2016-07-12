@@ -28,6 +28,9 @@ class Comparison(BaseComparison):
     def __call__(self, qvalue):
         return self.get_operator()(qvalue, self.get_expression(qvalue))
 
+    def __repr__(self):
+        return "(%r %s %r)" % (self.quality, self.comparison, self.expression)
+
 
 class ComparisonParser(BaseExpressionParser):
     grammar = Grammar(

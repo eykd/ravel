@@ -1,10 +1,15 @@
-
-
 intro:
   - Situation
   - when:
     - Intro == 0
 
-  - It was raining steadily by the time I dropped my last rider off.[] I swung by the post office on my way home.
+  - It was raining steadily by the time I dropped my last rider off[...] and swung by the post office on my way home.
   - choice:
     - The post office was closed[.], but I let myself in to the PO box room.
+    - The fluorescent glare hurt my eyes after the evening of headlight
+      glare.
+      - choice:
+          - I quietly cursed the light, wishing for the dark.
+      - choice: I quietly gave thanks for the light.
+  - I found my box, lucky 1313.
+  - text: What a lovely number.

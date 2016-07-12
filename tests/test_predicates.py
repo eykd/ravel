@@ -2,12 +2,11 @@ from unittest import TestCase
 from ensure import ensure
 
 from ravel.comparisons import Comparison
+from ravel import exceptions
 from ravel import predicates
 from ravel import types
 
-
-def source(text):
-    return types.Source(0, 0, text)
+from .helpers import source
 
 
 class TestCompileRuleset(TestCase):
@@ -92,3 +91,8 @@ class TestGetPredicate(TestCase):
         predicate = predicates.get_predicate(source('"foo" != 9'))
         (ensure(predicate)
          .equals(predicates.Predicate('foo', Comparison('foo', '!=', 9))))
+
+    def test_it_should_produce_a_predicate_function_for_inequality(self):
+        (ensure(predicates.get_predicate)
+         .called_with(source('"foo" !='))
+         .raises(exceptions.ComparisonParseError))

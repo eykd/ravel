@@ -57,6 +57,10 @@ class QueryTopTest(TestCase):
         result = queries.query_top('onTest', [('foo', 'bar'), ('blah', 'boo')], rules=self.rules)
         ensure(result).equals(['blah'])
 
+    def test_it_should_query_a_rules_database_and_return_None_for_no_matches(self):
+        result = queries.query_top('onTest', [('foo', 'blah')], rules=self.rules)
+        ensure(result).is_none()
+
 
 TEST_RULES = textwrap.dedent("""
     foo-bar:

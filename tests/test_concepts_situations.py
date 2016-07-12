@@ -8,6 +8,7 @@ from ensure import EnsureError
 from deepdiff import DeepDiff
 
 from ravel.comparisons import Comparison
+from ravel import exceptions
 from ravel.predicates import Predicate
 from ravel import rules
 from ravel import yamlish
@@ -18,7 +19,33 @@ ensure = ensure.ensure
 
 
 class TextTests(TestCase):
-    pass
+    def test_it_should_present_a_helpful_repr_for_plain_text(self):
+        text = situations.Text('Some plain text.')
+        (ensure(repr(text))
+         .equals("<Text: 'Some plain text.'>"))
+
+    def test_it_should_present_a_helpful_repr_for_sticky_text(self):
+        text = situations.Text('Some plain text.', sticky=True)
+        (ensure(repr(text))
+         .equals("<Text (sticky): 'Some plain text.'>"))
+
+    def test_it_should_present_a_helpful_repr_for_plain_text_with_predicate(self):
+        predicate = Predicate(
+            name = 'Intro',
+            predicate = Comparison(
+                quality = 'Intro',
+                comparison = '==',
+                expression = 0,
+            )
+        )
+
+        text = situations.Text('Some plain text.', predicate=predicate)
+        (ensure(repr(text))
+         .equals("<Text {Intro: ('Intro' == 0)}: 'Some plain text.'>"))
+
+    def test_it_should_stringify_nicely(self):
+        text = situations.Text('Some plain text.')
+        ensure(str(text)).equals('Some plain text.')
 
 
 class IntroTextParserTests(TestCase):
@@ -100,6 +127,50 @@ class CompileSituationRulebookTests(TestCase):
             pprint(DeepDiff(EXPECTED_COMPILED_RULEBOOK, compiled))
             raise
 
+    def test_it_should_fail_to_compile_an_unknown_directive(self):
+        bad_rulebook_yamlish = yamlish.YamlParser().parse(textwrap.dedent("""
+            intro:
+              - Situation
+              - when:
+                - Intro == 0
+
+              - Some intro text.
+              - foo: bar
+        """)).as_data()
+        (ensure(rules.compile_rulebook)
+         .called_with(bad_rulebook_yamlish)
+         .raises(exceptions.ParseError))
+
+    def test_it_should_fail_to_compile_a_multipronged_directive(self):
+        bad_rulebook_yamlish = yamlish.YamlParser().parse(textwrap.dedent("""
+            intro:
+              - Situation
+              - when:
+                - Intro == 0
+
+              - Some intro text.
+              - choice:
+                  - foo
+                  - bar
+                text: This shouldn't be!
+        """)).as_data()
+        (ensure(rules.compile_rulebook)
+         .called_with(bad_rulebook_yamlish)
+         .raises(exceptions.ParseError))
+
+    def test_it_should_fail_to_compile_with_missing_intro_text(self):
+        bad_rulebook_yamlish = yamlish.YamlParser().parse(textwrap.dedent("""
+            intro:
+              - Situation
+              - when:
+                - Intro == 0
+
+              - foo: bar
+        """)).as_data()
+        (ensure(rules.compile_rulebook)
+         .called_with(bad_rulebook_yamlish)
+         .raises(exceptions.ParseError))
+
 TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
     intro:
       - Situation
@@ -111,55 +182,13 @@ TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
         - The post office was closed[.], but I let myself in to the PO box room.
         - The fluorescent glare hurt my eyes after the evening of headlight
           glare.
+          - choice:
+            - I quietly cursed the light, wishing for the dark.
+          - choice:
+            - I quietly gave thanks for the light.
       - I found my box, lucky 1313.
+      - text: What a lovely number.
 """)
-
-
-# EXPECTED_COMPILED_RULEBOOK = {
-#     'Situation': [
-#         rules.Rule(
-#             name = 'intro',
-#             predicates = [
-#                 Predicate(
-#                     name = 'Intro',
-#                     predicate = Comparison(
-#                         quality = 'Intro',
-#                         comparison = '==',
-#                         expression = 0,
-#                     )
-#                 ),
-#             ],
-#             baggage = situations.Situation(
-#                 intro = [
-#                     situations.Text(
-#                         'It was raining steadily by the time I dropped my last rider '
-#                         'off and swung by the post office on my way home.'
-#                     ),
-#                     situations.Text(
-#                         'It was raining steadily by the time I dropped my last rider '
-#                         'off and swung by the post office on my way home.'
-#                     ),
-#                 ],
-#                 directives = [
-#                     situations.Choice(
-#                         intro = [
-#                             situations.Text('The post office was closed.'),
-#                             situations.Text('The post office was closed, '
-#                                             'but I let myself in to the PO box room.')
-#                         ],
-#                         directives = [
-#                             situations.Text(
-#                                 'The fluorescent glare hurt my eyes after '
-#                                 'the evening of headlight glare.'
-#                             ),
-#                         ]
-#                     ),
-#                     situations.Text('I found my box, lucky 1313.')
-#                 ],
-#             )
-#         ),
-#     ],
-# }
 
 
 EXPECTED_COMPILED_RULEBOOK = {
@@ -181,33 +210,52 @@ EXPECTED_COMPILED_RULEBOOK = {
         ],
         'locations': {
             'intro': situations.Situation(
-                intro = [
-                    situations.Text(
-                        'It was raining steadily by the time I dropped my last rider off...'
-                    ),
+                intro = situations.Text(
+                    'It was raining steadily by the time I dropped my last rider off...'
+                ),
+                directives = [
                     situations.Text(
                         'It was raining steadily by the time I dropped my last rider '
                         'off and swung by the post office on my way home.'
                     ),
-                ],
-                directives = (
                     situations.Choice(location='intro::the-post-office-was-closed'),
                     situations.Text('I found my box, lucky 1313.'),
-                ),
+                    situations.Text('What a lovely number.'),
+                ],
             ),
             'intro::the-post-office-was-closed': situations.Situation(
-                intro = [
-                    situations.Text(
-                        'The post office was closed.'
-                    ),
+                intro = situations.Text(
+                    'The post office was closed.'
+                ),
+                directives = [
                     situations.Text(
                         'The post office was closed, but I let myself in to the PO box room.'
                     ),
-                ],
-                directives = (
                     situations.Text('The fluorescent glare hurt my eyes after the evening '
                                     'of headlight glare.'),
+                    situations.Choice(location='intro::i-quietly-cursed-the-light-wishing-for-the-dark'),
+                    situations.Choice(location='intro::i-quietly-gave-thanks-for-the-light'),
+                ],
+            ),
+            'intro::i-quietly-cursed-the-light-wishing-for-the-dark': situations.Situation(
+                intro = situations.Text(
+                    'I quietly cursed the light, wishing for the dark.'
                 ),
+                directives = [
+                    situations.Text(
+                        'I quietly cursed the light, wishing for the dark.'
+                    ),
+                ],
+            ),
+            'intro::i-quietly-gave-thanks-for-the-light': situations.Situation(
+                intro = situations.Text(
+                    'I quietly gave thanks for the light.'
+                ),
+                directives = [
+                    situations.Text(
+                        'I quietly gave thanks for the light.'
+                    ),
+                ],
             ),
         },
     },

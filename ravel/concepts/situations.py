@@ -1,14 +1,15 @@
 from collections import namedtuple
+import itertools as it
 import logging
 
 from parsimonious import Grammar
 from slugify import slugify_unicode
 
 from ravel import concepts
+from ravel import exceptions
 from ravel import grammars
 from ravel.parsers import BaseParser
 from ravel.comparisons import ComparisonParser
-from ravel import rules
 from ravel.utils.data import merge_dicts
 
 logger = logging.getLogger('situations')
@@ -105,28 +106,45 @@ def compile_situation_baggage(concept, parent_rule, baggage):
 
 def compile_directives(concept, parent_rule, raw_directives):
     intro, *the_rest = raw_directives
-    intro = IntroTextParser().parse(intro.text)
-    directives, subsituations = zip(*(
-        compile_directive(concept, parent_rule, d) for d in the_rest)
-    )
-    return intro, directives, subsituations
+    try:
+        intro, first_text = IntroTextParser().parse(intro.text)
+    except AttributeError:
+        raise exceptions.ParseError("No intro text found:\n%r" % intro)
+    if the_rest:
+        directives, subsituations = zip(*(
+            compile_directive(concept, parent_rule, d) for d in the_rest)
+        )
+    else:
+        directives = []
+        subsituations = {}
+    return intro, list(it.chain([first_text], directives)), subsituations
 
 
 def compile_directive(concept, parent_rule, raw_directive):
     if isinstance(raw_directive, dict):
-        assert len(raw_directive) == 1, "Too many directives in %s" % raw_directive
-        for key, directive in raw_directive.items():
-            assert key.text == 'choice', "Unknown directive %s in %s" % (key.text, raw_directive)
+        if len(raw_directive) != 1:
+            raise exceptions.ParseError("Too many directives in %s" % raw_directive)
+        key, directive = list(raw_directive.items())[0]
+        if key.text == 'choice':
             return compile_choice(concept, parent_rule, directive)
-
+        elif key.text == 'text':
+            return compile_text(concept, parent_rule, directive)
+        else:
+            raise exceptions.ParseError("Unknown directive %s in %r" % (key.text, raw_directive))
     else:
-        return PlainTextParser().parse(raw_directive.text), {}
+        return compile_text(concept, parent_rule, raw_directive)
+
+
+def compile_text(concept, parent_rule, raw_directive):
+    return PlainTextParser().parse(raw_directive.text), {}
 
 
 def compile_choice(concept, parent_rule, directives):
     logger.debug('Compiling choice for %s:%s:\n%r', concept, parent_rule, directives)
+    if not isinstance(directives, list):
+        directives = [directives]
     intro, directives, subsituations = compile_directives(concept, parent_rule, directives)
-    subrule = '%s::%s' % (parent_rule, slugify_unicode(intro[0].text, to_lower=True))
+    subrule = '%s::%s' % (parent_rule, slugify_unicode(intro.text, to_lower=True))
     return (
         Choice(subrule),
         {subrule: Situation(intro, directives), **merge_dicts(*subsituations)}
@@ -147,39 +165,3 @@ tag_replace = [
 ]
 
 
-def compile_text(txt):
-    intro, *rest = txt.split('\n\n', 1)
-    try:
-        common_intro, remainder = intro.split('[', 1)
-        short_intro, long_intro = remainder.split(']', 1)
-    except ValueError:
-        common_intro = intro
-        short_intro = long_intro = ''
-
-    if short_intro or long_intro:
-        txt = '%(common)s{%% if short %%}%(short)s{%% else %%}%(long)s%(rest)s{%% endif %%}' % {
-            'common': common_intro,
-            'short': short_intro,
-            'long': long_intro,
-            'rest': ('\n\n' + '\n\n'.join(rest)) if rest else '',
-        }
-    for search, replace in tag_replace:
-        txt = txt.replace(search, replace)
-
-#     template = text.get_template_from_string(util.strip_outer_whitespace(txt))
-#     def render_template(**context):
-#         return util.rewrap(template.render(**context))
-
-#     return render_template
-
-
-def enact_consequences(choice, state):
-    for consequence in choice.then:
-        consequence(state)
-
-
-def query_choices(queries, situation):
-    queries = sorted(queries)
-    for choice in situation.choices:
-        if rules.query_predicates(queries, choice.when):
-            yield choice

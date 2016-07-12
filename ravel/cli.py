@@ -1,3 +1,5 @@
+import logging
+
 import click
 
 from ravel import rules
@@ -27,6 +29,12 @@ def run(config, story):
     """Run the indicated storyfile.
     """
     state = {}
-    rulebook = rules.compile_rulebook(yamlish.parse(story.read()).as_data())
+    try:
+        rulebook = rules.compile_rulebook(yamlish.parse(story.read()).as_data())
+    except:
+        logging.exception('Something bad happened while compiling the rulebook...')
+        import ipdb
+        ipdb.post_mortem()
+        return
     situation = queries.query_top('Situation', state, rulebook)
-    click.echo(situation.intro.head.text + situation.intro.suffix.text)
+    click.echo(situation.intro.text)
