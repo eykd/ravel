@@ -182,8 +182,7 @@ TEST_RULEBOOK_YAMLISH = textwrap.dedent("""
         - The post office was closed[.], but I let myself in to the PO box room.
         - The fluorescent glare hurt my eyes after the evening of headlight
           glare.
-          - choice:
-            - I quietly cursed the light, wishing for the dark.
+          - choice: I quietly cursed the light, wishing for the dark.
           - choice:
             - I quietly gave thanks for the light.
       - I found my box, lucky 1313.
@@ -219,6 +218,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                         'off and swung by the post office on my way home.'
                     ),
                     situations.Choice(location='intro::the-post-office-was-closed'),
+                    situations.GetChoice(),
                     situations.Text('I found my box, lucky 1313.'),
                     situations.Text('What a lovely number.'),
                 ],
@@ -235,6 +235,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                                     'of headlight glare.'),
                     situations.Choice(location='intro::i-quietly-cursed-the-light-wishing-for-the-dark'),
                     situations.Choice(location='intro::i-quietly-gave-thanks-for-the-light'),
+                    situations.GetChoice(),
                 ],
             ),
             'intro::i-quietly-cursed-the-light-wishing-for-the-dark': situations.Situation(

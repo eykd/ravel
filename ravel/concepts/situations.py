@@ -26,6 +26,10 @@ class Situation(BaseSituation):
         return super().__new__(cls, intro, directives)
 
 
+class GetChoice(namedtuple('GetChoice', ())):
+    __slots__ = ()
+
+
 class Text(BaseText):
     __slots__ = ()
 
@@ -110,13 +114,19 @@ def compile_directives(concept, parent_rule, raw_directives):
         intro, first_text = IntroTextParser().parse(intro.text)
     except AttributeError:
         raise exceptions.ParseError("No intro text found:\n%r" % intro)
+    directives = []
+    subsituations = []
     if the_rest:
-        directives, subsituations = zip(*(
-            compile_directive(concept, parent_rule, d) for d in the_rest)
-        )
-    else:
-        directives = []
-        subsituations = {}
+        last_directive = None
+        for item in the_rest:
+            directive, situations = compile_directive(concept, parent_rule, item)
+            if isinstance(last_directive, Choice) and not isinstance(directive, Choice):
+                directives.append(GetChoice())
+            directives.append(directive)
+            subsituations.append(situations)
+            last_directive = directive
+        if isinstance(last_directive, Choice):
+            directives.append(GetChoice())
     return intro, list(it.chain([first_text], directives)), subsituations
 
 
