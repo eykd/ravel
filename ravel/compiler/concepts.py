@@ -1,4 +1,4 @@
-from ..utils.strings import get_text
+from ravel.utils.strings import get_text
 
 
 _HANDLERS = {}
@@ -30,3 +30,9 @@ def get_handler_for(concept):
     """Return a handler for the given concept.
     """
     return _HANDLERS.get(concept, _dummy_handler)
+
+
+def compile_baggage(concept, rule_name, baggage_data):
+    """Compile the given baggage using a registered concept handler.
+    """
+    return get_handler_for(concept)(concept, rule_name, baggage_data)

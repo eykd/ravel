@@ -6,7 +6,8 @@ import textwrap
 
 import ensure
 
-from ravel import yamlish as ish
+from ravel import exceptions
+from ravel.compiler import yamlish as ish
 from ravel.utils.strings import get_text_source
 
 ensure.unittest_case.maxDiff = None
@@ -345,5 +346,5 @@ class YamlParserTests(TestCase):
         """)
         (ensure(self.parser.parse)
          .called_with(bad_yamlish)
-         .raises(ish.OutOfContextNodeError)
+         .raises(exceptions.OutOfContextNodeError)
          )

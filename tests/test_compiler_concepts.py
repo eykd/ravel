@@ -1,7 +1,7 @@
 from unittest import TestCase
 from ensure import ensure
 
-from ravel import concepts
+from ravel.compiler import concepts
 
 
 class TestGetHandlerFor(TestCase):

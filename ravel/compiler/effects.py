@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
-from copy import deepcopy
-from functools import wraps
-import logging
+from ravel import parsers
+from ravel.utils.strings import get_text
 
-from .operations import OperationParser
-
-logger = logging.getLogger('effects')
+from . import logger
 
 
 def compile_effect(concept, parent_rule, effect):
     logger.debug('Compiling effect for %s:%s:\n%r', concept, parent_rule, effect)
-    return OperationParser().parse(effect)
+    return parsers.OperationParser().parse(get_text(effect)), {}
 
 
 def compile_effects(concept, parent_rule, raw_effects):

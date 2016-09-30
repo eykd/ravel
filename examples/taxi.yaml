@@ -8,8 +8,12 @@ intro:
     - The post office was closed[.], but I let myself in to the PO box room.
     - The fluorescent glare hurt my eyes after the evening of headlight
       glare.
-      - choice:
-          - I quietly cursed the light, wishing for the dark.
-      - choice: I quietly gave thanks for the light.
-  - I found my box, lucky 1313.
-  - text: What a lovely number.
+    - choice:
+        - I quietly cursed the light, wishing for the dark.
+        - effect: Dark += 1
+    - choice:
+        - I quietly gave thanks for the light.
+        - effect: Light += 1
+  - I found my box, lucky 1313. <>
+  - {Dark > 0} What a lovely number.
+  - {Light > 0} What a joke. The number mocked me.

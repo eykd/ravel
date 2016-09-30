@@ -11,8 +11,10 @@ setup(
     author_email = "david.eyk@gmail.com",
     modules = [PROJECT_NAME],
     install_requires = [
+        'attrs==16.2.0',
         'click==6.6',
-        'parsimonious==0.6.2',
+        'marshmallow==2.9.0',
+        'parsimonious==0.7.0',
         'pydash==3.4.1',
         'straight.plugin==1.4.1',
         'awesome-slugify==1.6.5',

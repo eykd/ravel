@@ -9,7 +9,9 @@ def query_predicates(query, predicates):
     matches = []
     qkeys = set()
     qvalue = None
-    for rkey, predicate in predicates:
+    for predicate in predicates:
+        rkey = predicate.name
+        predicate = predicate.predicate
         for qkey, qvalue in query:
             if qkey == rkey:
                 qkeys.add(qkey)
@@ -38,14 +40,13 @@ def query_predicates(query, predicates):
 
 def query_ruleset(q, rules):
     q = sorted(q)
-    locations = rules['locations']
-    for rname, predicates in rules['rules']:
-        logger.debug("Against rule %s: %r", rname, predicates)
-        if query_predicates(q, predicates):
-            logger.debug("Rule %s accepted", rname)
-            yield (len(predicates), random.random(), rname, locations[rname])
+    for rule in rules['rules']:
+        logger.debug("Against rule %r", rule)
+        if query_predicates(q, rule.predicates):
+            logger.debug("Rule %s accepted", rule.name)
+            yield (len(rule.predicates), random.random(), rule.name, query_by_name(rule.name, rules))
         else:
-            logger.debug("Rule %s rejected", rname)
+            logger.debug("Rule %s rejected", rule.name)
 
 
 def query(concept, q, rules, how_many=None):
@@ -61,3 +62,7 @@ def query(concept, q, rules, how_many=None):
 def query_top(concept, q, rules):
     for result in query(concept, q, rules=rules, how_many=1):
         return result
+
+
+def query_by_name(rname, rules):
+    return rules['locations'][rname]

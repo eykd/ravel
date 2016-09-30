@@ -3,9 +3,10 @@ import re
 from ..types import Source, Pos
 
 
-def get_text_source(text, substring, source_text=None):
+def get_text_source(text, substring, source_text=None, filename=''):
     match = re.search(substring, text)
     return Source(
+        filename = '',
         start = get_coords_of_str_index(text, match.start()),
         end = get_coords_of_str_index(text, match.end()),
         text = match.group() if source_text is None else source_text

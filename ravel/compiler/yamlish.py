@@ -2,10 +2,10 @@ from collections import OrderedDict
 
 from parsimonious import NodeVisitor, Grammar, VisitationError
 
-from .exceptions import OutOfContextNodeError
-from . import grammars
-from .types import Source
-from .utils.strings import get_coords_of_str_index, get_line
+from ravel.exceptions import OutOfContextNodeError
+from ravel import grammars
+from ravel.types import Source
+from ravel.utils.strings import get_coords_of_str_index, get_line
 
 
 class YamlNode:
@@ -27,7 +27,7 @@ class YamlNode:
     def _set_level(self, level):
         self._level = level
 
-    def as_data(self):
+    def as_data(self, filename=''):
         raise NotImplementedError()
 
     def get_tip(self):
@@ -65,9 +65,9 @@ class ContainerNode(YamlNode):
         if isinstance(self.value, YamlNode):
             self.value.level = level
 
-    def as_data(self):
+    def as_data(self, filename=''):
         if isinstance(self.value, YamlNode):
-            return self.value.as_data()
+            return self.value.as_data(filename)
         else:
             return self.value
 
@@ -168,8 +168,8 @@ class List(ParentNode):
             isinstance(node, ListItem)
         )
 
-    def as_data(self):
-        return [c.as_data() for c in self.children]
+    def as_data(self, filename=''):
+        return [c.as_data(filename) for c in self.children]
 
 
 class ListItem(ContainerNode):
@@ -184,8 +184,11 @@ class Mapping(ParentNode):
             isinstance(node, KeyValue)
         )
 
-    def as_data(self):
-        return OrderedDict([(c.key.as_data(), c.as_data()) for c in self.children])
+    def as_data(self, filename=''):
+        return OrderedDict([
+            (c.key.as_data(filename), c.as_data(filename))
+            for c in self.children
+        ])
 
 
 class KeyValue(ContainerNode):
@@ -199,12 +202,17 @@ class LeafNode(YamlNode):
         self.value = [(pnode, value)] if value is not None else []
         super().__init__(pnode, **kwargs)
 
-    def as_data(self):
+    def as_data(self, filename=''):
         start_pnode = self.value[0][0]
         end_pnode = self.value[-1][0]
         start = get_coords_of_str_index(start_pnode.full_text, start_pnode.start)
         end = get_coords_of_str_index(end_pnode.full_text, end_pnode.end)
-        return Source(start, end, ' '.join([v[1] for v in self.value]))
+        return Source(
+            filename = filename,
+            start = start,
+            end = end,
+            text = ' '.join([v[1] for v in self.value]),
+        )
 
     def can_add_node(self, node):
         return (
@@ -295,5 +303,5 @@ class YamlParser(NodeVisitor):
                 raise
 
 
-def parse(*args, **kwargs):
-    return YamlParser().parse(*args, **kwargs)
+def parse(source, filename=''):
+    return YamlParser().parse(source).as_data(filename)
