@@ -3,12 +3,12 @@ import operator as op
 import attr
 
 
-@attr.s
+@attr.s(slots=True)
 class Choice:
     choice = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Comparison:
     quality = attr.ib()
     comparison = attr.ib()
@@ -35,30 +35,30 @@ class Comparison:
         return "(%r %s %r)" % (self.quality, self.comparison, self.expression)
 
 
-@attr.s
+@attr.s(slots=True)
 class Constraint:
     kind = attr.ib()
     value = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Effect:
     operation = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Expression:
     term1 = attr.ib()
     operator = attr.ib()
     term2 = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class GetChoice:
     pass
 
 
-@attr.s
+@attr.s(slots=True)
 class Operation:
     quality = attr.ib()
     operation = attr.ib()
@@ -66,38 +66,40 @@ class Operation:
     constraint = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Pos:
     index = attr.ib()
     line = attr.ib()
     column = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Predicate:
     name = attr.ib()
     predicate = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Situation:
     intro = attr.ib()
     directives = attr.ib()
 
 
-@attr.s
+@attr.s(slots=True)
 class Source:
+    filename = attr.ib()
     start = attr.ib()
     end = attr.ib()
     text = attr.ib()
 
     def __repr__(self):
-        return 'Line %s, Column %s (index %s): %r' % (
+        return '%sLine %s, Column %s (index %s): %r' % (
+            '%s, ' % self.filename if self.filename else '',
             self.start.line, self.start.column, self.start.index, self.text
         )
 
 
-@attr.s
+@attr.s(slots=True)
 class Text:
     text = attr.ib()
     sticky = attr.ib(default=False)
@@ -107,12 +109,12 @@ class Text:
         return self.text
 
 
-@attr.s
+@attr.s(slots=True)
 class VALUE:
     pass
 
 
-@attr.s
+@attr.s(slots=True)
 class Rule:
     name = attr.ib()
     predicates = attr.ib()
