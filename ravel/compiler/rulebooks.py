@@ -12,7 +12,7 @@ from . import situations  # noqa
 from .rulesets import compile_ruleset
 
 
-def compile_rulebook(rulebook):
+def compile_rulebook(rulebook, prefix=''):
     """Compile a rulebook declaration
     """
     rules = defaultdict(lambda: {'rules': [], 'locations': {}})
@@ -50,7 +50,7 @@ def compile_rulebook(rulebook):
             ruleset = data[1]
             baggage_data = data[2:]
 
-        rule_name = get_text(rule_name)
+        rule_name = prefix + get_text(rule_name)
         concept = get_text(concept)
         _, ruleset_predicates = list(list(ruleset.items())[0])
         assert get_text(_) == 'when', _

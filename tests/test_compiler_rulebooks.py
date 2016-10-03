@@ -30,6 +30,18 @@ class CompileRulebookTests(TestCase):
         ensure(result['rulebook']).has_length(1)
         ensure(result['rulebook']).contains('Situation')
 
+    def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(self):
+        rulebook_yamlish = textwrap.dedent("""
+            intro:
+              - when:
+                - Intro == 0
+
+              - Some intro text.
+        """)
+        prefix = 'prefix-'
+        result = compile_rulebook(yamlish.parse(rulebook_yamlish), prefix)
+        ensure(result['rulebook']['Situation']['locations']).contains('prefix-intro')
+
     def test_it_should_fail_to_compile_an_unknown_directive(self):
         bad_rulebook_yamlish = textwrap.dedent("""
             intro:
