@@ -3,6 +3,7 @@ import ensure
 
 import textwrap
 
+from ravel import environments
 from ravel import queries
 from ravel import types
 
@@ -65,7 +66,8 @@ class QueryPredicatesTest(TestCase):
 class QueryTopTest(TestCase):
     def setUp(self):
         rulebook = yamlish.YamlParser().parse(TEST_RULES).as_data()
-        self.rules = compile_rulebook(rulebook)['rulebook']
+        env = environments.Environment()
+        self.rules = compile_rulebook(env, rulebook)['rulebook']
 
     def test_it_should_query_a_rules_database_and_reject_mismatched_rules(self):
         result = queries.query_top('onTest', [('foo', 'bar')], rules=self.rules)

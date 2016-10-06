@@ -5,7 +5,7 @@ from ravel import types
 from ravel.utils.strings import get_text
 
 
-def compile_predicate(target):
+def compile_predicate(environment, target):
     try:
         comparison = parsers.ComparisonParser().parse(get_text(target))
     except (exceptions.ParseError, exceptions.ParsimoniousParseError, exceptions.VisitationError):

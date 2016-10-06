@@ -20,7 +20,7 @@ def handler(concept):
     return register_handler
 
 
-def _dummy_handler(concept, rule_name, baggage):
+def _dummy_handler(environment, concept, rule_name, baggage):
     """Return the baggage as-is.
     """
     return {rule_name: [get_text(b) for b in baggage]}
@@ -32,7 +32,7 @@ def get_handler_for(concept):
     return _HANDLERS.get(concept, _dummy_handler)
 
 
-def compile_baggage(concept, rule_name, baggage_data):
+def compile_baggage(environment, concept, rule_name, baggage_data):
     """Compile the given baggage using a registered concept handler.
     """
-    return get_handler_for(concept)(concept, rule_name, baggage_data)
+    return get_handler_for(concept)(environment, concept, rule_name, baggage_data)

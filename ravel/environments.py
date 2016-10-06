@@ -12,8 +12,10 @@ from ravel.utils.data import merge_dicts
 
 @attr.s
 class Environment:
-    loader = attr.ib(attr.Factory(lambda: loaders.FileSystemLoader('.')))
-    cache = attr.ib(attr.Factory(dict))
+    loader = attr.ib(default=attr.Factory(lambda: loaders.FileSystemLoader()))
+    location_separator = attr.ib(default='::')
+
+    cache = attr.ib(default=attr.Factory(dict))
 
     def get_rulebook(self, name):
         loaded_rulebooks = OrderedDict()
@@ -22,7 +24,7 @@ class Environment:
         while names_to_load:
             name = names_to_load.popleft()
             if name not in loaded_rulebooks:
-                rulebook = rulebooks[name] = self.load_rulebook(name)
+                rulebook = loaded_rulebooks[name] = self.load_rulebook(name)
                 names_to_load.extend([
                     include_name for include_name in rulebook['includes']
                     if include_name not in loaded_rulebooks
@@ -47,9 +49,10 @@ class Environment:
             self.cache[name] = rulebook
         return rulebook
 
-    def compile_rulebook(self, source, filename='', is_up_to_date=lambda: True):
-        data = yamlish.parse(source, filename)
+    def compile_rulebook(self, source, name='', is_up_to_date=lambda: True):
+        data = yamlish.parse(source, name)
 
-        rulebook = rulebooks.compile_rulebook(data)
+        prefix = name + self.location_separator if name else ''
+        rulebook = rulebooks.compile_rulebook(self, data, prefix)
         rulebook['is_up_to_date'] = is_up_to_date
         return rulebook

@@ -2,6 +2,7 @@ from unittest import TestCase
 
 import textwrap
 
+from ravel import environments
 from ravel import exceptions
 from ravel import types
 
@@ -13,8 +14,11 @@ from .helpers import ensure
 
 
 class CompileRulebookTests(TestCase):
+    def setUp(self):
+        self.env = environments.Environment()
+
     def test_it_should_compile_a_situation_rulebook(self):
-        compiled = compile_rulebook(yamlish.parse(TEST_RULEBOOK_YAMLISH))
+        compiled = compile_rulebook(self.env, yamlish.parse(TEST_RULEBOOK_YAMLISH))
         (ensure(compiled)
          .equals(EXPECTED_COMPILED_RULEBOOK))
 
@@ -26,7 +30,7 @@ class CompileRulebookTests(TestCase):
 
               - Some intro text.
         """)
-        result = compile_rulebook(yamlish.parse(rulebook_yamlish))
+        result = compile_rulebook(self.env, yamlish.parse(rulebook_yamlish))
         ensure(result['rulebook']).has_length(1)
         ensure(result['rulebook']).contains('Situation')
 
@@ -39,7 +43,7 @@ class CompileRulebookTests(TestCase):
               - Some intro text.
         """)
         prefix = 'prefix-'
-        result = compile_rulebook(yamlish.parse(rulebook_yamlish), prefix)
+        result = compile_rulebook(self.env, yamlish.parse(rulebook_yamlish), prefix)
         ensure(result['rulebook']['Situation']['locations']).contains('prefix-intro')
 
     def test_it_should_fail_to_compile_an_unknown_directive(self):
@@ -53,7 +57,7 @@ class CompileRulebookTests(TestCase):
               - foo: bar
         """)
         (ensure(compile_rulebook)
-         .called_with(yamlish.parse(bad_rulebook_yamlish))
+         .called_with(self.env, yamlish.parse(bad_rulebook_yamlish))
          .raises(exceptions.ParseError))
 
     def test_it_should_fail_to_compile_a_multipronged_directive(self):
@@ -70,7 +74,7 @@ class CompileRulebookTests(TestCase):
                 text: This shouldn't be!
         """)
         (ensure(compile_rulebook)
-         .called_with(yamlish.parse(bad_rulebook_yamlish))
+         .called_with(self.env, yamlish.parse(bad_rulebook_yamlish))
          .raises(exceptions.ParseError))
 
     def test_it_should_fail_to_compile_with_missing_intro_text(self):
@@ -86,7 +90,7 @@ class CompileRulebookTests(TestCase):
             ]
         }
         (ensure(compile_rulebook)
-         .called_with(bad_rulebook)
+         .called_with(self.env, bad_rulebook)
          .raises(exceptions.ParseError))
 
 TEST_RULEBOOK_YAMLISH = textwrap.dedent("""

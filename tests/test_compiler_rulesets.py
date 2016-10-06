@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+from ravel import environments
 from ravel import types
 
 from ravel.compiler.rulesets import compile_ruleset
@@ -8,8 +9,12 @@ from .helpers import source, ensure
 
 
 class TestCompileRuleset(TestCase):
+    def setUp(self):
+        self.env = environments.Environment()
+
     def test_it_should_compile_predicates_in_a_list_ruleset(self):
         result = compile_ruleset(
+            self.env,
             'test-concept',
             'test-rule',
             [

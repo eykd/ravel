@@ -1,6 +1,7 @@
 from unittest import TestCase
 from ensure import ensure
 
+from ravel import environments
 from ravel.compiler import concepts
 
 
@@ -30,4 +31,5 @@ class Test_DummyHandler(TestCase):
         rule_name = 'foo'
         value = ['bar']
         (ensure(concepts._dummy_handler)
-         .called_with('concept', rule_name, value).equals({rule_name: value}))
+         .called_with(environments.Environment(), 'concept', rule_name, value)
+         .equals({rule_name: value}))

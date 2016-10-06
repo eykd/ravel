@@ -1,4 +1,4 @@
-from collections import defaultdict, Mapping
+from collections import defaultdict, Mapping, Sequence
 import itertools as it
 
 from ravel import exceptions
@@ -7,17 +7,19 @@ from ravel import types
 from ravel.utils.strings import get_text
 
 from . import concepts
+from . import effects
 from . import situations  # noqa
 
 from .rulesets import compile_ruleset
 
 
-def compile_rulebook(rulebook, prefix=''):
+def compile_rulebook(environment, rulebook, prefix=''):
     """Compile a rulebook declaration
     """
     rules = defaultdict(lambda: {'rules': [], 'locations': {}})
 
     includes = []
+    givens = []
     common_predicates = []
 
     rule = None
@@ -34,7 +36,15 @@ def compile_rulebook(rulebook, prefix=''):
             if key_name == 'when':
                 common_predicates.extend(rule[1])
             elif key_name == 'include':
-                includes.extend(get_text(rule[1]))
+                if isinstance(rule[1], Sequence):
+                    includes.extend([get_text(inc) for inc in rule[1]])
+                else:
+                    includes.append(get_text(rule[1]))
+            elif key_name == 'given':
+                if isinstance(rule[1], Sequence):
+                    givens.extend(effects.compile_effects(environment, '', '', rule[1]))
+                else:
+                    givens.append(effects.compile_effect(environment, '', '', rule[1]))
             else:
                 # Found the baggage. Put the rule back into the iterator.
                 rulesets = it.chain([rule], rulesets)
@@ -59,6 +69,7 @@ def compile_rulebook(rulebook, prefix=''):
             types.Rule(
                 rule_name,
                 compile_ruleset(
+                    environment,
                     concept,
                     rule_name,
                     common_predicates + ruleset_predicates
@@ -66,7 +77,7 @@ def compile_rulebook(rulebook, prefix=''):
             )
         )
         rules[concept]['locations'].update(
-            concepts.compile_baggage(concept, rule_name, baggage_data)
+            concepts.compile_baggage(environment, concept, rule_name, baggage_data)
         )
 
     for ruleset in rules.values():
