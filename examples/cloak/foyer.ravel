@@ -1,0 +1,43 @@
+include:
+  - cloakroom
+  - bar-dark
+  - bar-light
+
+when:
+  - Foyer == 1
+
+
+foyer:
+
+  - You stand in a spacious hall[.], splendidly decorated in red and gold, with
+    glittering chandeliers overhead. The hall, that is. The hall is splendidly
+    decorated.
+
+  - {"Wearing Cloak" >= 1}Your cloak drips readily on the thick red carpet.
+
+
+outside:
+
+  - Outside, the rain pours down, and lightning flashes.[] Better stay inside.
+
+
+cloakroom:
+
+  - [A cloak room lies just off the main hall.]
+  - {"Wearing Cloak" >= 1}Dripping from the rain, you enter the cloak room.
+  - {"Wearing Cloak" == 0}You enter the cloak room.
+
+  - effect:
+    - Foyer = 0
+    - Cloakroom = 1
+
+
+bar:
+
+  - [A little further down the hall, a neon sign advertises the bar.]
+  - {"Wearing Cloak" >= 1}Dripping from the rain, you wander over to the bar.
+  - {"Wearing Cloak" == 0}You wander over to the bar.
+
+  - effect:
+    - Foyer = 0
+    - Bar = 1

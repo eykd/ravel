@@ -1,4 +1,0 @@
-nose
-green
-ensure
-coverage

@@ -1,0 +1,10 @@
+include:
+  - rooms
+  - actions
+
+intro:
+  - Situation
+  - when:
+    - Intro == 1
+
+  - Test!

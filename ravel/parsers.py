@@ -26,6 +26,9 @@ class BaseExpressionParser(BaseParser):
     def visit_quoted_quality(self, node, children):
         return node.text[1:-1]
 
+    def visit_bracketed_quality(self, node, children):
+        return node.text[1:-1]
+
     def visit_float(self, node, children):
         return float(node.text)
 

@@ -1,0 +1,27 @@
+include:
+  - foyer
+
+given:
+  - Intro = 1
+  - "Wearing Cloak" = 1
+
+when:
+  - Intro = 1
+
+intro:
+
+  - Hurrying through the rainswept November night[…], you're glad to see the bright
+    lights of the Opera House. It's surprising that there aren't more people about
+    but, hey, what do you expect in a cheap demo game…?
+
+  - {"Wearing Cloak" == 0}The rain drenches you. Boy, you sure do wish you'd
+    worn your opera cloak.
+
+  - choice:
+
+    - [Press onward!]You press onward, until you reach the double doors and let
+      yourself in.
+
+    - effect: Intro = 0
+
+    - effect: Foyer = 1

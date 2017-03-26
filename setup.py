@@ -11,13 +11,16 @@ setup(
     author_email = "david.eyk@gmail.com",
     modules = [PROJECT_NAME],
     install_requires = [
-        'attrs==16.2.0',
-        'click==6.6',
-        'marshmallow==2.9.0',
-        'parsimonious==0.7.0',
-        'pydash==3.4.1',
-        'straight.plugin==1.4.1',
-        'awesome-slugify==1.6.5',
+        'attrs<16.4',
+        'awesome-slugify<1.7',
+        'blinker<1.5',
+        'click<6.7',
+        'marshmallow<2.10',
+        'parsimonious<0.8',
+        'path.py<10.2',
+        'pydash<3.5',
+        'straight.plugin<1.5',
+        'syml<0.3'
     ],
     entry_points = dict(
         console_scripts = [

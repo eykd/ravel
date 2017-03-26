@@ -1,0 +1,15 @@
+foyer:
+  - when:
+    - Foyer == 1
+
+  - You are standing in a spacious hall[.], splendidly decorated in red and
+    gold, with glittering chandeliers overhead.
+
+  - choice:
+    - Outside, the rain pours down, and lightning flashes.[] Better stay inside.
+
+  - choice:
+
+    - [A cloak room lies just off the main hall.]The walls of this small room
+      were clearly once lined with hooks, though now only one remains. The exit
+      is a door to the east.

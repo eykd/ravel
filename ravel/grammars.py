@@ -1,9 +1,10 @@
 import textwrap
 
 base_expression_grammar = textwrap.dedent(r"""
-    quality               = quoted_quality / simple_quality
+    quality               = bracketed_quality / quoted_quality / simple_quality
     quoted_quality        = ~'"[^"]+"'
     simple_quality        = ~'[^\s]+'
+    bracketed_quality     = ~'\[[^\]]+\]'
 
     expression            = additive
     additive              = (multiplicative ws? (add / subtract) ws? additive)
@@ -44,12 +45,12 @@ base_expression_grammar = textwrap.dedent(r"""
     lte                   = "<="
     lt                    = "<"
     ne                    = "!="
-    eq                    = "=="
+    eq                    = "==" / "="
 
     ws                    = ~"\s+"
     end                   = ~"\s*$"
 
-    value                 = number / string / qvalue
+    value                 = number / string / qvalue / bracketed_quality
 
     qvalue                = "value"
 
@@ -90,7 +91,7 @@ intro_text_grammar = textwrap.dedent(r"""
 
 
 plain_text_grammar = textwrap.dedent(r"""
-    line        = cmp_prefix? text glue? eol
+    line        = cmp_prefix? text glue?
 
     text        = ~"(?:(?!<>).)*"
     glue        = "<>"
@@ -98,26 +99,3 @@ plain_text_grammar = textwrap.dedent(r"""
 
     cmp_prefix  = "{" comparison "}"
 """) + comparison_grammar
-
-
-yamlish_grammar = textwrap.dedent(r"""
-    lines       = line*
-    line        = indent (comment / list_item / key_value / section / blank / text) &eol
-
-    indent      = ~"\s*"
-
-    blank       = &eol
-    comment     = ~"(#|//+)+" text?
-
-    list_item   = "-" ws value
-
-    key_value   = key ":" ws value
-    section     = key ":"
-    key         = ~"[^\s:]+"
-
-    value       = list_item / key_value / section / text
-
-    eol         = "\n" / ~"$"
-    ws          = ~"[ \t]+"
-    text        = ~".+"
-""")

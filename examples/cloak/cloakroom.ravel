@@ -1,0 +1,74 @@
+include:
+  - foyer
+
+when:
+  - Cloakroom >= 1
+
+
+look:
+
+  - [The cloak room is small.]The walls of this small room were clearly once
+    lined with hooks, though now only one remains.
+
+  - {"Wearing Cloak" == 0}Your velvet cloak hangs from that single hook,
+    dripping on the carpet.
+
+  - effect: Cloakroom += 1
+
+
+the-hook:
+
+  - when:
+    - Cloakroom >= 2
+    - "Wearing Cloak" = 1
+
+  - There's a brass hook on the wall.[] Useful for hanging things on it.
+
+  - {"Wearing Cloak" == 0}Your velvet cloak hangs from that single hook,
+    dripping on the carpet.
+
+  - effect: Cloakroom += 1
+
+
+hang-up-cloak:
+
+  - when:
+    - Cloakroom >= 3
+    - "Wearing Cloak" >= 1
+
+  - [Hang up your cloak.]You hang the dripping velvet cloak on the small brass
+    hook.
+
+  - effect: "Wearing Cloak" = 0
+
+
+put-on-cloak:
+
+  - when:
+    - Cloakroom >= 2
+    - "Wearing Cloak" == 0
+
+  - [Put on your cloak.]You take the dripping velvet cloak from the small brass
+    hook and put it on.
+
+  - effect: "Wearing Cloak" = 1
+
+
+look-at-cloak:
+
+  - when:
+    - "Wearing Cloak" == 0
+
+  - Your cloak hangs from a brass hook.[] A handsome cloak, of velvet trimmed
+    with satin, and slightly spattered with raindrops. Its blackness is so deep
+    that it almost seems to suck light from the room.
+
+
+
+leave:
+
+  - [The warm glow of the Foyer beckons you out.]You leave the cloakroom.
+
+  - effect:
+    - Cloakroom = 0
+    - Foyer = 1

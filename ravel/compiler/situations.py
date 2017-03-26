@@ -1,4 +1,3 @@
-from ravel import parsers
 from ravel import types
 
 from ravel.utils.data import merge_dicts

@@ -3,10 +3,13 @@ import sys
 
 import click
 
-from ravel import rules
+from ravel import environments
+from ravel import loaders
 from ravel import queries
-from ravel import yamlish
-from ravel.concepts import situations
+from ravel import types
+
+from ravel.vm import machines
+from ravel.vm import runners
 
 
 class Config:
@@ -19,53 +22,22 @@ pass_config = click.make_pass_decorator(Config, ensure=True)
 
 @click.group()
 @click.option('--verbose', is_flag=True, default=False)
+@click.option('--debug', is_flag=True, default=False)
 @pass_config
-def main(config, verbose):
+def main(config, verbose, debug):
     config.verbose = verbose
+    config.debug = debug
+    if verbose or debug:
+        logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
+    else:
+        logging.basicConfig(level=logging.WARNING)
 
 
 @main.command()
-@click.argument('story', type=click.File('r'))
+@click.argument('directory', type=click.STRING)
 @pass_config
-def run(config, story):
-    """Run the indicated storyfile.
+def run(config, directory):
+    """Run the indicated story.
     """
-    import ipdb; ipdb.set_trace()
-    state = {}
-    try:
-        rulebook = rules.compile_rulebook(yamlish.parse(story.read()).as_data())
-    except:
-        logging.exception('Something bad happened while compiling the rulebook...')
-        import ipdb
-        ipdb.post_mortem()
-        sys.exit(1)
-    else:
-        situation = queries.query_top('Situation', state, rulebook)
-        _display_situation(state, situation, rulebook)
-
-
-def _display_situation(state, situation, rulebook):
-    choices = []
-    for directive in situation.directives:
-        if isinstance(directive, situations.Text):
-            click.echo(directive.text)
-        elif isinstance(directive, situations.Choice):
-            target = queries.query_by_name(directive.location, rulebook['Situation'])
-            choices.append(target)
-            click.echo('%s: %s' % (len(choices), target.intro.text))
-        elif isinstance(directive, situations.GetChoice):
-            while True:
-                click.echo('? ', nl=False)
-                c = click.getchar()
-                click.echo(c)
-                try:
-                    choice = int(c) - 1
-                except ValueError:
-                    if c.lower() == 'q':
-                        sys.exit()
-                    pass
-                else:
-                    if 0 <= choice < len(choices):
-                        click.echo()
-                        _display_situation(state, choices[choice], rulebook)
-                        break
+    runner = runners.ConsoleRunner(directory)
+    runner.run()

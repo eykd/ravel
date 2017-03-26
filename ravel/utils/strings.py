@@ -1,16 +1,7 @@
-import re
+from syml.utils import get_text_source  # noqa
 
-from ..types import Source, Pos
-
-
-def get_text_source(text, substring, source_text=None, filename=''):
-    match = re.search(substring, text)
-    return Source(
-        filename = '',
-        start = get_coords_of_str_index(text, match.start()),
-        end = get_coords_of_str_index(text, match.end()),
-        text = match.group() if source_text is None else source_text
-    )
+from .. import exceptions
+from ..types import Pos
 
 
 def get_coords_of_str_index(s, index):
@@ -34,11 +25,17 @@ def get_line(s, line_number):
         return ''
 
 
+def is_text(text_or_source):
+    return hasattr(text_or_source, 'text') or isinstance(text_or_source, str)
+
+
 def get_text(text_or_source):
-    if isinstance(text_or_source, Source):
-        return text_or_source.text
-    else:
+    if hasattr(text_or_source, 'text'):
+        return str(text_or_source.text)
+    elif isinstance(text_or_source, str):
         return text_or_source
+    else:
+        raise exceptions.ParseError("No text found, instead: %r" % text_or_source)
 
 
 def strip_outer_whitespace(text):
@@ -55,3 +52,9 @@ def strip_outer_whitespace(text):
     except IndexError:
         i -= 1
     return '\n'.join(lines[i:])
+
+
+def unwrap(text):
+    """Unwrap a hard-wrapped paragraph of text.
+    """
+    return ' '.join(text.splitlines())

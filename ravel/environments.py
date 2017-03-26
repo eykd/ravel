@@ -1,34 +1,40 @@
 from collections import OrderedDict, deque, defaultdict
 
 import attr
+import syml
 
 from ravel import loaders
 
 from ravel.compiler import rulebooks
-from ravel.compiler import yamlish
-
-from ravel.utils.data import merge_dicts
 
 
 @attr.s
 class Environment:
     loader = attr.ib(default=attr.Factory(lambda: loaders.FileSystemLoader()))
     location_separator = attr.ib(default='::')
+    initializing_name = attr.ib(default='begin')
 
     cache = attr.ib(default=attr.Factory(dict))
 
-    def get_rulebook(self, name):
+    def load(self):
+        return self.load_rulebook(self.initializing_name)
+
+    def load_rulebook(self, name):
         loaded_rulebooks = OrderedDict()
         names_to_load = deque([name])
+        metadata = {}
+        givens = []
 
         while names_to_load:
             name = names_to_load.popleft()
             if name not in loaded_rulebooks:
-                rulebook = loaded_rulebooks[name] = self.load_rulebook(name)
+                rulebook = loaded_rulebooks[name] = self.get_rulebook(name)
                 names_to_load.extend([
                     include_name for include_name in rulebook['includes']
                     if include_name not in loaded_rulebooks
                 ])
+                metadata.update(rulebook['metadata'])
+                givens.extend(rulebook['givens'])
 
         master_rulebook = defaultdict(lambda: {'rules': [], 'locations': {}})
         for rulebook in loaded_rulebooks.values():
@@ -40,17 +46,25 @@ class Environment:
         for ruleset in master_rulebook.values():
             ruleset['rules'].sort()
 
-        return dict(master_rulebook)
+        return {
+            'metadata': metadata,
+            'rulebook': dict(master_rulebook),
+            'givens': givens,
+        }
 
-    def load_rulebook(self, name):
+    def get_rulebook(self, name):
         rulebook = self.cache.get(name)
         if rulebook is None or not rulebook['is_up_to_date']():
             rulebook = self.loader.load(self, name)
             self.cache[name] = rulebook
         return rulebook
 
-    def compile_rulebook(self, source, name='', is_up_to_date=lambda: True):
-        data = yamlish.parse(source, name)
+    @staticmethod
+    def default_is_up_to_date():
+        return True
+
+    def compile_rulebook(self, source, name='', is_up_to_date=default_is_up_to_date):
+        data = syml.loads(source, filename=name)
 
         prefix = name + self.location_separator if name else ''
         rulebook = rulebooks.compile_rulebook(self, data, prefix)

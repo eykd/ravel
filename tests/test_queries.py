@@ -1,19 +1,16 @@
 from unittest import TestCase
-import ensure
 
 import textwrap
+
+import syml
 
 from ravel import environments
 from ravel import queries
 from ravel import types
 
-from ravel.compiler import yamlish
-
 from ravel.compiler.rulebooks import compile_rulebook
 
-ensure.unittest_case.maxDiff = None
-
-ensure = ensure.ensure
+from .helpers import ensure
 
 
 class QueryPredicatesTest(TestCase):
@@ -65,17 +62,17 @@ class QueryPredicatesTest(TestCase):
 
 class QueryTopTest(TestCase):
     def setUp(self):
-        rulebook = yamlish.YamlParser().parse(TEST_RULES).as_data()
+        rulebook = syml.loads(TEST_RULES)
         env = environments.Environment()
         self.rules = compile_rulebook(env, rulebook)['rulebook']
 
     def test_it_should_query_a_rules_database_and_reject_mismatched_rules(self):
         result = queries.query_top('onTest', [('foo', 'bar')], rules=self.rules)
-        ensure(result).equals(['baz'])
+        ensure(result).equals(('foo-bar', ['baz']))
 
     def test_it_should_query_a_rules_database_and_return_the_higher_scoring_rule(self):
         result = queries.query_top('onTest', [('foo', 'bar'), ('blah', 'boo')], rules=self.rules)
-        ensure(result).equals(['blah'])
+        ensure(result).equals(('foo-bar-blah-boo', ['blah']))
 
     def test_it_should_query_a_rules_database_and_return_None_for_no_matches(self):
         result = queries.query_top('onTest', [('foo', 'blah')], rules=self.rules)
@@ -85,14 +82,13 @@ class QueryTopTest(TestCase):
 TEST_RULES = textwrap.dedent("""
     foo-bar:
         - onTest
-        - when:
-            - foo == "bar"
+        - when: foo == "bar"
         - baz
 
     foo-bar-blah-boo:
         - onTest
         - when:
-            - foo == "bar"
-            - blah == "boo"
+            - foo = "bar"
+            - blah = "boo"
         - blah
 """)

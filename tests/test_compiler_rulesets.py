@@ -29,7 +29,7 @@ class TestCompileRuleset(TestCase):
                 name = 'bar',
                 predicate = types.Comparison(
                     quality = 'bar',
-                    comparison = '<',
+                    comparator = '<',
                     expression = 5
                 )
             ),
@@ -37,7 +37,7 @@ class TestCompileRuleset(TestCase):
                 name = 'blah',
                 predicate = types.Comparison(
                     quality = 'blah',
-                    comparison = '==',
+                    comparator = '==',
                     expression = 'boo'
                 )
             ),
@@ -45,7 +45,7 @@ class TestCompileRuleset(TestCase):
                 name = 'foo',
                 predicate = types.Comparison(
                     quality = 'foo',
-                    comparison = '==',
+                    comparator = '==',
                     expression = 9
                 )
             ),

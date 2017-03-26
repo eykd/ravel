@@ -1,4 +1,3 @@
-import collections
 import logging
 import random
 
@@ -56,12 +55,12 @@ def query(concept, q, rules, how_many=None):
     )
     for score, rfactor, rname, result in accepted_rules[:how_many]:
         logger.debug("Query result: (rule %s with score of %s) %r", rname, score, result)
-        yield result
+        yield rname, result
 
 
 def query_top(concept, q, rules):
-    for result in query(concept, q, rules=rules, how_many=1):
-        return result
+    for rname, result in query(concept, q, rules=rules, how_many=1):
+        return rname, result
 
 
 def query_by_name(rname, rules):

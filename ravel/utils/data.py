@@ -9,3 +9,7 @@ def merge_dicts(*dicts):
     for d in dicts:
         result.update(d)
     return result
+
+
+def evaluate_term(term, **kwargs):
+    return term.evaluate(**kwargs) if hasattr(term, 'evaluate') else term
