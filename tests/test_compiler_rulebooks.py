@@ -1,5 +1,4 @@
 from unittest import TestCase
-
 import textwrap
 
 import syml
@@ -242,6 +241,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                             sticky = False,
                             predicate = None,
                         ),
+                        types.BeginChoices(),
                         types.Choice(
                             choice = 'intro::the-post-office-was-closed',
                         ),
@@ -291,6 +291,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                             sticky = False,
                             predicate = None,
                         ),
+                        types.BeginChoices(),
                         types.Choice(
                             choice = 'intro::i-quietly-cursed-the-light-wishing-for-the-dark',
                         ),
