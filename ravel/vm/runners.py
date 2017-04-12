@@ -90,7 +90,7 @@ class ConsoleRunner:
                     self.emit_text("I'm sorry, what?")
 
             self.choices.clear()
-            self.emit_text('\n')
+            self.emit_text('')
             send_input(choice)
 
         return wait_for_input
