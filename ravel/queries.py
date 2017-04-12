@@ -43,7 +43,7 @@ def query_ruleset(q, rules):
         logger.debug("Against rule %r", rule)
         if query_predicates(q, rule.predicates):
             logger.debug("Rule %s accepted", rule.name)
-            yield (len(rule.predicates), random.random(), rule.name, query_by_name(rule.name, rules))
+            yield (len(rule.predicates), rule.name, query_by_name(rule.name, rules))
         else:
             logger.debug("Rule %s rejected", rule.name)
 
@@ -53,7 +53,7 @@ def query(concept, q, rules, how_many=None):
         query_ruleset(q, rules.get(concept, [])),
         reverse=True,
     )
-    for score, rfactor, rname, result in accepted_rules[:how_many]:
+    for score, rname, result in accepted_rules[:how_many]:
         logger.debug("Query result: (rule %s with score of %s) %r", rname, score, result)
         yield rname, result
 
