@@ -34,6 +34,7 @@ class Begin(State):
 class DisplayPossibleSituations(State):
     def query_and_display(self, vm):
         query = queries.query('Situation', vm.qualities.items(), vm.rulebook)
+        vm.send('begin_display_choices')
         for n, (location, situation) in enumerate(query):
             vm.send(
                 'display_choice',
@@ -42,6 +43,7 @@ class DisplayPossibleSituations(State):
                 text = get_text(situation.intro),
                 state = self,
             )
+        vm.send('end_display_choices')
         vm.send(
             'waiting_for_input',
             send_input = lambda choice: self.receive(vm, choice),
@@ -101,7 +103,11 @@ class DisplaySituation(State):
             state = self,
         )
 
+    def handle_beginchoices(self, vm, directive):
+        vm.send('begin_display_choices')
+
     def handle_getchoice(self, vm, directive):
+        vm.send('end_display_choices')
         vm.send(
             'waiting_for_input',
             send_input = lambda choice: self.receive(vm, choice),
