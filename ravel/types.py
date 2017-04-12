@@ -87,6 +87,11 @@ class Expression:
 
 
 @attr.s(slots=True)
+class BeginChoices:
+    pass
+
+
+@attr.s(slots=True)
 class GetChoice:
     pass
 

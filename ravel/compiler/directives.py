@@ -25,6 +25,8 @@ def compile_directives(environment, concept, parent_rule, raw_directives):
         last_directive = None
         for item in the_rest:
             for directive, situations in compile_directive(environment, concept, parent_rule, item):
+                if not isinstance(last_directive, types.Choice) and isinstance(directive, types.Choice):
+                    directives.append(types.BeginChoices())
                 if isinstance(last_directive, types.Choice) and not isinstance(directive, types.Choice):
                     directives.append(types.GetChoice())
                 directives.append(directive)
