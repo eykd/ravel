@@ -9,9 +9,9 @@ when:
 
 foyer:
 
-  - You stand in a spacious hall[.], splendidly decorated in red and gold, with
-    glittering chandeliers overhead. The hall, that is. The hall is splendidly
-    decorated.
+  - You stand in a spacious hall[.], with glittering chandeliers overhead,
+    splendidly decorated in red and gold. The hall, that is. The hall is
+    splendidly decorated.
 
   - {"Wearing Cloak" >= 1}Your cloak drips readily on the thick red carpet.
 
