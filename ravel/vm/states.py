@@ -125,4 +125,4 @@ class DisplaySituation(State):
 
     def receive(self, vm, location):
         situation = vm.get_situation(location)
-        vm.push(DisplaySituation(situation=situation))
+        vm.do_push(DisplaySituation(situation=situation))
