@@ -144,14 +144,14 @@ class Predicate:
 @attr.s(slots=True)
 class Situation:
     intro = attr.ib()
-    directives = attr.ib()
+    directives = attr.ib(repr=False)
 
 
 @attr.s(slots=True)
 class Text:
     text = attr.ib()
-    sticky = attr.ib(default=False)
-    predicate = attr.ib(default=None)
+    sticky = attr.ib(default=False, repr=False)
+    predicate = attr.ib(default=None, repr=False)
 
     def check(self, qualities, **kwargs):
         if self.predicate is None:
