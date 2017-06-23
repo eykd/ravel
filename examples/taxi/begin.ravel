@@ -1,0 +1,37 @@
+about:
+
+  title: Taxi
+
+  author: David Eyk
+
+
+include:
+  - mail
+
+given:
+  - Intro = 1
+
+when:
+  - Intro == 1
+
+intro:
+  - It was raining steadily by the time I dropped my last rider off[...]. I had
+    one last errand. I swung by the post office on my way home.
+
+  - choice:
+    - The post office was closed[.], but I let myself in to the PO box room.
+    - The fluorescent glare hurt my eyes after the evening of headlight
+      glare.
+    - choice:
+        - I quietly cursed the light, wishing for the dark.
+        - effect: Dark += 1
+    - choice:
+        - I quietly gave thanks for the light.[] I could at least relax.
+
+    - I found my box, lucky 1313. <>
+    - {Dark > 0}What a lovely number.
+    - {Dark == 0}What a joke. The number mocked me.
+    - effect: Intro = 0
+    - I opened the box, and looked inside.
+    - effect: "Looking at Mail" = 1
+

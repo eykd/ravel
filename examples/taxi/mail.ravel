@@ -1,0 +1,43 @@
+when:
+  - "Looking at Mail" == 1
+
+
+bills:
+  - As usual, a stack of bills[...] dominated the pile.
+
+  - choice: [Take the bills.]"Get in line," I said quietly.
+
+
+sister:
+
+  - [A letter from my sister...]I recognized my sister's flowery script immediately.
+
+  - choice:
+
+    - [Read the letter.]I tore open the envelope, unfolded the paper, and
+      scanned the letter.
+
+    - {Dark > 0}Uh-oh. She was coming. Probably already on her way.
+
+    - {Dark == 0}Well, what a pleasant surprise! She had written to say that
+      she was coming to visit me. And she was probably already on her way!
+
+  - choice:
+
+    - [Save it for later.]
+
+    - {Dark > 0}I didn't have time for her nonsense. I would read it later.
+
+    - {Dark == 0}I would have to look at it later.
+
+
+envelope:
+
+  - [A strange, unmarked envelope...]A blank manilla envelope caught my
+    attention. It had a strange lump in the middle of it.
+
+  - choice: [Open the envelope.]I tore open the envelope, which smelled faintly
+    of cinnamon.
+
+  - choice: [Save it for later.]I didn't have time for mysteries. I added the
+    envelope to the pile.
