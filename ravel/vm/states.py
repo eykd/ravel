@@ -76,12 +76,14 @@ class DisplaySituation(State):
         while True:
             try:
                 directive = self.situation.directives[self.index]
+                logger.info(f'Displaying directive {self.index}: {directive!r}')
             except IndexError:
-                logger.info('End of directives for %r', self)
+                logger.info(f'End of directives for {self!r}')
                 if not vm.queue:
                     vm.pop()
                 break
             handler = getattr(self, 'handle_' + directive.__class__.__name__.lower())
+            logger.info(f'Running handler: {handler.__name__}')
             handler(vm, directive)
             self.index += 1
 
@@ -115,6 +117,7 @@ class DisplaySituation(State):
         )
 
     def handle_operation(self, vm, directive):
+        logger.info(f'Applying operation: {directive!r}')
         vm.apply_operation(directive)
 
     def receive(self, vm, location):

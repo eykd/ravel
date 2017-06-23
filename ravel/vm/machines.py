@@ -50,10 +50,11 @@ class VirtualMachine:
     queue = attr.ib(default=attr.Factory(deque))
 
     def enqueue(self, callable_action, *args, **kwargs):
-        logger.debug('Enqueuing action %r: %r, %r', callable_action, args, kwargs)
+        logger.debug(f'Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}')
         self.queue.append(partial(callable_action, *args, **kwargs))
 
     def do_next_in_queue(self):
+        logger.debug(f'Doing next: {self.queue[0]}')
         self.queue.popleft()()
 
     def begin(self):
@@ -72,7 +73,7 @@ class VirtualMachine:
         initial_value = self.qualities.get(quality)
         new_value = op.evaluate(initial_value, qualities=self.qualities)
         self.qualities[quality] = new_value
-        logger.info('Quality [%s] was %r, now %r', quality, initial_value, new_value)
+        logger.info(f'Quality [{quality}] was {initial_value!r}, now {new_value!r}')
         self.send(
             'quality_changed',
             quality = quality,
@@ -81,7 +82,7 @@ class VirtualMachine:
         )
 
     def initialize_from_givens(self):
-        logger.info('Initializing from givens: %r', self.givens)
+        logger.info(f'Initializing from givens: {self.givens!r}')
         state = self.qualities
         for op in self.givens:
             self.apply_operation(op)
@@ -92,17 +93,17 @@ class VirtualMachine:
         return self.stack[-1] if self.stack else None
 
     def push(self, state):
-        logger.debug('Pushing state: %r', state)
+        logger.debug(f'Pushing state: {state!r}')
         self.enqueue(self.do_push, state)
 
     def do_push(self, state):
         top_state = self.top_state
         if top_state is not None:
-            logger.info("Pausing state %r", top_state)
+            logger.info(f"Pausing state {top_state!r}")
             top_state.pause(self)
             self.send('pause_state', state=top_state)
 
-        logger.info("Entering state %r", state)
+        logger.info(f"Entering state {state!r}")
         self.stack.append(state)
         state.enter(self)
         self.send('enter_state', state=state)
@@ -113,18 +114,18 @@ class VirtualMachine:
 
     def do_pop(self):
         state = self.stack.pop()
-        logger.info("Exiting state %r", state)
+        logger.info(f"Exiting state {state!r}")
         state.exit(self)
         self.send('exit_state', state=state)
 
         top_state = self.top_state
         if top_state is not None:
-            logger.info("Resuming state %r", top_state)
+            logger.info(f"Resuming state {top_state!r}")
             top_state.resume(self)
             self.send('resume_state', state=top_state)
 
     def send(self, signal_name, **kwargs):
-        logger.debug('Sending signal %r, %r', signal_name, kwargs)
+        logger.debug(f'Sending signal {signal_name!r}, {kwargs!r}')
         signal = getattr(self.signals, signal_name)
         signal.send(self, **kwargs)
 
