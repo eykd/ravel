@@ -18,7 +18,8 @@ foyer:
 
 outside:
 
-  - Outside, the rain pours down, and lightning flashes.[] Better stay inside.
+  - [Outside, the rain pours down, and lightning flashes.]You look out at the
+    drenching rain. Lightning flashes, thunder rolls. Better stay inside.
 
 
 cloakroom:
