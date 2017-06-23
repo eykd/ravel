@@ -89,11 +89,14 @@ class DisplaySituation(State):
 
     def handle_text(self, vm, directive):
         if directive.check(vm.qualities):
-            vm.send(
-                'display_text',
-                text = get_text(directive),
-                state = self,
-            )
+            text = get_text(directive)
+            if text.strip():
+                vm.send(
+                    'display_text',
+                    text = text,
+                    state = self,
+                    sticky = directive.sticky,
+                )
 
     def handle_choice(self, vm, directive):
         situation = vm.get_situation(directive.choice)
