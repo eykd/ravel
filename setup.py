@@ -15,6 +15,7 @@ setup(
         'awesome-slugify<1.7',
         'blinker<1.5',
         'click<6.7',
+        'colorclass<2.3',
         'marshmallow<2.10',
         'parsimonious<0.8',
         'path.py<10.2',

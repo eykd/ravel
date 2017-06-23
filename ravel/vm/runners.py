@@ -3,6 +3,8 @@ import logging
 import sys
 import textwrap
 
+from colorclass import Color
+
 from .. import environments
 from .. import loaders
 
@@ -29,8 +31,6 @@ def with_exception_handling(func):
 
 class ConsoleRunner:
     signals = signals.Signals()
-    emit_text = print
-    get_input = input
 
     @with_exception_handling
     def __init__(self, source_directory):
@@ -45,6 +45,26 @@ class ConsoleRunner:
 
         self.choices = {}
 
+        self.out_queue = []
+
+    def enqueue_text(self, text):
+        self.out_queue.append(text)
+
+    def get_enqueued_text(self):
+        text = ''.join(self.out_queue)
+        self.out_queue[:] = ()
+        return Color(text)
+
+    def emit_text(self, text, sticky=False):
+        logging.info(f'Emitting text (sticky={sticky}): {text!r}')
+        self.enqueue_text(text)
+        if not sticky:
+            print(self.get_enqueued_text())
+
+    def get_input(self, text):
+        self.enqueue_text(text)
+        return input(self.get_enqueued_text())
+
     def get_handlers(self):
         return [
             self.get_display_text_handler(self.vm),
@@ -55,8 +75,11 @@ class ConsoleRunner:
     def get_display_text_handler(self, vm):
         @vm.signals.display_text.connect
         @with_exception_handling
-        def display_text(vm, text, state):
-            self.emit_text(textwrap.fill(text))
+        def display_text(vm, text, state, sticky=False):
+            text = '{yellow}%s{/yellow}' % textwrap.fill(text)
+            if not sticky:
+                text += '\n'
+            self.emit_text(text, sticky=sticky)
 
         return display_text
 
@@ -65,7 +88,7 @@ class ConsoleRunner:
         @with_exception_handling
         def display_choice(vm, index, choice, text, state):
             self.choices[index] = choice
-            self.emit_text('%s: %s' % (index, text))
+            self.emit_text(f'{{green}}{index}{{/green}}: {{yellow}}{text}{{/yellow}}')
 
         return display_choice
 
@@ -75,22 +98,24 @@ class ConsoleRunner:
         def wait_for_input(vm, send_input, state):
             choice = None
             while choice is None:
-                chosen = self.get_input("What'll it be? ").lower()
+                self.emit_text('')
+                chosen = self.get_input("{green}What'll it be?{/green} ").lower()
                 if chosen.isdigit():
                     try:
                         choice = self.choices[int(chosen)]
                     except (ValueError, KeyError):
-                        self.emit_text("That's not an option.")
+                        self.emit_text("{red}That's not an option.{/red}")
                         choice = None
                 elif chosen == 's':
                     self.emit_text(repr(vm.qualities))
                 elif chosen == 'q':
                     sys.exit(0)
                 else:
-                    self.emit_text("I'm sorry, what?")
+                    self.emit_text("{red}I'm sorry, what?{/red}")
 
             self.choices.clear()
             self.emit_text('')
+            self.emit_text('{cyan}%s{/cyan}' % ('-' * 80))
             send_input(choice)
 
         return wait_for_input
