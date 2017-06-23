@@ -20,6 +20,9 @@ class State:
     def pause(self, vm):
         pass
 
+    def resume(self, vm):
+        pass
+
     def receive(self, vm, data):
         pass
 
@@ -65,15 +68,20 @@ class DisplayPossibleSituations(State):
 class DisplaySituation(State):
     situation = attr.ib()
     index = attr.ib(default=0)
+    paused = attr.ib(default=False)
 
     def enter(self, vm):
         self.display(vm)
 
+    def pause(self, vm):
+        self.paused = True
+
     def resume(self, vm):
+        self.paused = False
         self.display(vm)
 
     def display(self, vm):
-        while True:
+        while not self.paused:
             try:
                 directive = self.situation.directives[self.index]
                 logger.info(f'Displaying directive {self.index}: {directive!r}')
