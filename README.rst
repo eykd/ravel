@@ -27,23 +27,17 @@ The goals of Ravel are manifold:
 Installing
 ----------
 
-Clone the repository:
+Clone the repository::
 
-```bash
-git clone https://github.com/eykd/ravel.git
-```
+    git clone https://github.com/eykd/ravel.git
 
-Install Python 3.6.1. Create a Python virtual environment in the repo, and install the requirements:
+Install Python 3.6.1. Create a Python virtual environment in the repo, and install the requirements::
 
-```bash
-cd ravel
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+    cd ravel
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
 
-Test that everything works by running the demo:
+Test that everything works by running the demo::
 
-```bash
-ravel run examples/cloak
-```
+    ravel run examples/cloak
