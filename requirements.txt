@@ -1,3 +1,4 @@
+coveralls
 coverage==4.3.4
 deepdiff==3.1.2
 ensure==0.6.2

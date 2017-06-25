@@ -8,3 +8,6 @@ install:
 # command to run tests
 script:
   green --quiet-stdout --run-coverage tests
+
+after_success:
+  coveralls
