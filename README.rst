@@ -1,6 +1,10 @@
 Ravel
 =====
 
+[![Build Status](https://travis-ci.org/eykd/ravel.svg?branch=master)](https://travis-ci.org/eykd/ravel)
+
+[![Coverage Status](https://coveralls.io/repos/github/eykd/ravel/badge.svg?branch=master)](https://coveralls.io/github/eykd/ravel?branch=master)
+
 Ravel is a tool for building Quality-Based Narratives (QBNs), as `pioneered`_ by
 Failbetter Games, with a syntax inspired by Inkle Studios' `Ink`_ format and
 YAML.
