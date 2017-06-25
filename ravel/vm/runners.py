@@ -43,7 +43,7 @@ class ConsoleRunner:
             **rulebook,
         )
 
-        self.choices = {}
+        self.choices = []
 
         self.out_queue = []
 
@@ -87,8 +87,8 @@ class ConsoleRunner:
         @vm.signals.display_choice.connect
         @with_exception_handling
         def display_choice(vm, index, choice, text, state):
-            self.choices[index] = choice
-            self.emit_text(f'{{green}}{index}{{/green}}: {{yellow}}{text}{{/yellow}}')
+            self.choices.append(choice)
+            self.emit_text(f'{{green}}{len(self.choices)}{{/green}}: {{yellow}}{text}{{/yellow}}')
 
         return display_choice
 
@@ -102,8 +102,8 @@ class ConsoleRunner:
                 chosen = self.get_input("{green}What'll it be?{/green} ").lower()
                 if chosen.isdigit():
                     try:
-                        choice = self.choices[int(chosen)]
-                    except (ValueError, KeyError):
+                        choice = self.choices[int(chosen) - 1]
+                    except (ValueError, IndexError):
                         self.emit_text("{red}That's not an option.{/red}")
                         choice = None
                 elif chosen == 's':
@@ -113,7 +113,7 @@ class ConsoleRunner:
                 else:
                     self.emit_text("{red}I'm sorry, what?{/red}")
 
-            self.choices.clear()
+            self.choices[:] = ()
             self.emit_text('')
             self.emit_text('{cyan}%s{/cyan}' % ('-' * 80))
             send_input(choice)
