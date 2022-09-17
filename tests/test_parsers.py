@@ -10,8 +10,6 @@ import ensure
 from ravel import types
 from ravel import parsers
 
-ensure.unittest_case.maxDiff = None
-
 ensure = ensure.ensure
 
 

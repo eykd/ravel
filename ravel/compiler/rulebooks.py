@@ -1,4 +1,5 @@
-from collections import defaultdict, Mapping, Sequence
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 import itertools as it
 
 from ravel import exceptions

@@ -4,7 +4,6 @@ set -x
 pytest \
     --failed-first \
     --exitfirst \
-    --flake8 \
-    --cov=src \
+    --cov=ravel \
     --cov-branch \
     --no-cov-on-fail $@

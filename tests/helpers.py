@@ -6,8 +6,6 @@ from syml.utils import get_text_source
 
 import ensure as _ensure
 
-_ensure.unittest_case.maxDiff = None
-
 
 def source(text):
     return get_text_source(text, text)
