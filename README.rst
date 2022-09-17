@@ -25,7 +25,7 @@ Clone the repository::
 
     git clone https://github.com/eykd/ravel.git
 
-Install Python 3.6.1. Create a Python virtual environment in the repo, and install the requirements::
+Install Python 3.10. Create a Python virtual environment in the repo, and install the requirements::
 
     cd ravel
     python3 -m venv venv
