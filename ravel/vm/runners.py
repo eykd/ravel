@@ -14,8 +14,8 @@ from . import signals
 
 def handle_exception(e):
     logging.exception('Something bad happened...')
-    import ipdb
-    ipdb.post_mortem()
+    import pdb
+    pdb.post_mortem()
 
 
 def with_exception_handling(func):
