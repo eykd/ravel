@@ -8,7 +8,7 @@ setup(
     name = PROJECT_NAME,
     version = VERSION,
     author = "David Eyk",
-    author_email = "david.eyk@gmail.com",
+    author_email = "david@worldsenoughstudios.com",
     modules = [PROJECT_NAME],
     install_requires = [
         'attrs<16.4',
