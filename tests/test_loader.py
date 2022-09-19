@@ -4,77 +4,78 @@ import time
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from path import Path
+import pytest
 
-from .helpers import ensure
+from path import Path
 
 from ravel import exceptions
 from ravel import loaders
 
 
-class BaseLoaderTests(TestCase):
+@pytest.fixture
+def tempdir():
+    _tempdir = Path(tempfile.mkdtemp())
+    yield _tempdir
+    _tempdir.rmtree()
+
+
+@pytest.fixture
+def fs_loader(tempdir):
+    return loaders.FileSystemLoader(base_path=tempdir)
+
+
+class TestBaseLoader:
     def test_get_source_should_raise_not_implemented(self):
         loader = loaders.BaseLoader()
-        (ensure(loader.load)
-         .called_with(Mock(), Mock())
-         .raises(NotImplementedError))
+        with pytest.raises(NotImplementedError):
+            loader.load(Mock(), Mock())
 
 
-class FileSystemLoaderTests(TestCase):
-    def setUp(self):
-        self.tempdir = Path(tempfile.mkdtemp())
-        self.loader = loaders.FileSystemLoader(base_path=self.tempdir)
-
-    def tearDown(self):
-        self.tempdir.rmtree()
-
-
-class GetUpToDateCheckerTests(FileSystemLoaderTests):
-    def test_it_should_return_an_up_to_date_checker(self):
-        fp = self.tempdir / 'test.txt'
+class TestGetUpToDateChecker:
+    def test_it_should_return_an_up_to_date_checker(self, tempdir, fs_loader):
+        fp = tempdir / 'test.txt'
         fp.touch()
         with patch('os.path.getmtime') as getmtime:
             getmtime.return_value = 42.0
-            is_up_to_date = self.loader.get_up_to_date_checker(fp)
-            ensure(is_up_to_date()).is_true()
+            is_up_to_date = fs_loader.get_up_to_date_checker(fp)
+            assert is_up_to_date() is True
 
         fp.write_text('foo')
-        ensure(is_up_to_date()).is_false()
+        assert is_up_to_date() is False
 
-    def test_it_should_return_an_up_to_date_checker_that_fails_for_non_existent_file(self):
-        fp = self.tempdir / 'foo.txt'
-        is_up_to_date = self.loader.get_up_to_date_checker(fp)
-        ensure(is_up_to_date()).is_false()
+    def test_it_should_return_an_up_to_date_checker_that_fails_for_non_existent_file(self, tempdir, fs_loader):
+        fp = tempdir / 'foo.txt'
+        is_up_to_date = fs_loader.get_up_to_date_checker(fp)
+        assert is_up_to_date() is False
 
 
-class GetSourceTests(FileSystemLoaderTests):
-    def test_it_should_return_the_file_source_and_up_to_date_checker(self):
+class TestGetSource:
+    def test_it_should_return_the_file_source_and_up_to_date_checker(self, tempdir, fs_loader):
         env = Mock()
-        (self.tempdir / 'test.ravel').write_text('test!')
+        (tempdir / 'test.ravel').write_text('test!')
         with patch('os.path.getmtime') as getmtime:
             getmtime.return_value = 42.0
-            result, is_up_to_date = self.loader.get_source(env, 'test')
-            ensure(result).equals('test!')
-            ensure(is_up_to_date()).is_true()
+            result, is_up_to_date = fs_loader.get_source(env, 'test')
+            assert result == 'test!'
+            assert is_up_to_date() is True
 
-        ensure(is_up_to_date()).is_false()
+        assert is_up_to_date() is False
 
-    def test_it_should_raise_when_getting_source_of_nonexistent_rulebook(self):
+    def test_it_should_raise_when_getting_source_of_nonexistent_rulebook(self, tempdir, fs_loader):
         env = Mock()
-        (ensure(self.loader.get_source)
-         .called_with(env, 'foo')
-         .raises(exceptions.RulebookNotFound))
+        with pytest.raises(exceptions.RulebookNotFound):
+            fs_loader.get_source(env, 'foo')
 
 
-class LoadTests(FileSystemLoaderTests):
-    def test_it_should_load_and_compile_a_rulebook(self):
+class TestLoad:
+    def test_it_should_load_and_compile_a_rulebook(self, tempdir, fs_loader):
         env = Mock()
         env.compile_rulebook.return_value = 'compiled'
         checker = Mock(return_value = True)
-        self.loader.get_up_to_date_checker = Mock(return_value=checker)
-        (self.tempdir / 'test.ravel').write_text('test!')
+        fs_loader.get_up_to_date_checker = Mock(return_value=checker)
+        (tempdir / 'test.ravel').write_text('test!')
 
-        result = self.loader.load(env, 'test')
-        ensure(result).equals('compiled')
+        result = fs_loader.load(env, 'test')
+        assert result == 'compiled'
 
         env.compile_rulebook.assert_called_once_with('test!', 'test', checker)

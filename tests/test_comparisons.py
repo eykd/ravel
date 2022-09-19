@@ -1,5 +1,4 @@
 import itertools as it
-from unittest import TestCase
 
 import pytest
 
@@ -7,7 +6,7 @@ from ravel import parsers
 from ravel import types
 
 
-class TestComparison(TestCase):
+class TestComparison:
     def test_it_should_evaluate_a_gte_comparison(self):
         comp = types.Comparison("Man of Honor", ">=", 3)
         assert comp(4) is True

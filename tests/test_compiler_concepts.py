@@ -1,5 +1,3 @@
-from ensure import ensure
-
 from ravel import environments
 from ravel.compiler import concepts
 

@@ -1,29 +1,23 @@
-from unittest import TestCase
-from ensure import ensure
+import pytest
 
-from ravel import exceptions
-from ravel import types
+from ravel import exceptions, types
 
 from .helpers import source
 
 
-class TestRaiseParseError(TestCase):
+class TestRaiseParseError:
     def test_it_should_raise_a_parse_error_for_known_source(self):
-        (ensure(exceptions.raise_parse_error)
-         .called_with(source('foo'))
-         .raises(exceptions.ParseError))
+        with pytest.raises(exceptions.ParseError):
+            exceptions.raise_parse_error(source("foo"))
 
     def test_it_should_raise_a_custom_parse_error_for_known_source(self):
-        (ensure(exceptions.raise_parse_error)
-         .called_with(source('foo'), exceptions.ComparisonParseError)
-         .raises(exceptions.ComparisonParseError))
+        with pytest.raises(exceptions.ComparisonParseError):
+            exceptions.raise_parse_error(source("foo"), exceptions.ComparisonParseError)
 
     def test_it_should_raise_a_parse_error_for_unknown_source(self):
-        (ensure(exceptions.raise_parse_error)
-         .called_with('foo')
-         .raises(exceptions.ParseError))
+        with pytest.raises(exceptions.ParseError):
+            exceptions.raise_parse_error("foo")
 
     def test_it_should_raise_a_custom_parse_error_for_known_source(self):
-        (ensure(exceptions.raise_parse_error)
-         .called_with('foo', exceptions.ComparisonParseError)
-         .raises(exceptions.ComparisonParseError))
+        with pytest.raises(exceptions.ComparisonParseError):
+            exceptions.raise_parse_error("foo", exceptions.ComparisonParseError)

@@ -1,20 +1,15 @@
-from unittest import TestCase
-
 from ravel import environments
 from ravel import types
 
 from ravel.compiler.rulesets import compile_ruleset
 
-from .helpers import source, ensure
+from .helpers import source
 
 
-class TestCompileRuleset(TestCase):
-    def setUp(self):
-        self.env = environments.Environment()
-
-    def test_it_should_compile_predicates_in_a_list_ruleset(self):
+class TestCompileRuleset:
+    def test_it_should_compile_predicates_in_a_list_ruleset(self, env):
         result = compile_ruleset(
-            self.env,
+            env,
             'test-concept',
             'test-rule',
             [
@@ -51,4 +46,4 @@ class TestCompileRuleset(TestCase):
             ),
         ]
 
-        ensure(result).equals(expected)
+        assert result == expected
