@@ -6,4 +6,5 @@ pytest \
     --exitfirst \
     --cov=ravel \
     --cov-branch \
+    --disable-warnings \
     --no-cov-on-fail $@
