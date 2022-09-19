@@ -1,6 +1,7 @@
 import itertools as it
 from unittest import TestCase
-from ensure import ensure
+
+import pytest
 
 from ravel import parsers
 from ravel import types
@@ -8,126 +9,130 @@ from ravel import types
 
 class TestComparison(TestCase):
     def test_it_should_evaluate_a_gte_comparison(self):
-        comp = types.Comparison('Man of Honor', '>=', 3)
-        ensure(comp(4)).is_true()
-        ensure(comp(3)).is_true()
-        ensure(comp(0)).is_false()
+        comp = types.Comparison("Man of Honor", ">=", 3)
+        assert comp(4) is True
+        assert comp(3) is True
+        assert comp(0) is False
 
     def test_it_should_evaluate_a_gt_comparison(self):
-        comp = types.Comparison('Man of Honor', '>', 3)
-        ensure(comp(4)).is_true()
-        ensure(comp(3)).is_false()
-        ensure(comp(0)).is_false()
+        comp = types.Comparison("Man of Honor", ">", 3)
+        assert comp(4) is True
+        assert comp(3) is False
+        assert comp(0) is False
 
     def test_it_should_evaluate_an_eq_comparison(self):
-        comp = types.Comparison('Man of Honor', '==', 3)
-        ensure(comp(4)).is_false()
-        ensure(comp(3)).is_true()
-        ensure(comp(0)).is_false()
+        comp = types.Comparison("Man of Honor", "==", 3)
+        assert comp(4) is False
+        assert comp(3) is True
+        assert comp(0) is False
 
     def test_it_should_evaluate_a_lte_comparison(self):
-        comp = types.Comparison('Man of Honor', '<=', 3)
-        ensure(comp(4)).is_false()
-        ensure(comp(3)).is_true()
-        ensure(comp(0)).is_true()
+        comp = types.Comparison("Man of Honor", "<=", 3)
+        assert comp(4) is False
+        assert comp(3) is True
+        assert comp(0) is True
 
     def test_it_should_evaluate_a_lt_comparison(self):
-        comp = types.Comparison('Man of Honor', '<', 3)
-        ensure(comp(4)).is_false()
-        ensure(comp(3)).is_false()
-        ensure(comp(0)).is_true()
+        comp = types.Comparison("Man of Honor", "<", 3)
+        assert comp(4) is False
+        assert comp(3) is False
+        assert comp(0) is True
 
 
-class TestComparisonParser(TestCase):
+class TestComparisonParser:
+    @pytest.fixture
+    def parser(self):
+        return parsers.ComparisonParser()
+
+    @pytest.fixture
+    def factors(self):
+        comparisons = ("<", "<=", ">", ">=", "==", "!=")
+        values = (3, 3.0, 5, 5.0)
+        return it.product(comparisons, values)
+
     def setUp(self):
         self.parser = parsers.ComparisonParser()
-        self.comparisons = ('<', '<=', '>', '>=', '==', '!=')
+        self.comparisons = ("<", "<=", ">", ">=", "==", "!=")
         self.values = (3, 3.0, 5, 5.0)
-        self.quote_styles = ('"', "'", '`', '"""', "'''", '```')
+        self.quote_styles = ('"', "'", "`", '"""', "'''", "```")
 
-    def test_it_should_parse_a_simple_quality_name(self):
-        factors = it.product(self.comparisons, self.values)
-        for comp, val in factors:
-            statement = '"Man of Honor" %s %s' % (comp, val)
-            print(statement)
-            expected = types.Comparison(
-                'Man of Honor', comp, val
-            )
-            result = self.parser.parse(statement)
-            print("Got", result)
-            print("Exp", expected)
-            ensure(result).is_an(types.Comparison)
-            ensure(result).equals(expected)
+    comparisons = ("<", "<=", ">", ">=", "==", "!=")
+    values = (3, 3.0, 5, 5.0)
 
-    def test_it_should_parse_a_comparison(self):
-        factors = it.product(self.comparisons, self.values)
-        for comp, val in factors:
-            statement = '"Man of Honor" %s %s' % (comp, val)
-            print(statement)
-            expected = types.Comparison(
-                'Man of Honor', comp, val
-            )
-            result = self.parser.parse(statement)
-            print("Got", result)
-            print("Exp", expected)
-            ensure(result).is_an(types.Comparison)
-            ensure(result).equals(expected)
-
-    def test_it_should_handle_a_simple_expression(self):
-        statement = '"Man of Honor" > 3 * 2'
+    @pytest.mark.parametrize("comp,value", list(it.product(comparisons, values)))
+    def test_it_should_parse_a_simple_quality_name(self, parser, comp, value):
+        statement = '"Man of Honor" %s %s' % (comp, value)
         print(statement)
-        expected = types.Comparison(
-            'Man of Honor', '>', types.Expression(3, '*', 2))
-        result = self.parser.parse(statement)
+        expected = types.Comparison("Man of Honor", comp, value)
+        result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
-        ensure(result).is_an(types.Comparison)
-        ensure(result).equals(expected)
+        assert isinstance(result, types.Comparison)
+        assert result == expected
 
-    def test_it_should_handle_a_more_complicated_expressions(self):
+    @pytest.mark.parametrize("comp,value", list(it.product(comparisons, values)))
+    def test_it_should_parse_a_comparison(self, parser, comp, value):
+        statement = '"Man of Honor" %s %s' % (comp, value)
+        print(statement)
+        expected = types.Comparison("Man of Honor", comp, value)
+        result = parser.parse(statement)
+        print("Got", result)
+        print("Exp", expected)
+        assert isinstance(result, types.Comparison)
+        assert result == expected
+
+    def test_it_should_handle_a_simple_expression(self, parser):
+        statement = '"Man of Honor" > 3 * 2'
+        print(statement)
+        expected = types.Comparison("Man of Honor", ">", types.Expression(3, "*", 2))
+        result = parser.parse(statement)
+        print("Got", result)
+        print("Exp", expected)
+        assert isinstance(result, types.Comparison)
+        assert result == expected
+
+    def test_it_should_handle_a_more_complicated_expressions(self, parser):
         statement = '"Man of Honor" > 3 + 2 + 3'
         print(statement)
         expected = types.Comparison(
-            'Man of Honor', '>',
-            types.Expression(
-                3, '+',
-                types.Expression(2, '+', 3)),
+            "Man of Honor",
+            ">",
+            types.Expression(3, "+", types.Expression(2, "+", 3)),
         )
-        result = self.parser.parse(statement)
+        result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
-        ensure(result).is_an(types.Comparison)
-        ensure(result).equals(expected)
+        assert isinstance(result, types.Comparison)
+        assert result == expected
 
-    def test_it_should_handle_a_complex_expression(self):
+    def test_it_should_handle_a_complex_expression(self, parser):
         statement = '"Man of Honor" > 3 + 5 * 2 / (3 - 2)'
         print(statement)
         expected = types.Comparison(
-            'Man of Honor', '>',
+            "Man of Honor",
+            ">",
             types.Expression(
-                3, '+',
+                3,
+                "+",
                 types.Expression(
-                    5, '*',
-                    types.Expression(
-                        2, '/',
-                        types.Expression(3, '-', 2)
-                    )
-                )
+                    5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))
+                ),
             ),
         )
-        result = self.parser.parse(statement)
+        result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
-        ensure(result).is_an(types.Comparison)
-        ensure(result).equals(expected)
+        assert isinstance(result, types.Comparison)
+        assert result == expected
 
-    def test_it_should_handle_a_simple_expression_with_a_value(self):
+    def test_it_should_handle_a_simple_expression_with_a_value(self, parser):
         statement = '"Man of Honor" > 3 * value'
         print(statement)
         expected = types.Comparison(
-            'Man of Honor', '>', types.Expression(3, '*', types.VALUE))
-        result = self.parser.parse(statement)
+            "Man of Honor", ">", types.Expression(3, "*", types.VALUE)
+        )
+        result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
-        ensure(result).is_a(types.Comparison)
-        ensure(result).equals(expected)
+        assert isinstance(result, types.Comparison)
+        assert result == expected

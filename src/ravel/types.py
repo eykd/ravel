@@ -144,7 +144,7 @@ class Predicate:
 @attr.s(slots=True)
 class Situation:
     intro = attr.ib()
-    directives = attr.ib(repr=False)
+    directives = attr.ib()
 
 
 @attr.s(slots=True)
