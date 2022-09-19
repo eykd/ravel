@@ -11,11 +11,6 @@ from ravel import types
 from ravel.compiler import directives
 
 
-@pytest.fixture
-def env():
-    return environments.Environment()
-
-
 class TestCompileDirective:
     def test_it_should_handle_text_directives(self, env):
         result = directives.compile_directive(
