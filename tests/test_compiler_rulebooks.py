@@ -171,6 +171,18 @@ class TestCompileRulebook:
         with pytest.raises(exceptions.ParseError):
             rulebooks.compile_rulebook(env, bad_rulebook)
 
+    def test_it_should_fail_to_compile_missing_situation_baggage(self, env):
+        bad_rulebook_syml = textwrap.dedent(
+            """
+            intro:
+              - Situation
+              - when:
+                - Intro == 0
+        """
+        )
+        with pytest.raises(exceptions.MissingBaggageError):
+            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml, raw=False))
+
 
 TEST_RULEBOOK_SYML = textwrap.dedent(
     """
