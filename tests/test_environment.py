@@ -7,8 +7,6 @@ import pytest
 
 from path import Path
 
-from .helpers import ensure
-
 from ravel import environments
 from ravel import loaders
 
@@ -43,7 +41,7 @@ class TestGetRulebook:
         assert 'actions::actions' in rulebook['rulebook']['Situation']['locations']
 
         new_rulebook = env.load_rulebook('begin')
-        ensure(new_rulebook).equals(rulebook)
+        assert new_rulebook == rulebook
 
 
 class TestDefaultIsUpToDate:

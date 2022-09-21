@@ -16,7 +16,5 @@ pytest-profiling
 seed-isort-config
 coveralls
 coverage
-deepdiff
-ensure
 ipython
 -e .

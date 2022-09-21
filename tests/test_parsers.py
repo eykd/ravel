@@ -3,9 +3,6 @@ from unittest import TestCase
 
 import pytest
 
-from pprint import pprint
-from deepdiff import DeepDiff
-
 from ravel import types
 from ravel import parsers
 

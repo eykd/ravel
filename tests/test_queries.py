@@ -1,6 +1,6 @@
-from unittest import TestCase
-
 import textwrap
+
+import pytest
 
 import syml
 
@@ -10,10 +10,8 @@ from ravel import types
 
 from ravel.compiler.rulebooks import compile_rulebook
 
-from .helpers import ensure
 
-
-class QueryPredicatesTest(TestCase):
+class TestQueryPredicates:
     def test_it_should_query_a_set_of_fully_matching_predicates_against_a_query(self):
         query = [('foo', 2), ('bar', 3), ('baz', 4)]
         predicates = [
@@ -21,7 +19,7 @@ class QueryPredicatesTest(TestCase):
             types.Predicate('bar', lambda x: x >= 3),
         ]
         matched = queries.query_predicates(query, predicates)
-        ensure(matched).is_true()
+        assert matched is True
 
     def test_it_should_query_a_set_of_partially_matching_predicates_against_a_query(self):
         query = [('foo', 2), ('bar', 3), ('baz', 4)]
@@ -30,7 +28,7 @@ class QueryPredicatesTest(TestCase):
             types.Predicate('bar', lambda x: x < 2),
         ]
         matched = queries.query_predicates(query, predicates)
-        ensure(matched).is_false()
+        assert matched is False
 
     def test_it_should_query_a_set_of_partially_matching_predicates_with_missing_query(self):
         query = [('foo', 2), ('baz', 4)]  # 'bar' is effectively 0
@@ -39,7 +37,7 @@ class QueryPredicatesTest(TestCase):
             types.Predicate('bar', lambda x: x < 2),
         ]
         matched = queries.query_predicates(query, predicates)
-        ensure(matched).is_true()
+        assert matched is True
 
     def test_it_should_query_a_set_of_partially_matching_predicates_with_missing_query_redux(self):
         query = [('foo', 2), ('baz', 4)]  # 'bar' is effectively 0
@@ -48,7 +46,7 @@ class QueryPredicatesTest(TestCase):
             types.Predicate('bar', lambda x: x > 2),
         ]
         matched = queries.query_predicates(query, predicates)
-        ensure(matched).is_false()
+        assert matched is False
 
     def test_it_should_query_with_a_missing_query_and_type_mismatch_on_predicate(self):
         query = [('foo', 2), ('baz', 4)]  # 'bar' is effectively 0
@@ -57,26 +55,27 @@ class QueryPredicatesTest(TestCase):
             types.Predicate('bar', lambda x: x < 'blah'),
         ]
         matched = queries.query_predicates(query, predicates)
-        ensure(matched).is_false()
+        assert matched is False
 
 
-class QueryTopTest(TestCase):
-    def setUp(self):
+class TestQueryTop:
+    @pytest.fixture
+    def rules(self):
         rulebook = syml.loads(TEST_RULES)
         env = environments.Environment()
-        self.rules = compile_rulebook(env, rulebook)['rulebook']
+        return compile_rulebook(env, rulebook)['rulebook']
 
-    def test_it_should_query_a_rules_database_and_reject_mismatched_rules(self):
-        result = queries.query_top('onTest', [('foo', 'bar')], rules=self.rules)
-        ensure(result).equals(('foo-bar', ['baz']))
+    def test_it_should_query_a_rules_database_and_reject_mismatched_rules(self, rules):
+        result = queries.query_top('onTest', [('foo', 'bar')], rules=rules)
+        assert result == ('foo-bar', ['baz'])
 
-    def test_it_should_query_a_rules_database_and_return_the_higher_scoring_rule(self):
-        result = queries.query_top('onTest', [('foo', 'bar'), ('blah', 'boo')], rules=self.rules)
-        ensure(result).equals(('foo-bar-blah-boo', ['blah']))
+    def test_it_should_query_a_rules_database_and_return_the_higher_scoring_rule(self, rules):
+        result = queries.query_top('onTest', [('foo', 'bar'), ('blah', 'boo')], rules=rules)
+        assert result == ('foo-bar-blah-boo', ['blah'])
 
-    def test_it_should_query_a_rules_database_and_return_None_for_no_matches(self):
-        result = queries.query_top('onTest', [('foo', 'blah')], rules=self.rules)
-        ensure(result).is_none()
+    def test_it_should_query_a_rules_database_and_return_None_for_no_matches(self, rules):
+        result = queries.query_top('onTest', [('foo', 'blah')], rules=rules)
+        assert result is None
 
 
 TEST_RULES = textwrap.dedent("""

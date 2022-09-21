@@ -1,6 +1,3 @@
-from unittest import TestCase
-
-from ensure import ensure
 from ravel import environments, types
 from ravel.compiler import effects
 
