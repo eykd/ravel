@@ -1,10 +1,9 @@
 import operator as op
 
 import attr
+from syml.types import Pos, Source  # noqa
 
 from ravel.utils.data import evaluate_term
-
-from syml.types import Pos, Source  # noqa
 
 
 @attr.s(slots=True)

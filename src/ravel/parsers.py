@@ -1,7 +1,6 @@
-from parsimonious import NodeVisitor, Grammar
+from parsimonious import Grammar, NodeVisitor
 
-from ravel import grammars
-from ravel import types
+from ravel import grammars, types
 
 
 class BaseParser(NodeVisitor):

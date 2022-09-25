@@ -1,11 +1,9 @@
 from ravel import exceptions, types
-
 from ravel.utils.data import merge_dicts
 
 from . import concepts
-from . import logger
-
 from . import directives as _directives
+from . import logger
 
 
 @concepts.handler("Situation")

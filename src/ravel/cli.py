@@ -3,13 +3,8 @@ import sys
 
 import click
 
-from ravel import environments
-from ravel import loaders
-from ravel import queries
-from ravel import types
-
-from ravel.vm import machines
-from ravel.vm import runners
+from ravel import environments, loaders, queries, types
+from ravel.vm import machines, runners
 
 
 class Config:

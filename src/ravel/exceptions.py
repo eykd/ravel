@@ -1,5 +1,5 @@
-from parsimonious.exceptions import VisitationError
 from parsimonious.exceptions import ParseError as ParsimoniousParseError
+from parsimonious.exceptions import VisitationError
 
 from .types import Source
 

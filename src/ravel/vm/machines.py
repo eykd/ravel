@@ -1,14 +1,11 @@
+import logging
 from collections import deque
 from functools import partial
-import logging
 
 import attr
 
 from .. import queries
-
-from . import signals
-from . import states
-
+from . import signals, states
 
 logger = logging.getLogger("ravel.vm")
 

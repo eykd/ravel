@@ -5,11 +5,8 @@ import textwrap
 
 from colorclass import Color
 
-from .. import environments
-from .. import loaders
-
-from . import machines
-from . import signals
+from .. import environments, loaders
+from . import machines, signals
 
 
 def handle_exception(e):

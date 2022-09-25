@@ -1,6 +1,5 @@
 from ravel.utils.strings import get_text
 
-
 _HANDLERS = {}
 
 

@@ -1,19 +1,13 @@
-from collections.abc import Mapping, Sequence
 import itertools as it
+from collections.abc import Mapping, Sequence
 
 from slugify import slugify_unicode
 
-from ravel import exceptions
-from ravel import parsers
-from ravel import types
-
+from ravel import exceptions, parsers, types
 from ravel.utils.data import merge_dicts
 from ravel.utils.strings import get_text, is_text, unwrap
 
-from . import effects
-from . import text
-
-from . import logger
+from . import effects, logger, text
 
 
 def compile_directives(environment, concept, parent_rule, raw_directives):

@@ -1,10 +1,9 @@
-from collections import OrderedDict, deque, defaultdict
+from collections import OrderedDict, defaultdict, deque
 
 import attr
 import syml
 
 from ravel import loaders
-
 from ravel.compiler import rulebooks
 
 

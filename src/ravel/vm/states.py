@@ -5,7 +5,6 @@ import attr
 from ravel import queries
 from ravel.utils.strings import get_text
 
-
 logger = logging.getLogger("vm.states")
 
 

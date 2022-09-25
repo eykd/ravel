@@ -1,16 +1,12 @@
+import itertools as it
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-import itertools as it
 
-from ravel import exceptions
-from ravel import types
-
+from ravel import exceptions, types
 from ravel.utils.strings import get_text, is_text
 
-from . import concepts
-from . import effects
 from . import situations  # noqa
-
+from . import concepts, effects
 from .rulesets import compile_ruleset
 
 

@@ -1,7 +1,4 @@
-from ravel import exceptions
-from ravel import parsers
-from ravel import types
-
+from ravel import exceptions, parsers, types
 from ravel.utils.strings import get_text
 
 
