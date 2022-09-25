@@ -1,5 +1,4 @@
 import itertools as it
-from unittest import TestCase
 
 import pytest
 

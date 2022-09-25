@@ -1,6 +1,6 @@
 import itertools as it
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 from ravel import exceptions, types
 from ravel.utils.strings import get_text, is_text

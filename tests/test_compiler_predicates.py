@@ -1,6 +1,6 @@
 import pytest
 
-from ravel import environments, exceptions, types
+from ravel import exceptions, types
 from ravel.compiler.predicates import compile_predicate
 
 from .helpers import source

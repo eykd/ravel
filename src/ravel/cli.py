@@ -1,10 +1,8 @@
 import logging
-import sys
 
 import click
 
-from ravel import environments, loaders, queries, types
-from ravel.vm import machines, runners
+from ravel.vm import runners
 
 
 class Config:

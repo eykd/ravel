@@ -1,5 +1,4 @@
 import logging
-import random
 
 logger = logging.getLogger("ravel.query")
 

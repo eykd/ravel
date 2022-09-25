@@ -1,6 +1,5 @@
 import re
 import textwrap
-from unittest import TestCase
 
 import pytest
 

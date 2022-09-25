@@ -1,5 +1,5 @@
-from parsimonious.exceptions import ParseError as ParsimoniousParseError
-from parsimonious.exceptions import VisitationError
+from parsimonious.exceptions import ParseError as ParsimoniousParseError  # noqa: F401
+from parsimonious.exceptions import VisitationError  # noqa: F401
 
 from .types import Source
 

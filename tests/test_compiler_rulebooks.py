@@ -3,7 +3,7 @@ import textwrap
 import pytest
 import syml
 
-from ravel import environments, exceptions, types
+from ravel import exceptions, types
 from ravel.compiler import rulebooks
 from ravel.utils.strings import get_text_source
 
@@ -212,7 +212,7 @@ TEST_RULEBOOK_SYML = textwrap.dedent(
       - I found my box, lucky 1313. <>
       - {Dark > 0}What a lovely number.
       - {Light > 0}What a joke. The number mocked me.
-"""
+"""  # noqa: E501
 )
 
 
