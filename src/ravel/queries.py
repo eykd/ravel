@@ -1,7 +1,7 @@
 import logging
 import random
 
-logger = logging.getLogger('ravel.query')
+logger = logging.getLogger("ravel.query")
 
 
 def query_predicates(query, predicates):
@@ -14,11 +14,19 @@ def query_predicates(query, predicates):
         for qkey, qvalue in query:
             if qkey == rkey:
                 qkeys.add(qkey)
-                logger.debug("Checking query `%s: %s` against `%s: %r`", qkey, qvalue, rkey, predicate)
+                logger.debug(
+                    "Checking query `%s: %s` against `%s: %r`",
+                    qkey,
+                    qvalue,
+                    rkey,
+                    predicate,
+                )
                 matched = predicate(qvalue)
                 matches.append(bool(matched))
                 if matched:
-                    logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
+                    logger.debug(
+                        "Matched rule for `%s %r`: %s", rkey, predicate, qvalue
+                    )
                 break
         else:
             assert rkey not in qkeys
@@ -39,7 +47,7 @@ def query_predicates(query, predicates):
 
 def query_ruleset(q, rules):
     q = sorted(q)
-    for rule in rules['rules']:
+    for rule in rules["rules"]:
         logger.debug("Against rule %r", rule)
         if query_predicates(q, rule.predicates):
             logger.debug("Rule %s accepted", rule.name)
@@ -54,7 +62,9 @@ def query(concept, q, rules, how_many=None):
         reverse=True,
     )
     for score, rname, result in accepted_rules[:how_many]:
-        logger.debug("Query result: (rule %s with score of %s) %r", rname, score, result)
+        logger.debug(
+            "Query result: (rule %s with score of %s) %r", rname, score, result
+        )
         yield rname, result
 
 
@@ -64,4 +74,4 @@ def query_top(concept, q, rules):
 
 
 def query_by_name(rname, rules):
-    return rules['locations'][rname]
+    return rules["locations"][rname]

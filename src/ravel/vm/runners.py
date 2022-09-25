@@ -13,8 +13,9 @@ from . import signals
 
 
 def handle_exception(e):
-    logging.exception('Something bad happened...')
+    logging.exception("Something bad happened...")
     import pdb
+
     pdb.post_mortem()
 
 
@@ -35,7 +36,7 @@ class ConsoleRunner:
     @with_exception_handling
     def __init__(self, source_directory):
         self.env = environments.Environment(
-            loader = loaders.FileSystemLoader(source_directory),
+            loader=loaders.FileSystemLoader(source_directory),
         )
 
         rulebook = self.env.load()
@@ -51,12 +52,12 @@ class ConsoleRunner:
         self.out_queue.append(text)
 
     def get_enqueued_text(self):
-        text = ''.join(self.out_queue)
+        text = "".join(self.out_queue)
         self.out_queue[:] = ()
         return Color(text)
 
     def emit_text(self, text, sticky=False):
-        logging.info(f'Emitting text (sticky={sticky}): {text!r}')
+        logging.info(f"Emitting text (sticky={sticky}): {text!r}")
         self.enqueue_text(text)
         if not sticky:
             print(self.get_enqueued_text())
@@ -76,9 +77,9 @@ class ConsoleRunner:
         @vm.signals.display_text.connect
         @with_exception_handling
         def display_text(vm, text, state, sticky=False):
-            text = '{yellow}%s{/yellow}' % textwrap.fill(text)
+            text = "{yellow}%s{/yellow}" % textwrap.fill(text)
             if not sticky:
-                text += '\n'
+                text += "\n"
             self.emit_text(text, sticky=sticky)
 
         return display_text
@@ -88,7 +89,9 @@ class ConsoleRunner:
         @with_exception_handling
         def display_choice(vm, index, choice, text, state):
             self.choices.append(choice)
-            self.emit_text(f'{{green}}{len(self.choices)}{{/green}}: {{yellow}}{text}{{/yellow}}')
+            self.emit_text(
+                f"{{green}}{len(self.choices)}{{/green}}: {{yellow}}{text}{{/yellow}}"
+            )
 
         return display_choice
 
@@ -98,7 +101,7 @@ class ConsoleRunner:
         def wait_for_input(vm, send_input, state):
             choice = None
             while choice is None:
-                self.emit_text('')
+                self.emit_text("")
                 chosen = self.get_input("{green}What'll it be?{/green} ").lower()
                 if chosen.isdigit():
                     try:
@@ -106,16 +109,16 @@ class ConsoleRunner:
                     except (ValueError, IndexError):
                         self.emit_text("{red}That's not an option.{/red}")
                         choice = None
-                elif chosen == 's':
+                elif chosen == "s":
                     self.emit_text(repr(vm.qualities))
-                elif chosen == 'q':
+                elif chosen == "q":
                     sys.exit(0)
                 else:
                     self.emit_text("{red}I'm sorry, what?{/red}")
 
             self.choices[:] = ()
-            self.emit_text('')
-            self.emit_text('{cyan}%s{/cyan}' % ('-' * 80))
+            self.emit_text("")
+            self.emit_text("{cyan}%s{/cyan}" % ("-" * 80))
             send_input(choice)
 
         return wait_for_input

@@ -1,6 +1,7 @@
 import textwrap
 
-base_expression_grammar = textwrap.dedent(r"""
+base_expression_grammar = textwrap.dedent(
+    r"""
     quality               = bracketed_quality / quoted_quality / simple_quality
     quoted_quality        = ~'"[^"]+"'
     simple_quality        = ~'[^\s]+'
@@ -58,39 +59,54 @@ base_expression_grammar = textwrap.dedent(r"""
     float                 = ~"\d+\.\d*"
     integer               = ~"\d+"
 
-    string                = ('""" + '"""' + r"""' ~'([^"])+' '""" + '"""' + r"""')
+    string                = ('"""
+    + '"""'
+    + r"""' ~'([^"])+' '"""
+    + '"""'
+    + r"""')
                             / ("'''" ~"([^'])+" "'''")
                             / ("```" ~"([^`])+" "```")
                             / ('"' ~'([^"])+' '"')
                             / ("'" ~"([^'])+" "'")
                             / ("`" ~"([^`])+" "`")
-""")
+"""
+)
 
 
 operation_grammar = (
-    textwrap.dedent("""
+    textwrap.dedent(
+        """
     operation = ws? quality ws setter ws (expression (ws constraint)?) ws?
-    """) + base_expression_grammar
+    """
+    )
+    + base_expression_grammar
 )
 
 
 comparison_grammar = (
-    textwrap.dedent("""
+    textwrap.dedent(
+        """
     comparison = ws? quality ws comparator ws expression ws?
-    """) + base_expression_grammar
+    """
+    )
+    + base_expression_grammar
 )
 
 
-intro_text_grammar = textwrap.dedent(r"""
+intro_text_grammar = textwrap.dedent(
+    r"""
     intro       = head (suffix tail)?
 
     head        = ~"[^\[]*"
     suffix      = "[" ~"[^\]]*" "]"
     tail        = ~".*"
-""")
+"""
+)
 
 
-plain_text_grammar = textwrap.dedent(r"""
+plain_text_grammar = (
+    textwrap.dedent(
+        r"""
     line        = cmp_prefix? text glue?
 
     text        = ~"(?:(?!<>).)*"
@@ -98,4 +114,7 @@ plain_text_grammar = textwrap.dedent(r"""
     eol         = "\n" / ~"$"
 
     cmp_prefix  = "{" comparison "}"
-""") + comparison_grammar
+"""
+    )
+    + comparison_grammar
+)

@@ -22,15 +22,15 @@ def get_line(s, line_number):
     try:
         return s.splitlines(True)[line_number - 1]
     except IndexError:
-        return ''
+        return ""
 
 
 def is_text(text_or_source):
-    return hasattr(text_or_source, 'text') or isinstance(text_or_source, str)
+    return hasattr(text_or_source, "text") or isinstance(text_or_source, str)
 
 
 def get_text(text_or_source):
-    if hasattr(text_or_source, 'text'):
+    if hasattr(text_or_source, "text"):
         return str(text_or_source.text)
     elif isinstance(text_or_source, str):
         return text_or_source
@@ -51,10 +51,9 @@ def strip_outer_whitespace(text):
             i += 1
     except IndexError:
         i -= 1
-    return '\n'.join(lines[i:])
+    return "\n".join(lines[i:])
 
 
 def unwrap(text):
-    """Unwrap a hard-wrapped paragraph of text.
-    """
-    return ' '.join(text.splitlines())
+    """Unwrap a hard-wrapped paragraph of text."""
+    return " ".join(text.splitlines())

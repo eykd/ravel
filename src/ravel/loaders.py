@@ -17,8 +17,8 @@ class BaseLoader:
 
 @attr.s
 class FileSystemLoader(BaseLoader):
-    base_path = attr.ib(default='.')
-    extension = attr.ib(default='.ravel')
+    base_path = attr.ib(default=".")
+    extension = attr.ib(default=".ravel")
 
     def get_up_to_date_checker(self, filepath):
         filepath = Path(filepath)
@@ -29,7 +29,7 @@ class FileSystemLoader(BaseLoader):
 
         def is_up_to_date():
             try:
-                print('was %s, now %s' % (mtime, filepath.getmtime()))
+                print("was %s, now %s" % (mtime, filepath.getmtime()))
                 return mtime == filepath.getmtime()
             except OSError:
                 return False
@@ -41,7 +41,7 @@ class FileSystemLoader(BaseLoader):
         if not filepath.exists():
             raise exceptions.RulebookNotFound(name)
 
-        with codecs.open(filepath, encoding='utf-8') as fi:
+        with codecs.open(filepath, encoding="utf-8") as fi:
             source = fi.read()
 
         is_up_to_date = self.get_up_to_date_checker(filepath)

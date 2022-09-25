@@ -6,7 +6,7 @@ from ravel import queries
 from ravel.utils.strings import get_text
 
 
-logger = logging.getLogger('vm.states')
+logger = logging.getLogger("vm.states")
 
 
 @attr.s
@@ -36,21 +36,21 @@ class Begin(State):
 @attr.s
 class DisplayPossibleSituations(State):
     def query_and_display(self, vm):
-        query = queries.query('Situation', vm.qualities.items(), vm.rulebook)
-        vm.send('begin_display_choices')
+        query = queries.query("Situation", vm.qualities.items(), vm.rulebook)
+        vm.send("begin_display_choices")
         for n, (location, situation) in enumerate(query):
             vm.send(
-                'display_choice',
-                index = n,
-                choice = location,
-                text = get_text(situation.intro),
-                state = self,
+                "display_choice",
+                index=n,
+                choice=location,
+                text=get_text(situation.intro),
+                state=self,
             )
-        vm.send('end_display_choices')
+        vm.send("end_display_choices")
         vm.send(
-            'waiting_for_input',
-            send_input = lambda choice: self.receive(vm, choice),
-            state = self,
+            "waiting_for_input",
+            send_input=lambda choice: self.receive(vm, choice),
+            state=self,
         )
 
     def enter(self, vm):
@@ -84,14 +84,14 @@ class DisplaySituation(State):
         while not self.paused:
             try:
                 directive = self.situation.directives[self.index]
-                logger.info(f'Displaying directive {self.index}: {directive!r}')
+                logger.info(f"Displaying directive {self.index}: {directive!r}")
             except IndexError:
-                logger.info(f'End of directives for {self!r}')
+                logger.info(f"End of directives for {self!r}")
                 if not vm.queue:
                     vm.pop()
                 break
-            handler = getattr(self, 'handle_' + directive.__class__.__name__.lower())
-            logger.info(f'Running handler: {handler.__name__}')
+            handler = getattr(self, "handle_" + directive.__class__.__name__.lower())
+            logger.info(f"Running handler: {handler.__name__}")
             handler(vm, directive)
             self.index += 1
 
@@ -100,35 +100,35 @@ class DisplaySituation(State):
             text = get_text(directive)
             if text.strip():
                 vm.send(
-                    'display_text',
-                    text = text,
-                    state = self,
-                    sticky = directive.sticky,
+                    "display_text",
+                    text=text,
+                    state=self,
+                    sticky=directive.sticky,
                 )
 
     def handle_choice(self, vm, directive):
         situation = vm.get_situation(directive.choice)
         vm.send(
-            'display_choice',
-            index = self.index,
-            choice = directive.choice,
-            text = get_text(situation.intro),
-            state = self,
+            "display_choice",
+            index=self.index,
+            choice=directive.choice,
+            text=get_text(situation.intro),
+            state=self,
         )
 
     def handle_beginchoices(self, vm, directive):
-        vm.send('begin_display_choices')
+        vm.send("begin_display_choices")
 
     def handle_getchoice(self, vm, directive):
-        vm.send('end_display_choices')
+        vm.send("end_display_choices")
         vm.send(
-            'waiting_for_input',
-            send_input = lambda choice: self.receive(vm, choice),
+            "waiting_for_input",
+            send_input=lambda choice: self.receive(vm, choice),
             state=self,
         )
 
     def handle_operation(self, vm, directive):
-        logger.info(f'Applying operation: {directive!r}')
+        logger.info(f"Applying operation: {directive!r}")
         vm.apply_operation(directive)
 
     def receive(self, vm, location):

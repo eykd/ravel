@@ -57,8 +57,10 @@ class BaseExpressionParser(BaseParser):
 
 class ComparisonParser(BaseExpressionParser):
     grammar = Grammar(
-        ("comparison = ws? quality ws comparator ws expression ws?"
-         + grammars.base_expression_grammar)
+        (
+            "comparison = ws? quality ws comparator ws expression ws?"
+            + grammars.base_expression_grammar
+        )
     )
 
     def visit_comparator(self, node, children):
@@ -76,7 +78,7 @@ class IntroTextParser(BaseParser):
         return node.text
 
     def visit_suffix(self, node, children):
-        return node.text.strip('[]')
+        return node.text.strip("[]")
 
     def visit_tail(self, node, children):
         return node.text
@@ -86,7 +88,7 @@ class IntroTextParser(BaseParser):
         if rest is not None:
             suffix, tail = rest
         else:
-            suffix = tail = ''
+            suffix = tail = ""
 
         return [
             types.Text(head + suffix),

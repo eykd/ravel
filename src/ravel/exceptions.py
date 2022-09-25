@@ -4,22 +4,28 @@ from parsimonious.exceptions import ParseError as ParsimoniousParseError
 from .types import Source
 
 
-class ParseError(ValueError): pass
+class ParseError(ValueError):
+    pass
 
 
-class OutOfContextNodeError(ParseError): pass
+class OutOfContextNodeError(ParseError):
+    pass
 
 
-class ComparisonParseError(ParseError): pass
+class ComparisonParseError(ParseError):
+    pass
 
 
-class OperationParseError(ParseError): pass
+class OperationParseError(ParseError):
+    pass
 
 
-class MissingBaggageError(Exception): pass
+class MissingBaggageError(Exception):
+    pass
 
 
-class RulebookNotFound(Exception): pass
+class RulebookNotFound(Exception):
+    pass
 
 
 def raise_parse_error(position, error_type=ParseError):
@@ -30,6 +36,5 @@ def raise_parse_error(position, error_type=ParseError):
         )
     else:
         raise error_type(
-            "Could not determine source position:\n%r" % position,
-            position
+            "Could not determine source position:\n%r" % position, position
         )

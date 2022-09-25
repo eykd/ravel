@@ -10,7 +10,7 @@ from . import signals
 from . import states
 
 
-logger = logging.getLogger('ravel.vm')
+logger = logging.getLogger("ravel.vm")
 
 
 @attr.s
@@ -40,6 +40,7 @@ class VirtualMachine:
     display-situation state onto the stack.
 
     """
+
     rulebook = attr.ib()
     givens = attr.ib(default=attr.Factory(list))
     metadata = attr.ib(default=attr.Factory(dict))
@@ -50,15 +51,17 @@ class VirtualMachine:
     queue = attr.ib(default=attr.Factory(deque))
 
     def enqueue(self, callable_action, *args, **kwargs):
-        logger.debug(f'Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}')
+        logger.debug(
+            f"Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}"
+        )
         self.queue.append(partial(callable_action, *args, **kwargs))
 
     def do_next_in_queue(self):
-        logger.debug(f'Doing next: {self.queue[0]}')
+        logger.debug(f"Doing next: {self.queue[0]}")
         self.queue.popleft()()
 
     def begin(self):
-        logger.debug('Beginning...')
+        logger.debug("Beginning...")
         self.enqueue(self.initialize_from_givens)
         self.enqueue(self.push, self.begin_state())
 
@@ -68,21 +71,21 @@ class VirtualMachine:
             self.do_next_in_queue()
 
     def apply_operation(self, op):
-        logger.debug('Applying operation: %r', op)
+        logger.debug("Applying operation: %r", op)
         quality = op.quality
         initial_value = self.qualities.get(quality)
         new_value = op.evaluate(initial_value, qualities=self.qualities)
         self.qualities[quality] = new_value
-        logger.debug(f'Quality [{quality}] was {initial_value!r}, now {new_value!r}')
+        logger.debug(f"Quality [{quality}] was {initial_value!r}, now {new_value!r}")
         self.send(
-            'quality_changed',
-            quality = quality,
-            initial_value = initial_value,
-            new_value = new_value,
+            "quality_changed",
+            quality=quality,
+            initial_value=initial_value,
+            new_value=new_value,
         )
 
     def initialize_from_givens(self):
-        logger.debug(f'Initializing from givens: {self.givens!r}')
+        logger.debug(f"Initializing from givens: {self.givens!r}")
         state = self.qualities
         for op in self.givens:
             self.apply_operation(op)
@@ -93,7 +96,7 @@ class VirtualMachine:
         return self.stack[-1] if self.stack else None
 
     def push(self, state):
-        logger.debug(f'Pushing state: {state!r}')
+        logger.debug(f"Pushing state: {state!r}")
         self.enqueue(self.do_push, state)
 
     def do_push(self, state):
@@ -101,34 +104,34 @@ class VirtualMachine:
         if top_state is not None:
             logger.debug(f"Pausing state {top_state!r}")
             top_state.pause(self)
-            self.send('pause_state', state=top_state)
+            self.send("pause_state", state=top_state)
 
         logger.debug(f"Entering state {state!r}")
         self.stack.append(state)
         state.enter(self)
-        self.send('enter_state', state=state)
+        self.send("enter_state", state=state)
 
     def pop(self):
-        logger.debug('Popping state')
+        logger.debug("Popping state")
         self.enqueue(self.do_pop)
 
     def do_pop(self):
         state = self.stack.pop()
         logger.debug(f"Exiting state {state!r}")
         state.exit(self)
-        self.send('exit_state', state=state)
+        self.send("exit_state", state=state)
 
         top_state = self.top_state
         if top_state is not None:
             logger.debug(f"Resuming state {top_state!r}")
             top_state.resume(self)
-            self.send('resume_state', state=top_state)
+            self.send("resume_state", state=top_state)
 
     def send(self, signal_name, **kwargs):
-        logger.debug(f'Sending signal {signal_name!r}, {kwargs!r}')
+        logger.debug(f"Sending signal {signal_name!r}, {kwargs!r}")
         signal = getattr(self.signals, signal_name)
         signal.send(self, **kwargs)
 
     def get_situation(self, name):
-        logger.debug('Getting situation %s', name)
-        return queries.query_by_name(name, self.rulebook['Situation'])
+        logger.debug("Getting situation %s", name)
+        return queries.query_by_name(name, self.rulebook["Situation"])

@@ -1,6 +1,6 @@
 import logging
 
-_logger = logging.getLogger('compiler')
+_logger = logging.getLogger("compiler")
 
 
 def debug(*args, **kwargs):

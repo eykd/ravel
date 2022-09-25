@@ -1,5 +1,3 @@
-
-
 def merge_dicts(*dicts):
     """
     Given any number of dicts, shallow copy and merge into a new dict,
@@ -12,4 +10,4 @@ def merge_dicts(*dicts):
 
 
 def evaluate_term(term, **kwargs):
-    return term.evaluate(**kwargs) if hasattr(term, 'evaluate') else term
+    return term.evaluate(**kwargs) if hasattr(term, "evaluate") else term
