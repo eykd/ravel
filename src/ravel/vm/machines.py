@@ -58,7 +58,7 @@ class VirtualMachine:
         self.queue.popleft()()
 
     def begin(self):
-        logger.info('Beginning...')
+        logger.debug('Beginning...')
         self.enqueue(self.initialize_from_givens)
         self.enqueue(self.push, self.begin_state())
 
@@ -68,12 +68,12 @@ class VirtualMachine:
             self.do_next_in_queue()
 
     def apply_operation(self, op):
-        logger.info('Applying operation: %r', op)
+        logger.debug('Applying operation: %r', op)
         quality = op.quality
         initial_value = self.qualities.get(quality)
         new_value = op.evaluate(initial_value, qualities=self.qualities)
         self.qualities[quality] = new_value
-        logger.info(f'Quality [{quality}] was {initial_value!r}, now {new_value!r}')
+        logger.debug(f'Quality [{quality}] was {initial_value!r}, now {new_value!r}')
         self.send(
             'quality_changed',
             quality = quality,
@@ -82,7 +82,7 @@ class VirtualMachine:
         )
 
     def initialize_from_givens(self):
-        logger.info(f'Initializing from givens: {self.givens!r}')
+        logger.debug(f'Initializing from givens: {self.givens!r}')
         state = self.qualities
         for op in self.givens:
             self.apply_operation(op)
@@ -99,11 +99,11 @@ class VirtualMachine:
     def do_push(self, state):
         top_state = self.top_state
         if top_state is not None:
-            logger.info(f"Pausing state {top_state!r}")
+            logger.debug(f"Pausing state {top_state!r}")
             top_state.pause(self)
             self.send('pause_state', state=top_state)
 
-        logger.info(f"Entering state {state!r}")
+        logger.debug(f"Entering state {state!r}")
         self.stack.append(state)
         state.enter(self)
         self.send('enter_state', state=state)
@@ -114,13 +114,13 @@ class VirtualMachine:
 
     def do_pop(self):
         state = self.stack.pop()
-        logger.info(f"Exiting state {state!r}")
+        logger.debug(f"Exiting state {state!r}")
         state.exit(self)
         self.send('exit_state', state=state)
 
         top_state = self.top_state
         if top_state is not None:
-            logger.info(f"Resuming state {top_state!r}")
+            logger.debug(f"Resuming state {top_state!r}")
             top_state.resume(self)
             self.send('resume_state', state=top_state)
 
