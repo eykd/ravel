@@ -9,37 +9,45 @@ from .. import environments, loaders
 from . import machines, signals
 
 
-def handle_exception(e):
+def handle_exception(debug=False):
     logging.exception("Something bad happened...")
-    import pdb
+    if debug:
+        import pdb
 
-    pdb.post_mortem()
+        pdb.post_mortem()
+    sys.exit(1)
 
 
-def with_exception_handling(func):
-    @functools.wraps(func)
-    def run_with_exception_handling(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except Exception as e:
-            handle_exception(e)
+def with_exception_handling(debug):
+    def wrapper(func):
+        @functools.wraps(func)
+        def run_with_exception_handling(*args, **kwargs):
+            try:
+                func(*args, **kwargs)
+            except Exception:
+                handle_exception(debug)
 
-    return run_with_exception_handling
+        return run_with_exception_handling
+
+    return wrapper
 
 
 class ConsoleRunner:
     signals = signals.Signals()
 
-    @with_exception_handling
-    def __init__(self, source_directory):
-        self.env = environments.Environment(
-            loader=loaders.FileSystemLoader(source_directory),
-        )
+    def __init__(self, source_directory, debug=False):
+        self.debug = debug
+        try:
+            self.env = environments.Environment(
+                loader=loaders.FileSystemLoader(source_directory),
+            )
 
-        rulebook = self.env.load()
-        self.vm = machines.VirtualMachine(
-            **rulebook,
-        )
+            rulebook = self.env.load()
+            self.vm = machines.VirtualMachine(
+                **rulebook,
+            )
+        except Exception:
+            handle_exception(debug)
 
         self.choices = []
 
@@ -72,7 +80,7 @@ class ConsoleRunner:
 
     def get_display_text_handler(self, vm):
         @vm.signals.display_text.connect
-        @with_exception_handling
+        @with_exception_handling(self.debug)
         def display_text(vm, text, state, sticky=False):
             text = "{yellow}%s{/yellow}" % textwrap.fill(text)
             if not sticky:
@@ -83,7 +91,7 @@ class ConsoleRunner:
 
     def get_display_choice_handler(self, vm):
         @vm.signals.display_choice.connect
-        @with_exception_handling
+        @with_exception_handling(self.debug)
         def display_choice(vm, index, choice, text, state):
             self.choices.append(choice)
             self.emit_text(
@@ -94,7 +102,7 @@ class ConsoleRunner:
 
     def get_wait_for_input_handler(self, vm):
         @vm.signals.waiting_for_input.connect
-        @with_exception_handling
+        @with_exception_handling(self.debug)
         def wait_for_input(vm, send_input, state):
             choice = None
             while choice is None:
@@ -120,7 +128,6 @@ class ConsoleRunner:
 
         return wait_for_input
 
-    @with_exception_handling
     def run(self):
         try:
             handlers = self.get_handlers()  # noqa: F841
