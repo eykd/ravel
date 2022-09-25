@@ -13,7 +13,7 @@ class TestCompileDirective:
         result = directives.compile_directive(
             env, "Situation", Mock(), {"text": "Hello world"}
         )
-        expected = [(types.Text(text="Hello world"), {})  ]
+        expected = [(types.Text(text="Hello world"), {})]
         assert result == expected
 
     def test_it_should_handle_a_list_of_effects(self, env):

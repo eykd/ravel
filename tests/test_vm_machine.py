@@ -30,11 +30,11 @@ class TestMachine:
     def test_it_should_initialize_from_rulebook_givens(self):
         givens = [
             types.Operation(
-                quality = 'Foo',
-                operator = '=',
-                expression = 0,
+                quality="Foo",
+                operator="=",
+                expression=0,
             )
         ]
         machine = machines.VirtualMachine(rulebook=Mock(), givens=givens)
         machine.initialize_from_givens()
-        assert machine.qualities == {'Foo': 0}
+        assert machine.qualities == {"Foo": 0}
