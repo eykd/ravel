@@ -1,6 +1,4 @@
-from ravel import environments
-from ravel import types
-
+from ravel import environments, types
 from ravel.compiler.rulesets import compile_ruleset
 
 from .helpers import source

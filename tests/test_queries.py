@@ -1,13 +1,9 @@
 import textwrap
 
 import pytest
-
 import syml
 
-from ravel import environments
-from ravel import queries
-from ravel import types
-
+from ravel import environments, queries, types
 from ravel.compiler.rulebooks import compile_rulebook
 
 

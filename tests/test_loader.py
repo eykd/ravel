@@ -1,15 +1,12 @@
 import tempfile
 import time
-
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import pytest
-
 from path import Path
 
-from ravel import exceptions
-from ravel import loaders
+from ravel import exceptions, loaders
 
 
 @pytest.fixture

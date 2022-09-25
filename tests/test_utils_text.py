@@ -4,8 +4,8 @@ from unittest import TestCase
 
 import pytest
 
-from ravel.utils import strings
 from ravel.types import Pos
+from ravel.utils import strings
 
 
 class TestStripOuterWhitespace:

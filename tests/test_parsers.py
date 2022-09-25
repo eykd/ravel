@@ -3,8 +3,7 @@ from unittest import TestCase
 
 import pytest
 
-from ravel import types
-from ravel import parsers
+from ravel import parsers, types
 
 
 class TestIntroTextParser:

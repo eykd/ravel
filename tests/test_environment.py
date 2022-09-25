@@ -1,15 +1,11 @@
 import tempfile
 import time
-
 from unittest.mock import Mock, patch
 
 import pytest
-
 from path import Path
 
-from ravel import environments
-from ravel import loaders
-
+from ravel import environments, loaders
 
 PATH = Path(__file__).abspath().dirname()
 EXAMPLES = PATH.parent / "examples"

@@ -2,8 +2,7 @@ import itertools as it
 
 import pytest
 
-from ravel import parsers
-from ravel import types
+from ravel import parsers, types
 
 
 class TestComparison:

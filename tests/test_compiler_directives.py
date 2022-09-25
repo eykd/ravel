@@ -2,9 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from ravel import environments
-from ravel import exceptions
-from ravel import types
+from ravel import environments, exceptions, types
 from ravel.compiler import directives
 
 
