@@ -1,19 +1,42 @@
 import functools
 import logging
+import pdb
 import sys
 import textwrap
+from typing import Callable
 
+from attrs import define
 from colorclass import Color
 
 from .. import environments, loaders
 from . import machines, signals
+from .states import State
+
+
+@define(auto_attrib=True, frozen=True)
+class DisplayText:
+    text: str
+    state: dict
+    sticky: bool
+
+
+@define(auto_attrib=True, frozen=True)
+class DisplayChoice:
+    index: int
+    choice: str
+    text: str
+    state: dict
+
+
+@define(auto_attrib=True, frozen=True)
+class Waiter:
+    send_input: Callable
+    state: State
 
 
 def handle_exception(debug=False):
     logging.exception("Something bad happened...")
     if debug:
-        import pdb
-
         pdb.post_mortem()
     sys.exit(1)
 
@@ -30,6 +53,64 @@ def with_exception_handling(debug):
         return run_with_exception_handling
 
     return wrapper
+
+
+class StatefulRunner:
+    def __init__(self, env):
+        self.env = env
+        rulebook = self.env.load()
+        self.vm = machines.VirtualMachine(**rulebook)
+
+        self.choices = []
+        self.out_queue = []
+
+        self.waiting_for_choice = False
+        self.waiter = None
+
+    def enqueue_text(self, text):
+        self.out_queue.append(text)
+
+    def clear_text_queue(self):
+        self.out_queue[:] = ()
+
+    def consume_text_queue(self):
+        yield from iter(self.out_queue)
+        self.clear_text_queue()
+
+    def get_display_text_handler(self, vm):
+        @vm.signals.display_text.connect
+        def display_text(vm, text, state, sticky=False):
+            self.out_queue.append(DisplayText(text=text, state=state, sticky=sticky))
+
+        return display_text
+
+    def get_display_choice_handler(self, vm):
+        @vm.signals.display_choice.connect
+        def display_choice(vm, index, choice, text, state):
+            self.choices.append(DisplayChoice(index=index, choice=choice, text=text, state=state))
+
+        return display_choice
+
+    def get_wait_for_input_handler(self, vm):
+        @vm.signals.waiting_for_input.connect
+        def wait_for_input(vm, send_input, state):
+            self.waiting_for_choice = True
+            self.waiter = Waiter(send_input=send_input, state=state)
+
+        return wait_for_input
+
+    def choose(self, choice_idx: int):
+        if not self.waiting_for_choice:
+            raise RuntimeError("VM is not currently waiting for a choice.")
+
+        choice = self.choices[choice_idx]
+        waiter = self.waiter
+
+        self.choices[:] = ()
+        self.waiter = None
+        self.waiting_for_choice = False
+
+        waiter.send_input(choice)
 
 
 class ConsoleRunner:
@@ -94,9 +175,7 @@ class ConsoleRunner:
         @with_exception_handling(self.debug)
         def display_choice(vm, index, choice, text, state):
             self.choices.append(choice)
-            self.emit_text(
-                f"{{green}}{len(self.choices)}{{/green}}: {{yellow}}{text}{{/yellow}}"
-            )
+            self.emit_text(f"{{green}}{len(self.choices)}{{/green}}: {{yellow}}{text}{{/yellow}}")
 
         return display_choice
 

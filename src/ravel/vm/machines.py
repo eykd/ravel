@@ -1,16 +1,19 @@
 import logging
 from collections import deque
 from functools import partial
+from typing import Callable, Deque, Dict, List
 
 import attr
+from attrs import define, field
 
 from .. import queries
-from . import signals, states
+from .signals import Signals
+from .states import Begin, State
 
 logger = logging.getLogger("ravel.vm")
 
 
-@attr.s
+@define
 class VirtualMachine:
     """The VirtualMachine is a stack of State objects. Each State controls the
     transitions that it may make. Some states will simply pop themselves off
@@ -38,19 +41,17 @@ class VirtualMachine:
 
     """
 
-    rulebook = attr.ib()
-    givens = attr.ib(default=attr.Factory(list))
-    metadata = attr.ib(default=attr.Factory(dict))
-    qualities = attr.ib(default=attr.Factory(dict))
-    stack = attr.ib(default=attr.Factory(deque))
-    signals = attr.ib(default=attr.Factory(signals.Signals))
-    begin_state = attr.ib(default=states.Begin)
-    queue = attr.ib(default=attr.Factory(deque))
+    rulebook: Dict = field()
+    givens: List = field(default=attr.Factory(list))
+    metadata: Dict = field(default=attr.Factory(dict))
+    qualities: Dict = field(default=attr.Factory(dict))
+    stack: Deque[State] = field(default=attr.Factory(deque))
+    signals: Signals = field(default=attr.Factory(Signals))
+    begin_state: Begin = field(default=Begin)
+    queue: Deque[Callable] = field(default=attr.Factory(deque))
 
-    def enqueue(self, callable_action, *args, **kwargs):
-        logger.debug(
-            f"Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}"
-        )
+    def enqueue(self, callable_action: Callable, *args, **kwargs):
+        logger.debug(f"Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}")
         self.queue.append(partial(callable_action, *args, **kwargs))
 
     def do_next_in_queue(self):
@@ -89,10 +90,10 @@ class VirtualMachine:
         self.qualities = state
 
     @property
-    def top_state(self):
+    def top_state(self) -> State:
         return self.stack[-1] if self.stack else None
 
-    def push(self, state):
+    def push(self, state: State):
         logger.debug(f"Pushing state: {state!r}")
         self.enqueue(self.do_push, state)
 
