@@ -12,28 +12,23 @@ from .. import loaders
 from ..environments import Environment
 from . import machines
 from .signals import SIGNALS, signal
-from .states import State
 
 
 @define(auto_attribs=True, frozen=True)
 class DisplayText:
     text: str
-    state: dict
     sticky: bool
 
 
 @define(auto_attribs=True, frozen=True)
 class DisplayChoice:
-    index: int
     choice: str
     text: str
-    state: dict
 
 
 @define(auto_attribs=True, frozen=True)
 class Waiter:
     send_input: Callable
-    state: State
 
 
 def handle_exception(debug=False):
@@ -114,14 +109,14 @@ class StatefulRunner:
     def get_display_text_handler(self, vm):
         @vm.signals.display_text.connect
         def display_text(vm, text, state, sticky=False):
-            self.out_queue.append(DisplayText(text=text, state=state, sticky=sticky))
+            self.out_queue.append(DisplayText(text=text, sticky=sticky))
 
         return display_text
 
     def get_display_choice_handler(self, vm):
         @vm.signals.display_choice.connect
         def display_choice(vm, index, choice, text, state):
-            self.choices.append(DisplayChoice(index=index, choice=choice, text=text, state=state))
+            self.choices.append(DisplayChoice(choice=choice, text=text))
 
         return display_choice
 
@@ -129,7 +124,7 @@ class StatefulRunner:
         @vm.signals.waiting_for_input.connect
         def wait_for_input(vm, send_input, state):
             self.waiting_for_choice = True
-            self.waiter = Waiter(send_input=send_input, state=state)
+            self.waiter = Waiter(send_input=send_input)
 
         return wait_for_input
 
