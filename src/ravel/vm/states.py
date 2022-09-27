@@ -4,6 +4,7 @@ import attr
 
 from ravel import queries
 from ravel.utils.strings import get_text
+from ravel.vm import events
 
 logger = logging.getLogger("vm.states")
 
@@ -36,21 +37,13 @@ class Begin(State):
 class DisplayPossibleSituations(State):
     def query_and_display(self, vm):
         query = queries.query("Situation", vm.qualities.items(), vm.rulebook)
-        vm.send("begin_display_choices")
+        vm.send(events.begin_display_choices())
         for n, (location, situation) in enumerate(query):
             vm.send(
-                "display_choice",
-                index=n,
-                choice=location,
-                text=get_text(situation.intro),
-                state=self,
+                events.display_choice(index=n, choice=location, text=get_text(situation.intro), state=self),
             )
-        vm.send("end_display_choices")
-        vm.send(
-            "waiting_for_input",
-            send_input=lambda choice: self.receive(vm, choice),
-            state=self,
-        )
+        vm.send(events.end_display_choices())
+        vm.send(events.waiting_for_input(send_input=lambda choice: self.receive(vm, choice), state=self))
 
     def enter(self, vm):
         self.query_and_display(vm)
@@ -99,32 +92,23 @@ class DisplaySituation(State):
             text = get_text(directive)
             if text.strip():
                 vm.send(
-                    "display_text",
-                    text=text,
-                    state=self,
-                    sticky=directive.sticky,
+                    events.display_text(text=text, state=self, sticky=directive.sticky),
                 )
 
     def handle_choice(self, vm, directive):
         situation = vm.get_situation(directive.choice)
         vm.send(
-            "display_choice",
-            index=self.index,
-            choice=directive.choice,
-            text=get_text(situation.intro),
-            state=self,
+            events.display_choice(
+                index=self.index, choice=directive.choice, text=get_text(situation.intro), state=self
+            ),
         )
 
     def handle_beginchoices(self, vm, directive):
-        vm.send("begin_display_choices")
+        vm.send(events.begin_display_choices())
 
     def handle_getchoice(self, vm, directive):
-        vm.send("end_display_choices")
-        vm.send(
-            "waiting_for_input",
-            send_input=lambda choice: self.receive(vm, choice),
-            state=self,
-        )
+        vm.send(events.end_display_choices())
+        vm.send(events.waiting_for_input(send_input=lambda choice: self.receive(vm, choice), state=self))
 
     def handle_operation(self, vm, directive):
         logger.info(f"Applying operation: {directive!r}")

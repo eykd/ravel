@@ -2,7 +2,10 @@ import pytest
 
 from ravel.environments import Environment
 from ravel.loaders import FileSystemLoader
-from ravel.vm.runners import DisplayChoice, DisplayText, StatefulRunner
+from ravel.vm import events
+from ravel.vm.runners import StatefulRunner
+
+from .helpers import Any
 
 
 @pytest.fixture
@@ -20,17 +23,19 @@ class TestStatefulRunner:
         with runner:
             assert runner.running is True
             assert runner._handlers
-            assert runner.out_queue == []
-            assert runner.choices == []
+            assert runner.text_events == []
+            assert runner.choice_events == []
 
             for _ in runner:
                 pass
 
-            assert runner.out_queue == []
-            assert runner.choices == [
-                DisplayChoice(
+            assert runner.text_events == []
+            assert runner.choice_events == [
+                events.display_choice(
                     choice="begin::intro",
                     text="Hurrying through the rainswept November night…",
+                    state=Any(),
+                    index=0,
                 )
             ]
             assert runner.waiting_for_choice is True
@@ -40,8 +45,8 @@ class TestStatefulRunner:
             for _ in runner:
                 pass
 
-            assert runner.out_queue == [
-                DisplayText(
+            assert runner.text_events == [
+                events.display_text(
                     text=(
                         "Hurrying through the rainswept November night, you're "
                         "glad to see the bright lights of the Opera House. It's "
@@ -49,9 +54,12 @@ class TestStatefulRunner:
                         "what do you expect in a cheap demo game…?"
                     ),
                     sticky=False,
+                    state=Any(),
                 )
             ]
-            assert runner.choices == [
-                DisplayChoice(choice="begin::intro::press-onward", text="Press onward!"),
-                DisplayChoice(choice="begin::intro", text="Hurrying through the rainswept November night…"),
+            assert runner.choice_events == [
+                events.display_choice(choice="begin::intro::press-onward", text="Press onward!", state=Any(), index=3),
+                events.display_choice(
+                    choice="begin::intro", text="Hurrying through the rainswept November night…", state=Any(), index=0
+                ),
             ]

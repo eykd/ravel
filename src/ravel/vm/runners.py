@@ -3,32 +3,14 @@ import logging
 import pdb
 import sys
 import textwrap
-from typing import Callable
+from collections import defaultdict
 
-from attrs import define
 from colorclass import Color
 
 from .. import loaders
 from ..environments import Environment
 from . import machines
 from .signals import SIGNALS, signal
-
-
-@define(auto_attribs=True, frozen=True)
-class DisplayText:
-    text: str
-    sticky: bool
-
-
-@define(auto_attribs=True, frozen=True)
-class DisplayChoice:
-    choice: str
-    text: str
-
-
-@define(auto_attribs=True, frozen=True)
-class Waiter:
-    send_input: Callable
 
 
 def handle_exception(debug=False):
@@ -57,8 +39,9 @@ class StatefulRunner:
         self.env = env
         self.vm = machines.VirtualMachine(**self.env.load())
 
-        self.choices = []
-        self.out_queue = []
+        self.choice_events = []
+        self.text_events = []
+        self.all_events = []
 
         self.running = False
         self.waiting_for_choice = False
@@ -75,56 +58,75 @@ class StatefulRunner:
         self.teardown_handlers()
         self.running = False
 
-    def __next__(self):
-        try:
-            self.vm.do_next_in_queue()
-        except IndexError:
-            raise StopIteration()
-
     def __iter__(self):
-        return self
+        while True:
+            try:
+                self.vm.do_next_in_queue()
+            except IndexError:
+                break
+            else:
+                yield from self.consume_event_queue()
 
     def setup_handlers(self):
-        self._handlers = {
-            SIGNALS.display_text.value: self.get_display_text_handler(self.vm),
-            SIGNALS.display_choice.value: self.get_display_choice_handler(self.vm),
-            SIGNALS.waiting_for_input.value: self.get_wait_for_input_handler(self.vm),
-        }
+        handlers = defaultdict(
+            list,
+            {
+                SIGNALS.display_text.value: [self.get_display_text_handler(self.vm)],
+                SIGNALS.display_choice.value: [self.get_display_choice_handler(self.vm)],
+                SIGNALS.waiting_for_input.value: [self.get_wait_for_input_handler(self.vm)],
+            },
+        )
+        for sig in SIGNALS:
+            signal(sig.value).connect(self._handle_event)
+            handlers[sig.value].append(self._handle_event)
+
+        self._handlers = dict(handlers)
+
+    def _handle_event(self, event):
+        self.all_events.append(event)
 
     def teardown_handlers(self):
-        for signame, handler in self._handlers.items():
-            signal(signame).disconnect(handler)
+        for signame, handlers in self._handlers.items():
+            for handler in handlers:
+                signal(signame).disconnect(handler)
         self._handlers.clear()
 
     def begin(self):
         self.vm.begin()
 
     def clear_text_queue(self):
-        self.out_queue[:] = ()
+        self.text_events[:] = ()
 
     def consume_text_queue(self):
-        yield from iter(self.out_queue)
+        yield from iter(self.text_events)
         self.clear_text_queue()
+
+    def clear_event_queue(self):
+        self.all_events[:] = ()
+
+    def consume_event_queue(self):
+        yield from iter(self.all_events)
+        self.clear_event_queue()
 
     def get_display_text_handler(self, vm):
         @vm.signals.display_text.connect
-        def display_text(vm, text, state, sticky=False):
-            self.out_queue.append(DisplayText(text=text, sticky=sticky))
+        def display_text(event):
+            self.text_events.append(event)
 
         return display_text
 
     def get_display_choice_handler(self, vm):
         @vm.signals.display_choice.connect
-        def display_choice(vm, index, choice, text, state):
-            self.choices.append(DisplayChoice(choice=choice, text=text))
+        def display_choice(event):
+            self.choice_events.append(event)
 
         return display_choice
 
     def get_wait_for_input_handler(self, vm):
         @vm.signals.waiting_for_input.connect
-        def wait_for_input(vm, send_input, state):
+        def wait_for_input(event):
             self.waiting_for_choice = True
-            self.waiter = Waiter(send_input=send_input)
+            self.waiter = event
 
         return wait_for_input
 
@@ -132,10 +134,10 @@ class StatefulRunner:
         if not self.waiting_for_choice:
             raise RuntimeError("VM is not currently waiting for a choice.")
 
-        choice = self.choices[choice_idx]
+        choice = self.choice_events[choice_idx]
         waiter = self.waiter
 
-        self.choices[:] = ()
+        self.choice_events[:] = ()
         self.waiter = None
         self.waiting_for_choice = False
 
@@ -157,16 +159,16 @@ class ConsoleRunner:
         except Exception:
             handle_exception(debug)
 
-        self.choices = []
+        self.choice_events = []
 
-        self.out_queue = []
+        self.text_events = []
 
     def enqueue_text(self, text):
-        self.out_queue.append(text)
+        self.text_events.append(text)
 
     def get_enqueued_text(self):
-        text = "".join(self.out_queue)
-        self.out_queue[:] = ()
+        text = "".join(self.text_events)
+        self.text_events[:] = ()
         return Color(text)
 
     def emit_text(self, text, sticky=False):
@@ -189,34 +191,34 @@ class ConsoleRunner:
     def get_display_text_handler(self, vm):
         @vm.signals.display_text.connect
         @with_exception_handling(self.debug)
-        def display_text(vm, text, state, sticky=False):
-            text = "{yellow}%s{/yellow}" % textwrap.fill(text)
-            if not sticky:
+        def display_text(event):
+            text = "{yellow}%s{/yellow}" % textwrap.fill(event.text)
+            if not event.sticky:
                 text += "\n"
-            self.emit_text(text, sticky=sticky)
+            self.emit_text(text, sticky=event.sticky)
 
         return display_text
 
     def get_display_choice_handler(self, vm):
         @vm.signals.display_choice.connect
         @with_exception_handling(self.debug)
-        def display_choice(vm, index, choice, text, state):
-            self.choices.append(choice)
-            self.emit_text(f"{{green}}{len(self.choices)}{{/green}}: {{yellow}}{text}{{/yellow}}")
+        def display_choice(event):
+            self.choice_events.append(event.choice)
+            self.emit_text(f"{{green}}{len(self.choice_events)}{{/green}}: {{yellow}}{event.text}{{/yellow}}")
 
         return display_choice
 
     def get_wait_for_input_handler(self, vm):
         @vm.signals.waiting_for_input.connect
         @with_exception_handling(self.debug)
-        def wait_for_input(vm, send_input, state):
+        def wait_for_input(event):
             choice = None
             while choice is None:
                 self.emit_text("")
                 chosen = self.get_input("{green}What'll it be?{/green} ").lower()
                 if chosen.isdigit():
                     try:
-                        choice = self.choices[int(chosen) - 1]
+                        choice = self.choice_events[int(chosen) - 1]
                     except (ValueError, IndexError):
                         self.emit_text("{red}That's not an option.{/red}")
                         choice = None
@@ -227,10 +229,10 @@ class ConsoleRunner:
                 else:
                     self.emit_text("{red}I'm sorry, what?{/red}")
 
-            self.choices[:] = ()
+            self.choice_events[:] = ()
             self.emit_text("")
             self.emit_text("{cyan}%s{/cyan}" % ("-" * 80))
-            send_input(choice)
+            event.send_input(choice)
 
         return wait_for_input
 

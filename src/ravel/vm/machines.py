@@ -7,6 +7,7 @@ import attr
 from attrs import define, field
 
 from .. import queries
+from . import events
 from .signals import Signals
 from .states import Begin, State
 
@@ -76,10 +77,11 @@ class VirtualMachine:
         self.qualities[quality] = new_value
         logger.debug(f"Quality [{quality}] was {initial_value!r}, now {new_value!r}")
         self.send(
-            "quality_changed",
-            quality=quality,
-            initial_value=initial_value,
-            new_value=new_value,
+            events.quality_changed(
+                quality=quality,
+                initial_value=initial_value,
+                new_value=new_value,
+            )
         )
 
     def initialize_from_givens(self):
@@ -102,12 +104,12 @@ class VirtualMachine:
         if top_state is not None:
             logger.debug(f"Pausing state {top_state!r}")
             top_state.pause(self)
-            self.send("pause_state", state=top_state)
+            self.send(events.pause_state(state=top_state))
 
         logger.debug(f"Entering state {state!r}")
         self.stack.append(state)
         state.enter(self)
-        self.send("enter_state", state=state)
+        self.send(events.enter_state(state=state))
 
     def pop(self):
         logger.debug("Popping state")
@@ -117,18 +119,18 @@ class VirtualMachine:
         state = self.stack.pop()
         logger.debug(f"Exiting state {state!r}")
         state.exit(self)
-        self.send("exit_state", state=state)
+        self.send(events.exit_state(state=state))
 
         top_state = self.top_state
         if top_state is not None:
             logger.debug(f"Resuming state {top_state!r}")
             top_state.resume(self)
-            self.send("resume_state", state=top_state)
+            self.send(events.resume_state(state=top_state))
 
-    def send(self, signal_name, **kwargs):
-        logger.debug(f"Sending signal {signal_name!r}, {kwargs!r}")
-        signal = getattr(self.signals, signal_name)
-        signal.send(self, **kwargs)
+    def send(self, event):
+        logger.debug(f"Sending signal {event.name!r}")
+        signal = getattr(self.signals, event.name)
+        signal.send(event)
 
     def get_situation(self, name):
         logger.debug("Getting situation %s", name)

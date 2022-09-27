@@ -20,8 +20,6 @@ class SIGNALS(Enum):
 
     waiting_for_input = "waiting_for_input"
 
-    end_display_situation = "end_display_situation"
-
     quality_changed = "quality_changed"
 
 
@@ -41,7 +39,5 @@ class Signals:
     end_display_choices = signal(SIGNALS.end_display_choices.value)
 
     waiting_for_input = signal(SIGNALS.waiting_for_input.value)
-
-    end_display_situation = signal(SIGNALS.end_display_situation.value)
 
     quality_changed = signal(SIGNALS.quality_changed.value)
