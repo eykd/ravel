@@ -8,19 +8,21 @@ from typing import Callable
 from attrs import define
 from colorclass import Color
 
-from .. import environments, loaders
-from . import machines, signals
+from .. import loaders
+from ..environments import Environment
+from . import machines
+from .signals import SIGNALS, signal
 from .states import State
 
 
-@define(auto_attrib=True, frozen=True)
+@define(auto_attribs=True, frozen=True)
 class DisplayText:
     text: str
     state: dict
     sticky: bool
 
 
-@define(auto_attrib=True, frozen=True)
+@define(auto_attribs=True, frozen=True)
 class DisplayChoice:
     index: int
     choice: str
@@ -28,7 +30,7 @@ class DisplayChoice:
     state: dict
 
 
-@define(auto_attrib=True, frozen=True)
+@define(auto_attribs=True, frozen=True)
 class Waiter:
     send_input: Callable
     state: State
@@ -56,19 +58,51 @@ def with_exception_handling(debug):
 
 
 class StatefulRunner:
-    def __init__(self, env):
+    def __init__(self, env: Environment):
         self.env = env
-        rulebook = self.env.load()
-        self.vm = machines.VirtualMachine(**rulebook)
+        self.vm = machines.VirtualMachine(**self.env.load())
 
         self.choices = []
         self.out_queue = []
 
+        self.running = False
         self.waiting_for_choice = False
         self.waiter = None
 
-    def enqueue_text(self, text):
-        self.out_queue.append(text)
+        self._handlers = {}
+
+    def __enter__(self):
+        self.running = True
+        self.setup_handlers()
+        self.begin()
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.teardown_handlers()
+        self.running = False
+
+    def __next__(self):
+        try:
+            self.vm.do_next_in_queue()
+        except IndexError:
+            raise StopIteration()
+
+    def __iter__(self):
+        return self
+
+    def setup_handlers(self):
+        self._handlers = {
+            SIGNALS.display_text.value: self.get_display_text_handler(self.vm),
+            SIGNALS.display_choice.value: self.get_display_choice_handler(self.vm),
+            SIGNALS.waiting_for_input.value: self.get_wait_for_input_handler(self.vm),
+        }
+
+    def teardown_handlers(self):
+        for signame, handler in self._handlers.items():
+            signal(signame).disconnect(handler)
+        self._handlers.clear()
+
+    def begin(self):
+        self.vm.begin()
 
     def clear_text_queue(self):
         self.out_queue[:] = ()
@@ -110,16 +144,14 @@ class StatefulRunner:
         self.waiter = None
         self.waiting_for_choice = False
 
-        waiter.send_input(choice)
+        waiter.send_input(choice.choice)
 
 
 class ConsoleRunner:
-    signals = signals.Signals()
-
     def __init__(self, source_directory, debug=False):
         self.debug = debug
         try:
-            self.env = environments.Environment(
+            self.env = Environment(
                 loader=loaders.FileSystemLoader(source_directory),
             )
 

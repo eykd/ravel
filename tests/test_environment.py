@@ -1,18 +1,14 @@
 from unittest.mock import patch
 
 import pytest
-from path import Path
 
 from ravel import environments, loaders
 
-PATH = Path(__file__).abspath().dirname()
-EXAMPLES = PATH.parent / "examples"
-
 
 @pytest.fixture
-def env():
+def env(examples_path):
     return environments.Environment(
-        loader=loaders.FileSystemLoader(base_path=EXAMPLES / "simple"),
+        loader=loaders.FileSystemLoader(base_path=examples_path / "simple"),
     )
 
 
