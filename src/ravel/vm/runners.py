@@ -10,7 +10,7 @@ from colorclass import Color
 from .. import loaders
 from ..environments import Environment
 from . import machines
-from .signals import SIGNALS, signal
+from .signals import SIGNAL, signal
 
 
 def handle_exception(debug=False):
@@ -47,7 +47,7 @@ class StatefulRunner:
         self.waiting_for_choice = False
         self.waiter = None
 
-        self._handlers = {}
+        self._handlers = defaultdict(list)
 
     def __enter__(self):
         self.running = True
@@ -67,23 +67,29 @@ class StatefulRunner:
             else:
                 yield from self.consume_event_queue()
 
-    def setup_handlers(self):
-        handlers = defaultdict(
-            list,
-            {
-                SIGNALS.display_text.value: [self.get_display_text_handler(self.vm)],
-                SIGNALS.display_choice.value: [self.get_display_choice_handler(self.vm)],
-                SIGNALS.waiting_for_input.value: [self.get_wait_for_input_handler(self.vm)],
-            },
-        )
-        for sig in SIGNALS:
-            signal(sig.value).connect(self._handle_event)
-            handlers[sig.value].append(self._handle_event)
+    def _connect(self, enum: SIGNAL, handler):
+        signal(enum.value).connect(handler)
+        self._handlers[enum.value].append(handler)
 
-        self._handlers = dict(handlers)
+    def setup_handlers(self):
+        self._connect(SIGNAL.display_text, self._handle_display_text)
+        self._connect(SIGNAL.display_choice, self._handle_display_choice)
+        self._connect(SIGNAL.waiting_for_input, self._handle_wait_for_input)
+        for enum in SIGNAL:
+            self._connect(enum, self._handle_event)
 
     def _handle_event(self, event):
         self.all_events.append(event)
+
+    def _handle_display_text(self, event):
+        self.text_events.append(event)
+
+    def _handle_display_choice(self, event):
+        self.choice_events.append(event)
+
+    def _handle_wait_for_input(self, event):
+        self.waiting_for_choice = True
+        self.waiter = event
 
     def teardown_handlers(self):
         for signame, handlers in self._handlers.items():
@@ -107,28 +113,6 @@ class StatefulRunner:
     def consume_event_queue(self):
         yield from iter(self.all_events)
         self.clear_event_queue()
-
-    def get_display_text_handler(self, vm):
-        @vm.signals.display_text.connect
-        def display_text(event):
-            self.text_events.append(event)
-
-        return display_text
-
-    def get_display_choice_handler(self, vm):
-        @vm.signals.display_choice.connect
-        def display_choice(event):
-            self.choice_events.append(event)
-
-        return display_choice
-
-    def get_wait_for_input_handler(self, vm):
-        @vm.signals.waiting_for_input.connect
-        def wait_for_input(event):
-            self.waiting_for_choice = True
-            self.waiter = event
-
-        return wait_for_input
 
     def choose(self, choice_idx: int):
         if not self.waiting_for_choice:

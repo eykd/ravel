@@ -3,7 +3,7 @@ from enum import Enum
 from blinker import signal
 
 
-class SIGNALS(Enum):
+class SIGNAL(Enum):
     begin = "begin"
     end = "end"
 
@@ -24,20 +24,20 @@ class SIGNALS(Enum):
 
 
 class Signals:
-    begin = signal(SIGNALS.begin.value)
-    end = signal(SIGNALS.end.value)
+    begin = signal(SIGNAL.begin.value)
+    end = signal(SIGNAL.end.value)
 
-    enter_state = signal(SIGNALS.enter_state.value)
-    exit_state = signal(SIGNALS.exit_state.value)
-    pause_state = signal(SIGNALS.pause_state.value)
-    resume_state = signal(SIGNALS.resume_state.value)
+    enter_state = signal(SIGNAL.enter_state.value)
+    exit_state = signal(SIGNAL.exit_state.value)
+    pause_state = signal(SIGNAL.pause_state.value)
+    resume_state = signal(SIGNAL.resume_state.value)
 
-    display_text = signal(SIGNALS.display_text.value)
+    display_text = signal(SIGNAL.display_text.value)
 
-    begin_display_choices = signal(SIGNALS.begin_display_choices.value)
-    display_choice = signal(SIGNALS.display_choice.value)
-    end_display_choices = signal(SIGNALS.end_display_choices.value)
+    begin_display_choices = signal(SIGNAL.begin_display_choices.value)
+    display_choice = signal(SIGNAL.display_choice.value)
+    end_display_choices = signal(SIGNAL.end_display_choices.value)
 
-    waiting_for_input = signal(SIGNALS.waiting_for_input.value)
+    waiting_for_input = signal(SIGNAL.waiting_for_input.value)
 
-    quality_changed = signal(SIGNALS.quality_changed.value)
+    quality_changed = signal(SIGNAL.quality_changed.value)
