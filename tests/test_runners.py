@@ -23,13 +23,25 @@ class TestStatefulRunner:
         with runner:
             assert runner.running is True
             assert runner._handlers
-            assert runner.text_events == []
+            assert list(runner.consume_text_events()) == []
             assert runner.choice_events == []
 
-            for _ in runner:
-                pass
+            result = list(runner)
+            assert result == [
+                events.quality_changed(quality="Intro", initial_value=None, new_value=1),
+                events.quality_changed(quality="Wearing Cloak", initial_value=None, new_value=1),
+                events.quality_changed(quality="Fumbled", initial_value=None, new_value=0),
+                events.quality_changed(quality="Fumbled", initial_value=0, new_value=0),
+                events.enter_state(state=Any()),
+                events.pause_state(state=Any()),
+                events.begin_display_choices(),
+                events.display_choice(index=0, choice="begin::intro", text=Any(), state=Any()),
+                events.end_display_choices(),
+                events.waiting_for_input(send_input=Any(), state=Any()),
+                events.enter_state(state=Any()),
+            ]
 
-            assert runner.text_events == []
+            assert list(runner.consume_text_events()) == []
             assert runner.choice_events == [
                 events.display_choice(
                     choice="begin::intro",
@@ -42,10 +54,24 @@ class TestStatefulRunner:
 
             runner.choose(0)
 
-            for _ in runner:
-                pass
+            result = list(runner)
+            assert result == [
+                events.pause_state(state=Any()),
+                events.display_text(text=Any(), state=Any(), sticky=False),
+                events.begin_display_choices(),
+                events.display_choice(index=3, choice="begin::intro::press-onward", text=Any(), state=Any()),
+                events.end_display_choices(),
+                events.waiting_for_input(send_input=Any(), state=Any()),
+                events.enter_state(state=Any()),
+                events.exit_state(state=Any()),
+                events.begin_display_choices(),
+                events.display_choice(index=0, choice="begin::intro", text=Any(), state=Any()),
+                events.end_display_choices(),
+                events.waiting_for_input(send_input=Any(), state=Any()),
+                events.resume_state(state=Any()),
+            ]
 
-            assert runner.text_events == [
+            assert list(runner.consume_text_events()) == [
                 events.display_text(
                     text=(
                         "Hurrying through the rainswept November night, you're "

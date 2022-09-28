@@ -13,14 +13,14 @@ from . import machines
 from .signals import SIGNAL, signal
 
 
-def handle_exception(debug=False):
+def handle_exception(debug=False):  # pragma: nocover
     logging.exception("Something bad happened...")
     if debug:
         pdb.post_mortem()
     sys.exit(1)
 
 
-def with_exception_handling(debug):
+def with_exception_handling(debug):  # pragma: nocover
     def wrapper(func):
         @functools.wraps(func)
         def run_with_exception_handling(*args, **kwargs):
@@ -100,12 +100,12 @@ class StatefulRunner:
     def begin(self):
         self.vm.begin()
 
-    def clear_text_queue(self):
+    def clear_text_events(self):
         self.text_events[:] = ()
 
-    def consume_text_queue(self):
+    def consume_text_events(self):
         yield from iter(self.text_events)
-        self.clear_text_queue()
+        self.clear_text_events()
 
     def clear_event_queue(self):
         self.all_events[:] = ()

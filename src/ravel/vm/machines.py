@@ -64,7 +64,7 @@ class VirtualMachine:
         self.enqueue(self.initialize_from_givens)
         self.enqueue(self.push, self.begin_state())
 
-    def run(self):
+    def run(self):  # pragma: nocover
         self.begin()
         while self.queue:
             self.do_next_in_queue()
