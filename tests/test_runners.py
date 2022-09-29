@@ -2,7 +2,7 @@ import pytest
 
 from ravel.environments import Environment
 from ravel.loaders import FileSystemLoader
-from ravel.vm import events
+from ravel.vm import events, states
 from ravel.vm.runners import StatefulRunner
 
 from .helpers import Any
@@ -32,13 +32,15 @@ class TestStatefulRunner:
                 events.quality_changed(quality="Wearing Cloak", initial_value=None, new_value=1),
                 events.quality_changed(quality="Fumbled", initial_value=None, new_value=0),
                 events.quality_changed(quality="Fumbled", initial_value=0, new_value=0),
-                events.enter_state(state=Any()),
-                events.pause_state(state=Any()),
+                events.enter_state(state=states.Begin()),
+                events.pause_state(state=states.Begin()),
                 events.begin_display_choices(),
-                events.display_choice(index=0, choice="begin::intro", text=Any(), state=Any()),
+                events.display_choice(
+                    index=0, choice="begin::intro", text=Any(), state=states.DisplayPossibleSituations()
+                ),
                 events.end_display_choices(),
-                events.waiting_for_input(send_input=Any(), state=Any()),
-                events.enter_state(state=Any()),
+                events.waiting_for_input(send_input=Any(), state=states.DisplayPossibleSituations()),
+                events.enter_state(state=states.DisplayPossibleSituations()),
             ]
 
             assert list(runner.consume_text_events()) == []
@@ -46,7 +48,7 @@ class TestStatefulRunner:
                 events.display_choice(
                     choice="begin::intro",
                     text="Hurrying through the rainswept November night…",
-                    state=Any(),
+                    state=states.DisplayPossibleSituations(),
                     index=0,
                 )
             ]
@@ -56,19 +58,36 @@ class TestStatefulRunner:
 
             result = list(runner)
             assert result == [
-                events.pause_state(state=Any()),
-                events.display_text(text=Any(), state=Any(), sticky=False),
+                events.pause_state(state=states.DisplayPossibleSituations()),
+                events.display_text(
+                    text=Any(),
+                    state=states.DisplaySituation(
+                        situation=Any(),
+                        index=5,
+                        paused=False,
+                    ),
+                    sticky=False,
+                ),
                 events.begin_display_choices(),
-                events.display_choice(index=3, choice="begin::intro::press-onward", text=Any(), state=Any()),
+                events.display_choice(
+                    index=3,
+                    choice="begin::intro::press-onward",
+                    text=Any(),
+                    state=states.DisplaySituation(situation=Any(), index=5, paused=False),
+                ),
                 events.end_display_choices(),
-                events.waiting_for_input(send_input=Any(), state=Any()),
-                events.enter_state(state=Any()),
-                events.exit_state(state=Any()),
+                events.waiting_for_input(
+                    send_input=Any(), state=states.DisplaySituation(situation=Any(), index=5, paused=False)
+                ),
+                events.enter_state(state=states.DisplaySituation(situation=Any(), index=5, paused=False)),
+                events.exit_state(state=states.DisplaySituation(situation=Any(), index=5, paused=False)),
                 events.begin_display_choices(),
-                events.display_choice(index=0, choice="begin::intro", text=Any(), state=Any()),
+                events.display_choice(
+                    index=0, choice="begin::intro", text=Any(), state=states.DisplayPossibleSituations()
+                ),
                 events.end_display_choices(),
-                events.waiting_for_input(send_input=Any(), state=Any()),
-                events.resume_state(state=Any()),
+                events.waiting_for_input(send_input=Any(), state=states.DisplayPossibleSituations()),
+                events.resume_state(state=states.DisplayPossibleSituations()),
             ]
 
             assert list(runner.consume_text_events()) == [
@@ -80,12 +99,20 @@ class TestStatefulRunner:
                         "what do you expect in a cheap demo game…?"
                     ),
                     sticky=False,
-                    state=Any(),
+                    state=states.DisplaySituation(situation=Any(), index=5, paused=False),
                 )
             ]
             assert runner.choice_events == [
-                events.display_choice(choice="begin::intro::press-onward", text="Press onward!", state=Any(), index=3),
                 events.display_choice(
-                    choice="begin::intro", text="Hurrying through the rainswept November night…", state=Any(), index=0
+                    choice="begin::intro::press-onward",
+                    text="Press onward!",
+                    state=states.DisplaySituation(situation=Any(), index=5, paused=False),
+                    index=3,
+                ),
+                events.display_choice(
+                    choice="begin::intro",
+                    text="Hurrying through the rainswept November night…",
+                    state=states.DisplayPossibleSituations(),
+                    index=0,
                 ),
             ]
