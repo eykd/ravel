@@ -1,9 +1,11 @@
 include:
   - foyer
 
-when:
-  - Cloakroom >= 1
+given:
+  - Cloakroom = 0
 
+when:
+  - Location = "Cloakroom"
 
 look:
 
@@ -70,5 +72,4 @@ leave:
   - [The warm glow of the Foyer beckons you out.]You leave the cloakroom.
 
   - effect:
-    - Cloakroom = 0
-    - Foyer = 1
+    - Location = "Foyer"

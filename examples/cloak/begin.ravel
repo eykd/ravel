@@ -2,11 +2,11 @@ include:
   - foyer
 
 given:
-  - Intro = 1
+  - Location = "Intro"
   - "Wearing Cloak" = 1
 
 when:
-  - Intro = 1
+  - Location = "Intro"
 
 intro:
 
@@ -22,6 +22,5 @@ intro:
     - [Press onward!]You press onward, until you reach the double doors and let
       yourself in.
 
-    - effect: Intro = 0
-
-    - effect: Foyer = 1
+    - effect:
+        - Location = "Foyer"

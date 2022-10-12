@@ -28,10 +28,13 @@ class TestStatefulRunner:
 
             result = list(runner)
             assert result == [
-                events.quality_changed(quality="Intro", initial_value=None, new_value=1),
+                events.quality_changed(quality="Location", initial_value=None, new_value="Intro"),
                 events.quality_changed(quality="Wearing Cloak", initial_value=None, new_value=1),
+                events.quality_changed(quality="Cloakroom", initial_value=None, new_value=0),
                 events.quality_changed(quality="Fumbled", initial_value=None, new_value=0),
+                events.quality_changed(quality="Bar", initial_value=None, new_value=0),
                 events.quality_changed(quality="Fumbled", initial_value=0, new_value=0),
+                events.quality_changed(quality="Bar", initial_value=0, new_value=0),
                 events.enter_state(state=states.Begin()),
                 events.pause_state(state=states.Begin()),
                 events.begin_display_choices(),

@@ -3,9 +3,10 @@ include:
 
 given:
   - Fumbled = 0
+  - Bar = 0
 
 when:
-  - Bar >= 1
+  - Location = "Bar"
   - "Wearing Cloak" >= 1
 
 
@@ -32,5 +33,4 @@ leave:
   - [The bright opulence of the Foyer beckons you.]You leave the darkened Bar.
 
   - effect:
-    - Bar = 0
-    - Foyer = 1
+    - Location = "Foyer"

@@ -4,7 +4,7 @@ include:
   - bar-light
 
 when:
-  - Foyer == 1
+  - Location = "Foyer"
 
 
 foyer:
@@ -29,8 +29,7 @@ cloakroom:
   - {"Wearing Cloak" == 0}You enter the cloak room.
 
   - effect:
-    - Foyer = 0
-    - Cloakroom = 1
+    - Location = "Cloakroom"
 
 
 bar:
@@ -40,5 +39,4 @@ bar:
   - {"Wearing Cloak" == 0}You wander over to the bar.
 
   - effect:
-    - Foyer = 0
-    - Bar = 1
+    - Location = "Bar"
