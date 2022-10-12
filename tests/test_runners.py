@@ -3,7 +3,7 @@ import pytest
 from ravel.environments import Environment
 from ravel.loaders import FileSystemLoader
 from ravel.vm import events, states
-from ravel.vm.runners import StatefulRunner
+from ravel.vm.runners import QueueRunner
 
 from .helpers import Any
 
@@ -17,7 +17,7 @@ def cloak_env(examples_path):
 
 class TestStatefulRunner:
     def test_it_should_begin_playing_cloak_of_darkness(self, cloak_env):
-        runner = StatefulRunner(cloak_env)
+        runner = QueueRunner(cloak_env)
         assert runner.running is False
         assert not runner._handlers
         with runner:

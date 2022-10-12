@@ -2,6 +2,7 @@ import logging
 
 import click
 
+from ravel import environments, loaders
 from ravel.vm import runners
 
 
@@ -31,5 +32,8 @@ def main(config, verbose, debug):
 @pass_config
 def run(config, directory):
     """Run the indicated story."""
-    runner = runners.ConsoleRunner(directory)
-    runner.run()
+    env = environments.Environment(
+        loader=loaders.FileSystemLoader(directory),
+    )
+    with runners.ConsoleRunner(env, debug=config.debug) as runner:
+        runner.run()
