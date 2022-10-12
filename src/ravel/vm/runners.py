@@ -1,36 +1,8 @@
-import functools
-import logging
-import pdb
-import sys
-import textwrap
 from collections import defaultdict
-
-from colorclass import Color
 
 from ..environments import Environment
 from . import machines
 from .signals import SIGNAL, signal
-
-
-def handle_exception(debug=False):  # pragma: nocover
-    logging.exception("Something bad happened...")
-    if debug:
-        pdb.post_mortem()
-    sys.exit(1)
-
-
-def with_exception_handling(debug):  # pragma: nocover
-    def wrapper(func):
-        @functools.wraps(func)
-        def run_with_exception_handling(*args, **kwargs):
-            try:
-                func(*args, **kwargs)
-            except Exception:
-                handle_exception(debug)
-
-        return run_with_exception_handling
-
-    return wrapper
 
 
 class StatefulRunner:
@@ -46,6 +18,7 @@ class StatefulRunner:
 
     def __enter__(self):
         self.running = True
+        self._setup_handlers()
         self.setup_handlers()
         self.begin()
         return self
@@ -63,16 +36,19 @@ class StatefulRunner:
             else:
                 yield from self.consume_event_queue()
 
-    def _connect(self, enum: SIGNAL, handler):
+    def connect(self, enum: SIGNAL, handler):
         signal(enum.value).connect(handler)
         self._handlers[enum.value].append(handler)
 
-    def setup_handlers(self):
-        self._connect(SIGNAL.display_text, self.handle_display_text)
-        self._connect(SIGNAL.display_choice, self.handle_display_choice)
-        self._connect(SIGNAL.waiting_for_input, self.handle_waiting_for_input)
+    def _setup_handlers(self):
+        self.connect(SIGNAL.display_text, self.handle_display_text)
+        self.connect(SIGNAL.display_choice, self.handle_display_choice)
+        self.connect(SIGNAL.waiting_for_input, self.handle_waiting_for_input)
         for enum in SIGNAL:
-            self._connect(enum, self.handle_any_event)
+            self.connect(enum, self.handle_any_event)
+
+    def setup_handlers(self):
+        pass
 
     def handle_any_event(self, event):
         pass
@@ -142,53 +118,3 @@ class QueueRunner(StatefulRunner):
     def handle_waiting_for_input(self, event):
         self.waiting_for_choice = True
         self.waiter = event
-
-
-class ConsoleRunner(StatefulRunner):
-    def __init__(self, env: Environment, debug: bool = False):
-        super().__init__(env)
-        self.debug = debug
-        self.choice_events = []
-
-    def get_input(self, text):
-        return input(Color(text))
-
-    def handle_display_text(self, event):
-        print(Color("{yellow}%s{/yellow}\n" % textwrap.fill(event.text)))
-
-    def handle_display_choice(self, event):
-        self.choice_events.append(event.choice)
-        print(Color(f"{{green}}{len(self.choice_events)}{{/green}}: {{yellow}}{event.text}{{/yellow}}"))
-
-    def handle_waiting_for_input(self, event):
-        choice = None
-        while choice is None:
-            print()
-            chosen = self.get_input("{green}What'll it be?{/green} ").lower()
-            if chosen.isdigit():
-                try:
-                    choice = self.choice_events[int(chosen) - 1]
-                except (ValueError, IndexError):
-                    print(Color("{red}That's not an option.{/red}"))
-                    choice = None
-            elif chosen == "s":
-                print(repr(self.vm.qualities))
-            elif chosen == "q":
-                sys.exit(0)
-            else:
-                print(Color("{red}I'm sorry, what?{/red}"))
-
-        self.choice_events[:] = ()
-        print()
-        print(Color("{cyan}%s{/cyan}" % ("-" * 80)))
-        event.send_input(choice)
-
-    def run(self):
-        try:
-            while True:
-                self.vm.run()
-        except KeyboardInterrupt:
-            sys.exit(0)
-        except Exception as e:
-            handle_exception(e)
-            sys.exit(1)
