@@ -24,9 +24,9 @@ parsimonious==0.10.0
     # via
     #   ravel (setup.py)
     #   syml
-path==16.4.0
+path==16.5.0
     # via ravel (setup.py)
-pydash==5.1.0
+pydash==5.1.1
     # via ravel (setup.py)
 pyparsing==3.0.9
     # via packaging
@@ -40,7 +40,7 @@ six==1.16.0
     # via python-dateutil
 straight-plugin==1.5.0
     # via ravel (setup.py)
-strictyaml==1.6.1
+strictyaml==1.6.2
     # via ravel (setup.py)
 syml==0.3
     # via ravel (setup.py)
