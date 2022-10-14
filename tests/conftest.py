@@ -1,7 +1,8 @@
 import pytest
 from path import Path
 
-from ravel import environments
+from ravel.environments import Environment
+from ravel.loaders import FileSystemLoader
 
 PATH = Path(__file__).abspath().dirname()
 
@@ -13,4 +14,11 @@ def examples_path():
 
 @pytest.fixture
 def env():
-    return environments.Environment()
+    return Environment()
+
+
+@pytest.fixture
+def cloak_env(examples_path):
+    return Environment(
+        loader=FileSystemLoader(base_path=examples_path / "cloak"),
+    )

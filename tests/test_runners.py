@@ -1,18 +1,7 @@
-import pytest
-
-from ravel.environments import Environment
-from ravel.loaders import FileSystemLoader
 from ravel.vm import events, states
 from ravel.vm.runners import QueueRunner
 
 from .helpers import Any
-
-
-@pytest.fixture
-def cloak_env(examples_path):
-    return Environment(
-        loader=FileSystemLoader(base_path=examples_path / "cloak"),
-    )
 
 
 class TestStatefulRunner:
