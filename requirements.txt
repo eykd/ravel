@@ -32,6 +32,8 @@ pydash==5.1.1
     # via ravel (setup.py)
 pyparsing==3.0.9
     # via packaging
+pyrsistent==0.18.1
+    # via ravel (setup.py)
 python-dateutil==2.8.2
     # via strictyaml
 regex==2022.9.13
