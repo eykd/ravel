@@ -1,6 +1,6 @@
 from enum import Enum
 
-from blinker import signal
+from blinker import signal  # type: ignore
 
 
 class SIGNAL(Enum):

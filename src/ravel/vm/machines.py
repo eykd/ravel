@@ -1,7 +1,7 @@
 import logging
 from collections import deque
 from functools import partial
-from typing import Callable, Deque, Dict, List
+from typing import Callable, Deque, Dict, List, Optional
 
 import attr
 from attrs import define, field
@@ -48,7 +48,7 @@ class VirtualMachine:
     qualities: Dict = field(default=attr.Factory(dict))
     stack: Deque[State] = field(default=attr.Factory(deque))
     signals: Signals = field(default=attr.Factory(Signals))
-    begin_state: Begin = field(default=Begin)
+    begin_state: Begin = field(default=attr.Factory(Begin))
     queue: Deque[Callable] = field(default=attr.Factory(deque))
 
     def enqueue(self, callable_action: Callable, *args, **kwargs):
@@ -92,7 +92,7 @@ class VirtualMachine:
         self.qualities = state
 
     @property
-    def top_state(self) -> State:
+    def top_state(self) -> Optional[State]:
         return self.stack[-1] if self.stack else None
 
     def push(self, state: State):

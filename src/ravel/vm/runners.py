@@ -1,8 +1,13 @@
 from collections import defaultdict
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from ..environments import Environment
 from . import machines
 from .signals import SIGNAL, signal
+
+if TYPE_CHECKING:
+    from ravel.events import waiting_for_input
+    from ravel.types import Choice
 
 
 class StatefulRunner:
@@ -12,9 +17,10 @@ class StatefulRunner:
 
         self.running = False
         self.waiting_for_choice = False
-        self.waiter = None
+        self.waiter: Optional[waiting_for_input] = None
+        self.choice_events: List[Choice] = []
 
-        self._handlers = defaultdict(list)
+        self._handlers: Dict[str, List[Callable]] = defaultdict(list)
 
     def __enter__(self):
         self.running = True
@@ -102,7 +108,6 @@ class StatefulRunner:
 class QueueRunner(StatefulRunner):
     def __init__(self, env: Environment):
         super().__init__(env)
-        self.choice_events = []
         self.text_events = []
         self.all_events = []
 

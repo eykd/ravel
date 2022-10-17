@@ -36,9 +36,7 @@ class Comparison:
     def evaluate(self, qvalue, **kwargs):
         if qvalue is None:
             qvalue = 0
-        return self.get_comparators()(
-            qvalue, self.get_expression(qvalue=qvalue, **kwargs)
-        )
+        return self.get_comparators()(qvalue, self.get_expression(qvalue=qvalue, **kwargs))
 
     def check(self, qualities, **kwargs):
         value = qualities.get(self.quality)

@@ -1,7 +1,7 @@
 import itertools as it
 from collections.abc import Mapping, Sequence
 
-from slugify import slugify_unicode
+from slugify import slugify_unicode  # type: ignore
 
 from ravel import exceptions, parsers, types
 from ravel.utils.data import merge_dicts
@@ -18,16 +18,10 @@ def compile_directives(environment, concept, parent_rule, raw_directives):
     if the_rest:
         last_directive = None
         for item in the_rest:
-            for directive, situations in compile_directive(
-                environment, concept, parent_rule, item
-            ):
-                if not isinstance(last_directive, types.Choice) and isinstance(
-                    directive, types.Choice
-                ):
+            for directive, situations in compile_directive(environment, concept, parent_rule, item):
+                if not isinstance(last_directive, types.Choice) and isinstance(directive, types.Choice):
                     directives.append(types.BeginChoices())
-                if isinstance(last_directive, types.Choice) and not isinstance(
-                    directive, types.Choice
-                ):
+                if isinstance(last_directive, types.Choice) and not isinstance(directive, types.Choice):
                     directives.append(types.GetChoice())
                 directives.append(directive)
                 subsituations.append(situations)
@@ -48,19 +42,13 @@ def compile_directive(environment, concept, parent_rule, raw_directive):
             return [text.compile_text(environment, concept, parent_rule, directive)]
         elif get_text(key) == "effect":
             if is_text(directive):
-                return [
-                    effects.compile_effect(environment, concept, parent_rule, directive)
-                ]
+                return [effects.compile_effect(environment, concept, parent_rule, directive)]
             elif isinstance(directive, Sequence):
-                return effects.compile_effects(
-                    environment, concept, parent_rule, directive
-                )
+                return effects.compile_effects(environment, concept, parent_rule, directive)
             else:
                 raise exceptions.ParseError("Unrecognized effect type: %r" % directive)
         else:
-            raise exceptions.ParseError(
-                "Unknown directive %s in %r" % (get_text(key), raw_directive)
-            )
+            raise exceptions.ParseError("Unknown directive %s in %r" % (get_text(key), raw_directive))
     else:
         return [text.compile_text(environment, concept, parent_rule, raw_directive)]
 
@@ -69,12 +57,8 @@ def compile_choice(environment, concept, parent_rule, directives):
     logger.debug("Compiling choice for %s:%s:\n%r", concept, parent_rule, directives)
     if is_text(directives):
         directives = [directives]
-    intro, directives, subsituations = compile_directives(
-        environment, concept, parent_rule, directives
-    )
-    subrule = environment.location_separator.join(
-        [parent_rule, slugify_unicode(get_text(intro), to_lower=True)]
-    )
+    intro, directives, subsituations = compile_directives(environment, concept, parent_rule, directives)
+    subrule = environment.location_separator.join([parent_rule, slugify_unicode(get_text(intro), to_lower=True)])
     try:
         return (
             types.Choice(subrule),

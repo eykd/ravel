@@ -1,4 +1,10 @@
+from typing import TYPE_CHECKING, Callable
+
 from attrs import define, field
+
+if TYPE_CHECKING:
+    from ravel.types import Choice
+    from ravel.vm.states import State
 
 
 class Event:
@@ -18,32 +24,32 @@ class end(Event):
 @define(frozen=True)
 class enter_state(Event):
     name = "enter_state"
-    state = field()
+    state: State = field()
 
 
 @define(frozen=True)
 class exit_state(Event):
     name = "exit_state"
-    state = field()
+    state: State = field()
 
 
 @define(frozen=True)
 class pause_state(Event):
     name = "pause_state"
-    state = field()
+    state: str = field()
 
 
 @define(frozen=True)
 class resume_state(Event):
     name = "resume_state"
-    state = field()
+    state: State = field()
 
 
 @define(frozen=True)
 class display_text(Event):
     name = "display_text"
     text: str = field()
-    state: field()
+    state: State = field()
     sticky: bool = field()
 
 
@@ -56,9 +62,9 @@ class begin_display_choices(Event):
 class display_choice(Event):
     name = "display_choice"
     index: int = field()
-    choice = field()
+    choice: Choice = field()
     text: str = field()
-    state = field()
+    state: State = field()
 
 
 @define(frozen=True)
@@ -69,8 +75,8 @@ class end_display_choices(Event):
 @define(frozen=True)
 class waiting_for_input(Event):
     name = "waiting_for_input"
-    send_input = field()
-    state = field()
+    send_input: Callable = field()
+    state: State = field()
 
 
 @define(frozen=True)

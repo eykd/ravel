@@ -35,6 +35,4 @@ def raise_parse_error(position, error_type=ParseError):
             position,
         )
     else:
-        raise error_type(
-            "Could not determine source position:\n%r" % position, position
-        )
+        raise error_type("Could not determine source position:\n%r" % position, position)
