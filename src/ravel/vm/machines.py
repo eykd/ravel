@@ -48,7 +48,7 @@ class VirtualMachine:
     qualities: Dict = field(default=attr.Factory(dict))
     stack: Deque[State] = field(default=attr.Factory(deque))
     signals: Signals = field(default=attr.Factory(Signals))
-    begin_state: Begin = field(default=attr.Factory(Begin))
+    begin_state: Begin = field(default=Begin)
     queue: Deque[Callable] = field(default=attr.Factory(deque))
 
     def enqueue(self, callable_action: Callable, *args, **kwargs):

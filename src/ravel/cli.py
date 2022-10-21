@@ -1,4 +1,3 @@
-# pragma: nocover
 import logging
 import pdb
 import sys
@@ -25,7 +24,7 @@ pass_config = click.make_pass_decorator(Config, ensure=True)
 @click.option("--verbose", is_flag=True, default=False)
 @click.option("--debug", is_flag=True, default=False)
 @pass_config
-def main(config, verbose, debug):
+def main(config, verbose, debug):  # pragma: nocover
     config.verbose = verbose
     config.debug = debug
     if verbose or debug:
@@ -37,16 +36,24 @@ def main(config, verbose, debug):
 @main.command()
 @click.argument("directory", type=click.STRING)
 @pass_config
-def run(config, directory):
+def run(config, directory):  # pragma: nocover
     """Run the indicated story."""
-    env = Environment(
-        loader=loaders.FileSystemLoader(directory),
-    )
-    with ConsoleRunner(env, debug=config.debug, verbose=config.verbose) as runner:
-        runner.run()
+    try:
+        env = Environment(
+            loader=loaders.FileSystemLoader(base_path=directory),
+        )
+        with ConsoleRunner(env, debug=config.debug, verbose=config.verbose) as runner:
+            runner.run()
+    except (KeyboardInterrupt, EOFError):
+        sys.exit(0)
+    except Exception as e:
+        logging.exception("Something bad happened...")
+        if config.debug:
+            pdb.post_mortem()
+        sys.exit(1)
 
 
-class ConsoleRunner(runners.StatefulRunner):
+class ConsoleRunner(runners.StatefulRunner):  # pragma: nocover
     def __init__(self, env: Environment, debug: bool = False, verbose: bool = False):
         super().__init__(env)
         self.debug = debug
@@ -119,18 +126,6 @@ class ConsoleRunner(runners.StatefulRunner):
         if self.verbose:
             print(Color(f"## {{green}}Resuming{{/green}} {event.state.__class__.__name__}"))
 
-    def handle_exception(self, debug=False):
-        logging.exception("Something bad happened...")
-        if debug:
-            pdb.post_mortem()
-        sys.exit(1)
-
     def run(self):
-        try:
-            while True:
-                self.vm.run()
-        except (KeyboardInterrupt, EOFError):
-            sys.exit(0)
-        except Exception as e:
-            self.handle_exception(e)
-            sys.exit(1)
+        while True:
+            self.vm.run()

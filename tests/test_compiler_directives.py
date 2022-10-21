@@ -2,16 +2,16 @@ from unittest.mock import Mock
 
 import pytest
 
+from pyrsistent import pmap, pvector
+
 from ravel import exceptions, types
 from ravel.compiler import directives
 
 
 class TestCompileDirective:
     def test_it_should_handle_text_directives(self, env):
-        result = directives.compile_directive(
-            env, "Situation", Mock(), {"text": "Hello world"}
-        )
-        expected = [(types.Text(text="Hello world"), {})]
+        result = directives.compile_directive(env, "Situation", Mock(), {"text": "Hello world"})
+        expected = pvector([(types.Text(text="Hello world"), pmap())])
         assert result == expected
 
     def test_it_should_handle_a_list_of_effects(self, env):
@@ -19,10 +19,12 @@ class TestCompileDirective:
             "effect": ["foo = 1", "bar = 2"],
         }
         result = directives.compile_directive(env, "Situation", Mock(), effects)
-        expected = [
-            (types.Operation(quality="foo", operator="=", expression=1), {}),
-            (types.Operation(quality="bar", operator="=", expression=2), {}),
-        ]
+        expected = pvector(
+            [
+                (types.Operation(quality="foo", operator="=", expression=1), pmap()),
+                (types.Operation(quality="bar", operator="=", expression=2), pmap()),
+            ]
+        )
         assert result == expected
 
     def test_it_should_raise_parse_error_for_unknown_effect_type(self, env):
@@ -43,11 +45,13 @@ class TestCompileChoice:
         result = directives.compile_choice(env, "Situation", "parent", "Hello, world!")
         expected = (
             types.Choice(choice="parent::hello-world"),
-            {
-                "parent::hello-world": types.Situation(
-                    intro=types.Text(text="Hello, world!"),
-                    directives=[types.Text(text="Hello, world!")],
-                )
-            },
+            pmap(
+                {
+                    "parent::hello-world": types.Situation(
+                        intro=types.Text(text="Hello, world!"),
+                        directives=pvector([types.Text(text="Hello, world!")]),
+                    )
+                }
+            ),
         )
         assert result == expected
