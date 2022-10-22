@@ -13,7 +13,7 @@ from ravel.utils.strings import get_text, is_text, unwrap
 
 from . import effects, logger, text
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PVector
     from ravel.environments import Environment
 
@@ -69,15 +69,13 @@ def compile_choice(environment: Environment, concept: str, parent_rule: Any, dir
         directives = [directives]
     intro, directives, subsituations = compile_directives(environment, concept, parent_rule, directives)
     subrule = environment.loader.location_separator.join([parent_rule, slugify_unicode(get_text(intro), to_lower=True)])
-    try:
-        return (
-            types.Choice(subrule),
-            freeze(
-                {
-                    subrule: types.Situation(intro, directives),
-                    **merge_dicts(*subsituations),
-                }
-            ),
-        )
-    except Exception as e:
-        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, e.args[0]))
+
+    return (
+        types.Choice(subrule),
+        freeze(
+            {
+                subrule: types.Situation(intro, directives),
+                **merge_dicts(*subsituations),
+            }
+        ),
+    )

@@ -6,7 +6,7 @@ from pyrsistent import pmap, pvector
 
 from ravel import grammars, types
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from parsimonious.nodes import Node
     from pyrsistent import PVector
     from ravel.types import SourceStr

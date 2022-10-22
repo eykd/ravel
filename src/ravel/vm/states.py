@@ -1,6 +1,6 @@
 import logging
 
-import attr
+from attrs import define, field
 
 from ravel import queries
 from ravel.utils.strings import get_text
@@ -9,7 +9,7 @@ from ravel.vm import events
 logger = logging.getLogger("vm.states")
 
 
-@attr.s
+@define
 class State:
     def enter(self, vm):  # pragma: nocover
         pass
@@ -27,13 +27,13 @@ class State:
         pass
 
 
-@attr.s
+@define
 class Begin(State):
     def enter(self, vm):
         vm.push(DisplayPossibleSituations())
 
 
-@attr.s
+@define
 class DisplayPossibleSituations(State):
     def query_and_display(self, vm):
         query = queries.query("Situation", vm.qualities.items(), vm.rulebook)
@@ -56,11 +56,11 @@ class DisplayPossibleSituations(State):
         vm.push(DisplaySituation(situation=situation))
 
 
-@attr.s
+@define
 class DisplaySituation(State):
-    situation = attr.ib()
-    index = attr.ib(default=0)
-    paused = attr.ib(default=False)
+    situation = field()
+    index = field(default=0)
+    paused = field(default=False)
 
     def enter(self, vm):
         self.display(vm)

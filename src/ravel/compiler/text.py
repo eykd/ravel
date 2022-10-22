@@ -7,7 +7,7 @@ from pyrsistent import pmap
 from ravel import parsers
 from ravel.utils.strings import get_text
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from ravel.environment import Environment
     from ravel.types import Predicate, SourceStr, Text
 

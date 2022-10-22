@@ -9,7 +9,7 @@ from ravel.utils.strings import get_text
 
 from . import logger
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PVector, PMap
     from ravel.environment import Environment
     from ravel.types import Operation

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Tuple
 from collections.abc import Sequence, Mapping
 import logging
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from ravel.types import Concept, Predicate, SourceStr, Rulebook
 
 logger = logging.getLogger("ravel.query")

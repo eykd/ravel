@@ -13,15 +13,24 @@ from ravel import exceptions
 from ravel.compiler import rulebooks
 from ravel.types import Concept, Rulebook
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from syml.types import Source
 
     from ravel.environments import Environment
 
 
+def default_is_up_to_date() -> bool:
+    return True
+
+
+def unloaded_is_up_to_date() -> bool:
+    return False
+
+
 @define
 class BaseLoader:
     location_separator: str = field(default="::")
+    is_up_to_date: Dict[str, Callable] = field(factory=lambda: defaultdict(lambda: unloaded_is_up_to_date))
 
     def load(self, environment: Environment, name: str) -> PMap:
         source, is_up_to_date = self.get_source(environment, name)
@@ -29,10 +38,6 @@ class BaseLoader:
 
     def get_source(self, environment: Environment, name: str):
         raise NotImplementedError()
-
-    @staticmethod
-    def default_is_up_to_date() -> bool:
-        return True
 
     def load_rulebook(self, environment: Environment, name: str):
         loaded_rulebooks = {}
@@ -45,16 +50,16 @@ class BaseLoader:
             if name not in loaded_rulebooks:
                 rulebook = loaded_rulebooks[name] = self.get_rulebook(environment, name)
                 names_to_load.extend(
-                    [include_name for include_name in rulebook["includes"] if include_name not in loaded_rulebooks]
+                    [include_name for include_name in rulebook.includes if include_name not in loaded_rulebooks]
                 )
-                metadata.update(rulebook["metadata"])
-                givens.extend(rulebook["givens"])
+                metadata.update(rulebook.metadata)
+                givens.extend(rulebook.givens)
 
         return rulebooks.compile_master_rulebook(loaded_rulebooks.values(), metadata, givens)
 
     def get_rulebook(self, environment: Environment, name: str) -> PMap:
         rulebook = self.cache.get(name)
-        if rulebook is None or not rulebook["is_up_to_date"]():
+        if rulebook is None or not self.is_up_to_date[name]():
             rulebook = self.load(environment, name)
             self.cache[name] = rulebook
         return rulebook
@@ -70,7 +75,8 @@ class BaseLoader:
 
         prefix = name + self.location_separator if name else ""
         rulebook = rulebooks.compile_rulebook(environment, data, prefix)
-        return rulebook.set("is_up_to_date", is_up_to_date)
+        self.is_up_to_date[name] = is_up_to_date
+        return rulebook
 
 
 @define

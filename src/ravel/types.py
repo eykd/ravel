@@ -19,6 +19,7 @@ class Rulebook:
     metadata: PMap
     concepts: PMap[str, Concept]
     givens: PVector
+    includes: PVector = field(factory=pvector)
 
 
 @define(slots=True, frozen=True)
@@ -141,7 +142,7 @@ class Operation:
         return self._operators[self.operator]
 
     def get_expression(self, **kwargs):
-        return
+        return evaluate_term(self.expression, **kwargs)
 
     def evaluate(self, initial_value, **kwargs):
         if initial_value is None:

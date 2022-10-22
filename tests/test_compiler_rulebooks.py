@@ -7,6 +7,7 @@ from pyrsistent import freeze, thaw
 from ravel import exceptions, types
 from ravel.compiler import rulebooks
 from ravel.utils.strings import get_text_source
+from ravel.types import Rulebook
 
 
 class TestIsWhen:
@@ -107,8 +108,8 @@ class TestCompileRulebook:
         """
         )
         result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml, raw=False))
-        assert len(result["concepts"]) == 1
-        assert "Situation" in result["concepts"]
+        assert len(result.concepts) == 1
+        assert "Situation" in result.concepts
 
     def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(self, env):
         rulebook_syml = textwrap.dedent(
@@ -122,7 +123,7 @@ class TestCompileRulebook:
         )
         prefix = "prefix-"
         result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml, raw=False), prefix)
-        assert "prefix-intro" in result["concepts"]["Situation"].locations
+        assert "prefix-intro" in result.concepts["Situation"].locations
 
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
         bad_rulebook_syml = textwrap.dedent(
@@ -216,19 +217,21 @@ TEST_RULEBOOK_SYML = textwrap.dedent(
 )
 
 
-EXPECTED_COMPILED_RULEBOOK = freeze(
-    {
-        "metadata": {"author": "Me!"},
-        "givens": [
+EXPECTED_COMPILED_RULEBOOK = Rulebook(
+    metadata=freeze({"author": "Me!"}),
+    givens=freeze(
+        [
             types.Operation(
                 quality="Intro",
                 operator="=",
                 expression=0,
                 constraint=None,
             ),
-        ],
-        "includes": [],
-        "concepts": {
+        ]
+    ),
+    includes=freeze([]),
+    concepts=freeze(
+        {
             "Situation": types.Concept(
                 rules=[
                     types.Rule(
@@ -366,6 +369,6 @@ EXPECTED_COMPILED_RULEBOOK = freeze(
                     ),
                 },
             ),
-        },
-    }
+        }
+    ),
 )

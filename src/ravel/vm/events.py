@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Callable
 
 from attrs import define, field
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from ravel.types import Choice
     from ravel.vm.states import State
 

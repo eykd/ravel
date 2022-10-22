@@ -10,7 +10,7 @@ from pyrsistent import freeze
 from ravel import loaders
 from ravel.compiler import rulebooks
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PMap
     from syml.types import Source
 

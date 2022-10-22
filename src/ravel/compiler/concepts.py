@@ -3,7 +3,7 @@ from typing import Callable, TYPE_CHECKING, List, Union
 from pyrsistent import pmap, pvector
 from ravel.utils.strings import get_text
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PMap
     from syml.types import Source
     from ravel.environments import Environment

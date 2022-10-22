@@ -63,5 +63,10 @@ class TestGetSource:
 
 
 class TestDefaultIsUpToDate:
-    def test_it_should_return_true(self, fs_loader):
-        assert fs_loader.default_is_up_to_date() is True
+    def test_it_should_return_true(self):
+        assert loaders.default_is_up_to_date() is True
+
+
+class TestUnloadedIsUpToDate:
+    def test_it_should_return_false(self):
+        assert loaders.unloaded_is_up_to_date() is False

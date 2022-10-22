@@ -3,24 +3,24 @@ from __future__ import annotations
 import itertools as it
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Callable, Dict, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Union
 
 from funcy import first, second
-from pyrsistent import pmap, pvector, freeze
+from pyrsistent import freeze, pmap, pvector
 
 from ravel import exceptions, types
+from ravel.compiler import situations  # noqa
+from ravel.compiler import concepts, effects
+from ravel.compiler.rulesets import compile_ruleset
+from ravel.types import Rulebook
 from ravel.utils.strings import get_text, is_text
 
-from . import situations  # noqa
-from . import concepts, effects
-from .rulesets import compile_ruleset
-
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PMap, PVector
     from syml.types import Source
 
     from ravel.environments import Environment
-    from ravel.types import Operation
+    from ravel.types import Effect, Operation, Predicate
 
 
 def get_next(seq: Iterable) -> Callable:
@@ -46,10 +46,10 @@ def compile_about(data: Mapping) -> PMap[str, str]:
 
 
 def compile_preamble(environment: Environment, rulebook: Mapping):
-    includes = pvector()
-    givens = pvector()
-    common_predicates = pvector()
-    metadata = pmap()
+    includes: List[str] = []
+    givens: List[Effect] = []
+    common_predicates: List[str] = []
+    metadata: Dict[str, str] = {}
 
     rule = None
     rulesets = iter(rulebook.items())
@@ -63,24 +63,24 @@ def compile_preamble(environment: Environment, rulebook: Mapping):
             key_name = get_text(rule[0])
 
             if key_name == "when":
-                common_predicates = common_predicates.extend(get_list_of_texts(rule[1]))
+                common_predicates.extend(get_list_of_texts(rule[1]))
             elif key_name == "include":
-                includes = includes.extend(get_list_of_texts(rule[1]))
+                includes.extend(get_list_of_texts(rule[1]))
             elif key_name == "given":
-                givens = givens.extend(compile_givens(environment, rule[1]))
+                givens.extend(compile_givens(environment, rule[1]))
             elif key_name == "about":
-                metadata = metadata.update(compile_about(rule[1]))
+                metadata.update(compile_about(rule[1]))
             else:
                 # Found the baggage. Put the rule back into the iterator.
                 rulesets = it.chain([rule], rulesets)
                 break
 
-    return pmap(
+    return freeze(
         {
-            "includes": pvector(includes),
-            "givens": pvector(givens),
-            "common_predicates": pvector(common_predicates),
-            "metadata": pmap(metadata),
+            "includes": includes,
+            "givens": givens,
+            "common_predicates": common_predicates,
+            "metadata": metadata,
             "rulesets": pvector(rulesets),
         }
     )
@@ -97,58 +97,58 @@ def compile_rulebook(environment: Environment, rulebook: Dict, prefix: str = "")
 
     for rule_name, data in preamble["rulesets"]:
         if is_when(first(data)):
-            concept = "Situation"
+            concept_name = "Situation"
             ruleset_predicates = get_list_of_texts(get_next(data[0].values()))
             baggage_data = data[1:]
         elif is_when(second(data)):
-            concept = data[0]
+            concept_name = data[0]
             ruleset_predicates = get_list_of_texts(get_next(data[1].values()))
             baggage_data = data[2:]
         else:
-            concept = "Situation"
+            concept_name = "Situation"
             ruleset_predicates = []
             baggage_data = data[:]
 
         rule_name = prefix + get_text(rule_name)
-        concept = get_text(concept)
+        concept_name = get_text(concept_name)
 
-        concept_rules[concept].append(
+        concept_rules[concept_name].append(
             types.Rule(
                 rule_name,
                 compile_ruleset(
                     environment,
-                    concept,
+                    concept_name,
                     rule_name,
                     preamble["common_predicates"] + ruleset_predicates,
                 ),
             )
         )
-        concept_locations[concept].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
+        concept_locations[concept_name].update(
+            concepts.compile_baggage(environment, concept_name, rule_name, baggage_data)
+        )
 
     for ruleset in concept_rules.values():
         ruleset.sort()
 
     concepts_rules = {
-        concept: types.Concept(rules=concept_rules[concept], locations=concept_locations[concept])
-        for concept in (set(concept_rules) | set(concept_locations))
+        concept_name: types.Concept(rules=concept_rules[concept_name], locations=concept_locations[concept_name])
+        for concept_name in (set(concept_rules) | set(concept_locations))
     }
 
-    return freeze(
-        {
-            "concepts": concepts_rules,
-            "includes": preamble["includes"],
-            "givens": preamble["givens"],
-            "metadata": preamble["metadata"],
-        }
+    return Rulebook(
+        concepts=freeze(concepts_rules),
+        includes=freeze(preamble["includes"]),
+        givens=freeze(preamble["givens"]),
+        metadata=freeze(preamble["metadata"]),
     )
 
 
-def compile_master_rulebook(rulebooks: List, metadata: Dict, givens: List):
-    concept_rules: Dict[str, List] = defaultdict(list)
-    concept_locations: Dict[str, List] = defaultdict(dict)
+def compile_master_rulebook(rulebooks: List[Rulebook], metadata: Dict[str, str], givens: List[Effect]):
+    concept_rules: Dict[str, List[Predicate]] = defaultdict(list)
+    concept_locations: Dict[str, Dict] = defaultdict(dict)
 
     for rulebook in rulebooks:
-        for concept, ruleset in rulebook["concepts"].items():
+        for concept, ruleset in rulebook.concepts.items():
             concept_rules[concept].extend(ruleset.rules)
             concept_locations[concept].update(ruleset.locations)
 

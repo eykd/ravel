@@ -5,7 +5,7 @@ from ..environments import Environment
 from . import machines
 from .signals import SIGNAL, signal
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from ravel.events import waiting_for_input
     from ravel.types import Choice
 

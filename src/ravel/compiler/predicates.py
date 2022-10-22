@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Union
 from ravel import exceptions, parsers, types
 from ravel.utils.strings import get_text
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from ravel.types import SourceStr
     from ravel.environment import Environment
 
