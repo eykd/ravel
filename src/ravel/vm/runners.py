@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class StatefulRunner:
     def __init__(self, environment: Environment):
         self.environment = environment
-        self.vm = machines.VirtualMachine(**self.environment.load())
+        self.vm = machines.VirtualMachine(rulebook=self.environment.load())
 
         self.running = False
         self.waiting_for_choice = False

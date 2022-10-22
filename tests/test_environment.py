@@ -15,9 +15,9 @@ def env(examples_path):
 class TestGetRulebook:
     def test_it_should_load_the_rulebook_and_its_includes(self, env):
         rulebook = env.load()
-        assert "begin::intro" in rulebook["rulebook"]["Situation"]["locations"]
-        assert "rooms::rooms" in rulebook["rulebook"]["Situation"]["locations"]
-        assert "actions::actions" in rulebook["rulebook"]["Situation"]["locations"]
+        assert "begin::intro" in rulebook.concepts["Situation"].locations
+        assert "rooms::rooms" in rulebook.concepts["Situation"].locations
+        assert "actions::actions" in rulebook.concepts["Situation"].locations
 
         new_rulebook = env.load()
         assert new_rulebook == rulebook

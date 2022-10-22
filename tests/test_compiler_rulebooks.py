@@ -2,6 +2,7 @@ import textwrap
 
 import pytest
 import syml
+from pyrsistent import freeze, thaw
 
 from ravel import exceptions, types
 from ravel.compiler import rulebooks
@@ -90,7 +91,10 @@ class TestCompileRulebook:
     def test_it_should_compile_a_situation_rulebook(self, env):
         rulebook = syml.loads(TEST_RULEBOOK_SYML, raw=False)
         compiled = rulebooks.compile_rulebook(env, rulebook)
-        assert compiled == EXPECTED_COMPILED_RULEBOOK
+        if compiled == EXPECTED_COMPILED_RULEBOOK:
+            assert compiled == EXPECTED_COMPILED_RULEBOOK
+        else:
+            assert thaw(compiled) == thaw(EXPECTED_COMPILED_RULEBOOK)
 
     def test_it_should_compile_a_situation_with_missing_concept_label(self, env):
         rulebook_syml = textwrap.dedent(
@@ -103,8 +107,8 @@ class TestCompileRulebook:
         """
         )
         result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml, raw=False))
-        assert len(result["rulebook"]) == 1
-        assert "Situation" in result["rulebook"]
+        assert len(result["concepts"]) == 1
+        assert "Situation" in result["concepts"]
 
     def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(self, env):
         rulebook_syml = textwrap.dedent(
@@ -118,7 +122,7 @@ class TestCompileRulebook:
         )
         prefix = "prefix-"
         result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml, raw=False), prefix)
-        assert "prefix-intro" in result["rulebook"]["Situation"]["locations"]
+        assert "prefix-intro" in result["concepts"]["Situation"].locations
 
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
         bad_rulebook_syml = textwrap.dedent(
@@ -212,154 +216,156 @@ TEST_RULEBOOK_SYML = textwrap.dedent(
 )
 
 
-EXPECTED_COMPILED_RULEBOOK = {
-    "metadata": {"author": "Me!"},
-    "givens": [
-        types.Operation(
-            quality="Intro",
-            operator="=",
-            expression=0,
-            constraint=None,
-        ),
-    ],
-    "includes": [],
-    "rulebook": {
-        "Situation": {
-            "rules": [
-                types.Rule(
-                    name="intro",
-                    predicates=[
-                        types.Predicate(
-                            name="Intro",
-                            comparison=types.Comparison(
-                                quality="Intro",
-                                comparator="==",
-                                expression=0,
-                            ),
-                        ),
-                    ],
-                )
-            ],
-            "locations": {
-                "intro": types.Situation(
-                    intro=types.Text(
-                        text="It was raining steadily by the time I dropped my last rider off...",
-                        sticky=False,
-                        predicate=None,
-                    ),
-                    directives=[
-                        types.Text(
-                            text=(
-                                "It was raining steadily by the time I dropped my last rider "
-                                "off and swung by the post office on my way home."
-                            ),
-                            sticky=False,
-                            predicate=None,
-                        ),
-                        types.BeginChoices(),
-                        types.Choice(
-                            choice="intro::the-post-office-was-closed",
-                        ),
-                        types.GetChoice(),
-                        types.Text(
-                            text="I found my box, lucky 1313. ",
-                            sticky=True,
-                            predicate=None,
-                        ),
-                        types.Text(
-                            text="What a lovely number.",
-                            sticky=False,
-                            predicate=types.Predicate(
-                                name="Dark",
+EXPECTED_COMPILED_RULEBOOK = freeze(
+    {
+        "metadata": {"author": "Me!"},
+        "givens": [
+            types.Operation(
+                quality="Intro",
+                operator="=",
+                expression=0,
+                constraint=None,
+            ),
+        ],
+        "includes": [],
+        "concepts": {
+            "Situation": types.Concept(
+                rules=[
+                    types.Rule(
+                        name="intro",
+                        predicates=[
+                            types.Predicate(
+                                name="Intro",
                                 comparison=types.Comparison(
-                                    quality="Dark",
-                                    comparator=">",
+                                    quality="Intro",
+                                    comparator="==",
                                     expression=0,
                                 ),
                             ),
-                        ),
-                        types.Text(
-                            text="What a joke. The number mocked me.",
+                        ],
+                    )
+                ],
+                locations={
+                    "intro": types.Situation(
+                        intro=types.Text(
+                            text="It was raining steadily by the time I dropped my last rider off...",
                             sticky=False,
-                            predicate=types.Predicate(
-                                name="Light",
-                                comparison=types.Comparison(
-                                    quality="Light",
-                                    comparator=">",
-                                    expression=0,
+                            predicate=None,
+                        ),
+                        directives=[
+                            types.Text(
+                                text=(
+                                    "It was raining steadily by the time I dropped my last rider "
+                                    "off and swung by the post office on my way home."
+                                ),
+                                sticky=False,
+                                predicate=None,
+                            ),
+                            types.BeginChoices(),
+                            types.Choice(
+                                choice="intro::the-post-office-was-closed",
+                            ),
+                            types.GetChoice(),
+                            types.Text(
+                                text="I found my box, lucky 1313. ",
+                                sticky=True,
+                                predicate=None,
+                            ),
+                            types.Text(
+                                text="What a lovely number.",
+                                sticky=False,
+                                predicate=types.Predicate(
+                                    name="Dark",
+                                    comparison=types.Comparison(
+                                        quality="Dark",
+                                        comparator=">",
+                                        expression=0,
+                                    ),
                                 ),
                             ),
-                        ),
-                    ],
-                ),
-                "intro::the-post-office-was-closed": types.Situation(
-                    intro=types.Text(
-                        text="The post office was closed.",
-                        sticky=False,
-                        predicate=None,
+                            types.Text(
+                                text="What a joke. The number mocked me.",
+                                sticky=False,
+                                predicate=types.Predicate(
+                                    name="Light",
+                                    comparison=types.Comparison(
+                                        quality="Light",
+                                        comparator=">",
+                                        expression=0,
+                                    ),
+                                ),
+                            ),
+                        ],
                     ),
-                    directives=[
-                        types.Text(
-                            text="The post office was closed, but I let myself in to the PO box room.",
+                    "intro::the-post-office-was-closed": types.Situation(
+                        intro=types.Text(
+                            text="The post office was closed.",
                             sticky=False,
                             predicate=None,
                         ),
-                        types.Text(
-                            text=("The fluorescent glare hurt my eyes after the evening " "of headlight glare."),
-                            sticky=False,
-                            predicate=None,
-                        ),
-                        types.BeginChoices(),
-                        types.Choice(
-                            choice="intro::i-quietly-cursed-the-light-wishing-for-the-dark",
-                        ),
-                        types.Choice(
-                            choice="intro::i-quietly-gave-thanks-for-the-light",
-                        ),
-                        types.GetChoice(),
-                    ],
-                ),
-                "intro::i-quietly-cursed-the-light-wishing-for-the-dark": types.Situation(
-                    intro=types.Text(
-                        text="I quietly cursed the light, wishing for the dark.",
-                        sticky=False,
-                        predicate=None,
+                        directives=[
+                            types.Text(
+                                text="The post office was closed, but I let myself in to the PO box room.",
+                                sticky=False,
+                                predicate=None,
+                            ),
+                            types.Text(
+                                text=("The fluorescent glare hurt my eyes after the evening " "of headlight glare."),
+                                sticky=False,
+                                predicate=None,
+                            ),
+                            types.BeginChoices(),
+                            types.Choice(
+                                choice="intro::i-quietly-cursed-the-light-wishing-for-the-dark",
+                            ),
+                            types.Choice(
+                                choice="intro::i-quietly-gave-thanks-for-the-light",
+                            ),
+                            types.GetChoice(),
+                        ],
                     ),
-                    directives=[
-                        types.Text(
+                    "intro::i-quietly-cursed-the-light-wishing-for-the-dark": types.Situation(
+                        intro=types.Text(
                             text="I quietly cursed the light, wishing for the dark.",
                             sticky=False,
                             predicate=None,
                         ),
-                        types.Operation(
-                            quality="Dark",
-                            operator="+=",
-                            expression=1,
-                            constraint=None,
-                        ),
-                    ],
-                ),
-                "intro::i-quietly-gave-thanks-for-the-light": types.Situation(
-                    intro=types.Text(
-                        text="I quietly gave thanks for the light.",
-                        sticky=False,
-                        predicate=None,
+                        directives=[
+                            types.Text(
+                                text="I quietly cursed the light, wishing for the dark.",
+                                sticky=False,
+                                predicate=None,
+                            ),
+                            types.Operation(
+                                quality="Dark",
+                                operator="+=",
+                                expression=1,
+                                constraint=None,
+                            ),
+                        ],
                     ),
-                    directives=[
-                        types.Text(
+                    "intro::i-quietly-gave-thanks-for-the-light": types.Situation(
+                        intro=types.Text(
                             text="I quietly gave thanks for the light.",
                             sticky=False,
                             predicate=None,
                         ),
-                        types.Operation(
-                            quality="Light",
-                            operator="+=",
-                            expression=1,
-                            constraint=None,
-                        ),
-                    ],
-                ),
-            },
+                        directives=[
+                            types.Text(
+                                text="I quietly gave thanks for the light.",
+                                sticky=False,
+                                predicate=None,
+                            ),
+                            types.Operation(
+                                quality="Light",
+                                operator="+=",
+                                expression=1,
+                                constraint=None,
+                            ),
+                        ],
+                    ),
+                },
+            ),
         },
-    },
-}
+    }
+)

@@ -1,27 +1,42 @@
 from __future__ import annotations
+
 import operator as op
-from typing import Union, Optional
+from typing import Optional, Union
 
 import attr
-from pyrsistent import pmap
+from attrs import define, field
+from pyrsistent import PMap, PVector
+from pyrsistent import pmap, pvector
 from syml.types import Pos, Source  # noqa
 
 from ravel.utils.data import evaluate_term
 
-
 SourceStr = Union[Source, str]
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
+class Rulebook:
+    metadata: PMap
+    concepts: PMap[str, Concept]
+    givens: PVector
+
+
+@define(slots=True, frozen=True)
+class Concept:
+    rules: PVector = field(factory=pvector)
+    locations: PMap = field(factory=pmap)
+
+
+@define(slots=True, frozen=True)
 class Choice:
-    choice: str = attr.ib()
+    choice: str = field()
 
 
-@attr.s(slots=True, repr=False, frozen=True)
+@define(slots=True, repr=False, frozen=True)
 class Comparison:
-    quality: str = attr.ib()
-    comparator: str = attr.ib()
-    expression: str = attr.ib()
+    quality: str = field()
+    comparator: str = field()
+    expression: str = field()
 
     _comparators = pmap(
         {
@@ -57,22 +72,22 @@ class Comparison:
         return "(%r %s %r)" % (self.quality, self.comparator, self.expression)
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class Constraint:
-    kind: str = attr.ib()
-    value: str = attr.ib()
+    kind: str = field()
+    value: str = field()
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class Effect:
-    operation: Operation = attr.ib()
+    operation: Operation = field()
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class Expression:
-    term1: str = attr.ib()
-    operator: str = attr.ib()
-    term2: str = attr.ib()
+    term1: str = field()
+    operator: str = field()
+    term2: str = field()
 
     _operators = pmap(
         {
@@ -95,22 +110,22 @@ class Expression:
         )
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class BeginChoices:
     pass
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class GetChoice:
     pass
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class Operation:
-    quality: str = attr.ib()
-    operator: str = attr.ib()
-    expression: str = attr.ib()
-    constraint: Optional[Constraint] = attr.ib(default=None)
+    quality: str = field()
+    operator: str = field()
+    expression: str = field()
+    constraint: Optional[Constraint] = field(default=None)
 
     _operators = {
         "=": lambda a, b: b,
@@ -138,10 +153,10 @@ class Operation:
         return result
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True, order=True)
 class Predicate:
-    name: str = attr.ib()
-    comparison: Comparison = attr.ib()
+    name: str = field()
+    comparison: Comparison = field()
 
     def check(self, qualities, **kwargs):
         if self.comparison is None:
@@ -150,17 +165,17 @@ class Predicate:
         return self.comparison.check(qualities, **kwargs)
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class Situation:
-    intro = attr.ib()
-    directives = attr.ib()
+    intro = field()
+    directives = field()
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class Text:
-    text = attr.ib()
-    sticky = attr.ib(default=False, repr=False)
-    predicate = attr.ib(default=None, repr=False)
+    text = field()
+    sticky = field(default=False, repr=False)
+    predicate = field(default=None, repr=False)
 
     def check(self, qualities, **kwargs):
         if self.predicate is None:
@@ -172,12 +187,12 @@ class Text:
         return self.text
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True)
 class VALUE:
     pass
 
 
-@attr.s(slots=True, frozen=True)
+@define(slots=True, frozen=True, order=True)
 class Rule:
-    name = attr.ib()
-    predicates = attr.ib()
+    name = field()
+    predicates = field()

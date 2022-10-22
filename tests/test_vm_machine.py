@@ -48,7 +48,7 @@ class TestMachine:
                 expression=0,
             )
         ]
-        machine = machines.VirtualMachine(rulebook=Mock(), givens=givens)
+        machine = machines.VirtualMachine(rulebook=Mock(givens=givens))
         machine.initialize_from_givens()
         assert machine.qualities == {"Foo": 0}
 

@@ -4,7 +4,7 @@ from collections.abc import Sequence, Mapping
 import logging
 
 if TYPE_CHECKING:
-    from ravel.types import Predicate, SourceStr
+    from ravel.types import Concept, Predicate, SourceStr, Rulebook
 
 logger = logging.getLogger("ravel.query")
 
@@ -48,20 +48,20 @@ def query_predicates(query: Sequence[Tuple[SourceStr, SourceStr]], predicates: S
     return all(matches)
 
 
-def query_ruleset(q, rules):
+def query_ruleset(q, concept: Concept):
     q = sorted(q)
-    for rule in rules["rules"]:
+    for rule in concept.rules:
         logger.debug("Against rule %r", rule)
         if query_predicates(q, rule.predicates):
             logger.debug("Rule %s accepted", rule.name)
-            yield (len(rule.predicates), rule.name, query_by_name(rule.name, rules))
+            yield (len(rule.predicates), rule.name, query_by_name(rule.name, concept))
         else:
             logger.debug("Rule %s rejected", rule.name)
 
 
-def query(concept, q, rules, how_many=None):
+def query(name, q, rulebook: Rulebook, how_many=None):
     accepted_rules = sorted(
-        query_ruleset(q, rules.get(concept, [])),
+        query_ruleset(q, rulebook.concepts.get(name, [])),
         reverse=True,
     )
     for score, rname, result in accepted_rules[:how_many]:
@@ -69,10 +69,10 @@ def query(concept, q, rules, how_many=None):
         yield rname, result
 
 
-def query_top(concept, q, rules):
-    for rname, result in query(concept, q, rules=rules, how_many=1):
+def query_top(name, q, rulebook: Rulebook):
+    for rname, result in query(name, q, rulebook=rulebook, how_many=1):
         return rname, result
 
 
-def query_by_name(rname, rules):
-    return rules["locations"][rname]
+def query_by_name(rname, concept: Concept):
+    return concept.locations[rname]

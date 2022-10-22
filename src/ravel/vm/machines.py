@@ -6,10 +6,10 @@ from typing import Callable, Deque, Dict, List, Optional
 import attr
 from attrs import define, field
 
-from .. import queries
-from . import events
-from .signals import Signals
-from .states import Begin, State
+from ravel import queries, types
+from ravel.vm import events
+from ravel.vm.signals import Signals
+from ravel.vm.states import Begin, State
 
 logger = logging.getLogger("ravel.vm")
 
@@ -42,9 +42,9 @@ class VirtualMachine:
 
     """
 
-    rulebook: Dict = field()
-    givens: List = field(default=attr.Factory(list))
-    metadata: Dict = field(default=attr.Factory(dict))
+    rulebook: types.Rulebook = field()
+    # givens: List = field(default=attr.Factory(list))
+    # metadata: Dict = field(default=attr.Factory(dict))
     qualities: Dict = field(default=attr.Factory(dict))
     stack: Deque[State] = field(default=attr.Factory(deque))
     signals: Signals = field(default=attr.Factory(Signals))
@@ -85,9 +85,9 @@ class VirtualMachine:
         )
 
     def initialize_from_givens(self):
-        logger.debug(f"Initializing from givens: {self.givens!r}")
+        logger.debug(f"Initializing from givens: {self.rulebook.givens!r}")
         state = self.qualities
-        for op in self.givens:
+        for op in self.rulebook.givens:
             self.apply_operation(op)
         self.qualities = state
 
@@ -134,4 +134,4 @@ class VirtualMachine:
 
     def get_situation(self, name):
         logger.debug("Getting situation %s", name)
-        return queries.query_by_name(name, self.rulebook["Situation"])
+        return queries.query_by_name(name, self.rulebook.concepts["Situation"])

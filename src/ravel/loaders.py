@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import codecs
 from collections import defaultdict, deque
-from typing import TYPE_CHECKING, Callable, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Tuple, Union, Dict
 
 import syml
 from attrs import define, field, Factory
@@ -11,6 +11,7 @@ from pyrsistent import PMap, freeze
 
 from ravel import exceptions
 from ravel.compiler import rulebooks
+from ravel.types import Concept, Rulebook
 
 if TYPE_CHECKING:
     from syml.types import Source
@@ -49,23 +50,7 @@ class BaseLoader:
                 metadata.update(rulebook["metadata"])
                 givens.extend(rulebook["givens"])
 
-        master_rulebook = defaultdict(lambda: {"rules": [], "locations": {}})
-        for rulebook in loaded_rulebooks.values():
-            for concept, ruleset in rulebook["rulebook"].items():
-                master_concept = master_rulebook[concept]
-                master_concept["rules"].extend(ruleset["rules"])
-                master_concept["locations"].update(ruleset["locations"])
-
-        for ruleset in master_rulebook.values():
-            ruleset["rules"].sort()
-
-        return freeze(
-            {
-                "metadata": metadata,
-                "rulebook": dict(master_rulebook),
-                "givens": givens,
-            }
-        )
+        return rulebooks.compile_master_rulebook(loaded_rulebooks.values(), metadata, givens)
 
     def get_rulebook(self, environment: Environment, name: str) -> PMap:
         rulebook = self.cache.get(name)

@@ -92,6 +92,9 @@ def compile_rulebook(environment: Environment, rulebook: Dict, prefix: str = "")
 
     preamble = compile_preamble(environment, rulebook)
 
+    concept_rules: Dict[str, List] = defaultdict(list)
+    concept_locations: Dict[str, List] = defaultdict(dict)
+
     for rule_name, data in preamble["rulesets"]:
         if is_when(first(data)):
             concept = "Situation"
@@ -109,7 +112,7 @@ def compile_rulebook(environment: Environment, rulebook: Dict, prefix: str = "")
         rule_name = prefix + get_text(rule_name)
         concept = get_text(concept)
 
-        rules[concept]["rules"].append(
+        concept_rules[concept].append(
             types.Rule(
                 rule_name,
                 compile_ruleset(
@@ -120,16 +123,45 @@ def compile_rulebook(environment: Environment, rulebook: Dict, prefix: str = "")
                 ),
             )
         )
-        rules[concept]["locations"].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
+        concept_locations[concept].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
 
-    for ruleset in rules.values():
-        ruleset["rules"].sort()
+    for ruleset in concept_rules.values():
+        ruleset.sort()
+
+    concepts_rules = {
+        concept: types.Concept(rules=concept_rules[concept], locations=concept_locations[concept])
+        for concept in (set(concept_rules) | set(concept_locations))
+    }
 
     return freeze(
         {
-            "rulebook": dict(rules),
+            "concepts": concepts_rules,
             "includes": preamble["includes"],
             "givens": preamble["givens"],
             "metadata": preamble["metadata"],
         }
+    )
+
+
+def compile_master_rulebook(rulebooks: List, metadata: Dict, givens: List):
+    concept_rules: Dict[str, List] = defaultdict(list)
+    concept_locations: Dict[str, List] = defaultdict(dict)
+
+    for rulebook in rulebooks:
+        for concept, ruleset in rulebook["concepts"].items():
+            concept_rules[concept].extend(ruleset.rules)
+            concept_locations[concept].update(ruleset.locations)
+
+    for ruleset in concept_rules.values():
+        ruleset.sort()
+
+    concepts_rules = {
+        concept: types.Concept(rules=concept_rules[concept], locations=concept_locations[concept])
+        for concept in (set(concept_rules) | set(concept_locations))
+    }
+
+    return types.Rulebook(
+        metadata=freeze(metadata),
+        concepts=freeze(concepts_rules),
+        givens=freeze(givens),
     )
