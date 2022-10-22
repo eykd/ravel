@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 
 
 class StatefulRunner:
-    def __init__(self, env: Environment):
-        self.env = env
-        self.vm = machines.VirtualMachine(**self.env.load())
+    def __init__(self, environment: Environment):
+        self.environment = environment
+        self.vm = machines.VirtualMachine(**self.environment.load())
 
         self.running = False
         self.waiting_for_choice = False

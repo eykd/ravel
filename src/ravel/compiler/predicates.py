@@ -5,11 +5,11 @@ from ravel import exceptions, parsers, types
 from ravel.utils.strings import get_text
 
 if TYPE_CHECKING:
-    from syml.types import Source
+    from ravel.types import SourceStr
     from ravel.environment import Environment
 
 
-def compile_predicate(environment: Environment, target: Union[Source, str]) -> types.Predicate:
+def compile_predicate(environment: Environment, target: SourceStr) -> types.Predicate:
     try:
         comparison = parsers.ComparisonParser().parse(get_text(target))
     except (
@@ -18,4 +18,4 @@ def compile_predicate(environment: Environment, target: Union[Source, str]) -> t
         exceptions.VisitationError,
     ):
         exceptions.raise_parse_error(target, exceptions.ComparisonParseError)
-    return types.Predicate(comparison.quality, comparison)
+    return types.Predicate(name=comparison.quality, comparison=comparison)

@@ -1,15 +1,21 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Tuple
+from collections.abc import Sequence, Mapping
 import logging
+
+if TYPE_CHECKING:
+    from ravel.types import Predicate, SourceStr
 
 logger = logging.getLogger("ravel.query")
 
 
-def query_predicates(query, predicates):
+def query_predicates(query: Sequence[Tuple[SourceStr, SourceStr]], predicates: Sequence[Predicate]) -> bool:
     matches = []
     qkeys = set()
     qvalue = None
     for predicate in predicates:
         rkey = predicate.name
-        predicate = predicate.predicate
+        comparison = predicate.comparison
         for qkey, qvalue in query:
             if qkey == rkey:
                 qkeys.add(qkey)
@@ -20,17 +26,15 @@ def query_predicates(query, predicates):
                     rkey,
                     predicate,
                 )
-                matched = predicate(qvalue)
+                matched = comparison(qvalue)
                 matches.append(bool(matched))
                 if matched:
-                    logger.debug(
-                        "Matched rule for `%s %r`: %s", rkey, predicate, qvalue
-                    )
+                    logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
                 break
         else:
             assert rkey not in qkeys
             try:
-                matched = predicate(0)
+                matched = comparison(0)
             except TypeError:
                 matched = False
             if matched:
@@ -61,9 +65,7 @@ def query(concept, q, rules, how_many=None):
         reverse=True,
     )
     for score, rname, result in accepted_rules[:how_many]:
-        logger.debug(
-            "Query result: (rule %s with score of %s) %r", rname, score, result
-        )
+        logger.debug("Query result: (rule %s with score of %s) %r", rname, score, result)
         yield rname, result
 
 

@@ -20,19 +20,15 @@ class TestCompileRuleset:
         expected = [
             types.Predicate(
                 name="bar",
-                predicate=types.Comparison(quality="bar", comparator="<", expression=5),
+                comparison=types.Comparison(quality="bar", comparator="<", expression=5),
             ),
             types.Predicate(
                 name="blah",
-                predicate=types.Comparison(
-                    quality="blah", comparator="==", expression="boo"
-                ),
+                comparison=types.Comparison(quality="blah", comparator="==", expression="boo"),
             ),
             types.Predicate(
                 name="foo",
-                predicate=types.Comparison(
-                    quality="foo", comparator="==", expression=9
-                ),
+                comparison=types.Comparison(quality="foo", comparator="==", expression=9),
             ),
         ]
 

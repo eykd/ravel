@@ -42,7 +42,7 @@ def run(config, directory):  # pragma: nocover
         env = Environment(
             loader=loaders.FileSystemLoader(base_path=directory),
         )
-        with ConsoleRunner(env, debug=config.debug, verbose=config.verbose) as runner:
+        with ConsoleRunner(environment=env, debug=config.debug, verbose=config.verbose) as runner:
             runner.run()
     except (KeyboardInterrupt, EOFError):
         sys.exit(0)
@@ -54,8 +54,8 @@ def run(config, directory):  # pragma: nocover
 
 
 class ConsoleRunner(runners.StatefulRunner):  # pragma: nocover
-    def __init__(self, env: Environment, debug: bool = False, verbose: bool = False):
-        super().__init__(env)
+    def __init__(self, environment: Environment, debug: bool = False, verbose: bool = False):
+        super().__init__(environment)
         self.debug = debug
         self.verbose = verbose
         self.choice_events = []

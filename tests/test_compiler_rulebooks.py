@@ -106,9 +106,7 @@ class TestCompileRulebook:
         assert len(result["rulebook"]) == 1
         assert "Situation" in result["rulebook"]
 
-    def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(
-        self, env
-    ):
+    def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(self, env):
         rulebook_syml = textwrap.dedent(
             """
             intro:
@@ -119,9 +117,7 @@ class TestCompileRulebook:
         """
         )
         prefix = "prefix-"
-        result = rulebooks.compile_rulebook(
-            env, syml.loads(rulebook_syml, raw=False), prefix
-        )
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml, raw=False), prefix)
         assert "prefix-intro" in result["rulebook"]["Situation"]["locations"]
 
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
@@ -235,7 +231,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                     predicates=[
                         types.Predicate(
                             name="Intro",
-                            predicate=types.Comparison(
+                            comparison=types.Comparison(
                                 quality="Intro",
                                 comparator="==",
                                 expression=0,
@@ -275,7 +271,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                             sticky=False,
                             predicate=types.Predicate(
                                 name="Dark",
-                                predicate=types.Comparison(
+                                comparison=types.Comparison(
                                     quality="Dark",
                                     comparator=">",
                                     expression=0,
@@ -287,7 +283,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                             sticky=False,
                             predicate=types.Predicate(
                                 name="Light",
-                                predicate=types.Comparison(
+                                comparison=types.Comparison(
                                     quality="Light",
                                     comparator=">",
                                     expression=0,
@@ -309,10 +305,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                             predicate=None,
                         ),
                         types.Text(
-                            text=(
-                                "The fluorescent glare hurt my eyes after the evening "
-                                "of headlight glare."
-                            ),
+                            text=("The fluorescent glare hurt my eyes after the evening " "of headlight glare."),
                             sticky=False,
                             predicate=None,
                         ),

@@ -1,31 +1,39 @@
+from __future__ import annotations
 import operator as op
+from typing import Union, Optional
 
 import attr
+from pyrsistent import pmap
 from syml.types import Pos, Source  # noqa
 
 from ravel.utils.data import evaluate_term
 
 
-@attr.s(slots=True)
+SourceStr = Union[Source, str]
+
+
+@attr.s(slots=True, frozen=True)
 class Choice:
-    choice = attr.ib()
+    choice: str = attr.ib()
 
 
-@attr.s(slots=True, repr=False)
+@attr.s(slots=True, repr=False, frozen=True)
 class Comparison:
-    quality = attr.ib()
-    comparator = attr.ib()
-    expression = attr.ib()
+    quality: str = attr.ib()
+    comparator: str = attr.ib()
+    expression: str = attr.ib()
 
-    _comparators = {
-        ">": op.gt,
-        ">=": op.ge,
-        "==": op.eq,
-        "=": op.eq,
-        "<=": op.le,
-        "<": op.lt,
-        "!=": op.ne,
-    }
+    _comparators = pmap(
+        {
+            ">": op.gt,
+            ">=": op.ge,
+            "==": op.eq,
+            "=": op.eq,
+            "<=": op.le,
+            "<": op.lt,
+            "!=": op.ne,
+        }
+    )
 
     def get_comparators(self):
         return self._comparators[self.comparator]
@@ -49,31 +57,33 @@ class Comparison:
         return "(%r %s %r)" % (self.quality, self.comparator, self.expression)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Constraint:
-    kind = attr.ib()
-    value = attr.ib()
+    kind: str = attr.ib()
+    value: str = attr.ib()
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Effect:
-    operation = attr.ib()
+    operation: Operation = attr.ib()
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Expression:
-    term1 = attr.ib()
-    operator = attr.ib()
-    term2 = attr.ib()
+    term1: str = attr.ib()
+    operator: str = attr.ib()
+    term2: str = attr.ib()
 
-    _operators = {
-        "+": op.add,
-        "-": op.sub,
-        "*": op.mul,
-        "//": op.floordiv,
-        "/": op.truediv,
-        "%": op.mod,
-    }
+    _operators = pmap(
+        {
+            "+": op.add,
+            "-": op.sub,
+            "*": op.mul,
+            "//": op.floordiv,
+            "/": op.truediv,
+            "%": op.mod,
+        }
+    )
 
     def get_operator(self):
         return self._operators[self.operator]
@@ -85,22 +95,22 @@ class Expression:
         )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class BeginChoices:
     pass
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class GetChoice:
     pass
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Operation:
-    quality = attr.ib()
-    operator = attr.ib()
-    expression = attr.ib()
-    constraint = attr.ib(default=None)
+    quality: str = attr.ib()
+    operator: str = attr.ib()
+    expression: str = attr.ib()
+    constraint: Optional[Constraint] = attr.ib(default=None)
 
     _operators = {
         "=": lambda a, b: b,
@@ -128,25 +138,25 @@ class Operation:
         return result
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Predicate:
-    name = attr.ib()
-    predicate = attr.ib()
+    name: str = attr.ib()
+    comparison: Comparison = attr.ib()
 
     def check(self, qualities, **kwargs):
-        if self.predicate is None:
+        if self.comparison is None:
             return True
 
-        return self.predicate.check(qualities, **kwargs)
+        return self.comparison.check(qualities, **kwargs)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Situation:
     intro = attr.ib()
     directives = attr.ib()
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Text:
     text = attr.ib()
     sticky = attr.ib(default=False, repr=False)
@@ -162,12 +172,12 @@ class Text:
         return self.text
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class VALUE:
     pass
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True)
 class Rule:
     name = attr.ib()
     predicates = attr.ib()
