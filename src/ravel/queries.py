@@ -48,20 +48,20 @@ def query_predicates(query: Sequence[Tuple[SourceStr, SourceStr]], predicates: S
     return all(matches)
 
 
-def query_ruleset(q, concept: Concept):
+def query_ruleset(concept: Concept, q):
     q = sorted(q)
     for rule in concept.rules:
         logger.debug("Against rule %r", rule)
         if query_predicates(q, rule.predicates):
             logger.debug("Rule %s accepted", rule.name)
-            yield (len(rule.predicates), rule.name, query_by_name(rule.name, concept))
+            yield (len(rule.predicates), rule.name, query_concept_by_name(concept, rule.name))
         else:
             logger.debug("Rule %s rejected", rule.name)
 
 
-def query(name, q, rulebook: Rulebook, how_many=None):
+def query(rulebook: Rulebook, name, q, how_many=None):
     accepted_rules = sorted(
-        query_ruleset(q, rulebook.concepts.get(name, [])),
+        query_ruleset(rulebook.concepts.get(name, []), q),
         reverse=True,
     )
     for score, rname, result in accepted_rules[:how_many]:
@@ -69,10 +69,14 @@ def query(name, q, rulebook: Rulebook, how_many=None):
         yield rname, result
 
 
-def query_top(name, q, rulebook: Rulebook):
-    for rname, result in query(name, q, rulebook=rulebook, how_many=1):
+def query_top(rulebook: Rulebook, name: str, q):
+    for rname, result in query(rulebook, name, q, how_many=1):
         return rname, result
 
 
-def query_by_name(rname, concept: Concept):
-    return concept.locations[rname]
+def query_concept_by_name(concept: Concept, rule_name: str):
+    return concept.locations[rule_name]
+
+
+def query_by_name(rulebook: Rulebook, concept_name: str, rname: str):
+    return query_concept_by_name(rulebook.concepts[concept_name], rname)

@@ -68,15 +68,15 @@ class TestQueryTop:
         return compile_rulebook(env, rulebook)
 
     def test_it_should_query_a_rules_database_and_reject_mismatched_rules(self, rulebook):
-        result = queries.query_top("onTest", [("foo", "bar")], rulebook=rulebook)
+        result = queries.query_top(rulebook, "onTest", [("foo", "bar")])
         assert result == ("foo-bar", ["baz"])
 
     def test_it_should_query_a_rules_database_and_return_the_higher_scoring_rule(self, rulebook):
-        result = queries.query_top("onTest", [("foo", "bar"), ("blah", "boo")], rulebook=rulebook)
+        result = queries.query_top(rulebook, "onTest", [("foo", "bar"), ("blah", "boo")])
         assert result == ("foo-bar-blah-boo", ["blah"])
 
     def test_it_should_query_a_rules_database_and_return_None_for_no_matches(self, rulebook):
-        result = queries.query_top("onTest", [("foo", "blah")], rulebook=rulebook)
+        result = queries.query_top(rulebook, "onTest", [("foo", "blah")])
         assert result is None
 
 

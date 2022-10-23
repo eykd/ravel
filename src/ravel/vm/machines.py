@@ -1,15 +1,18 @@
+from __future__ import annotations
 import logging
 from collections import deque
 from functools import partial
-from typing import Callable, Deque, Dict, List, Optional
+from typing import Callable, Deque, Dict, List, Optional, TYPE_CHECKING
 
-import attr
 from attrs import define, field
 
 from ravel import queries, types
 from ravel.vm import events
 from ravel.vm.signals import Signals
 from ravel.vm.states import Begin, State
+
+if TYPE_CHECKING:  # pragma: nocover
+    from ravel.types import Operation
 
 logger = logging.getLogger("ravel.vm")
 
@@ -18,7 +21,7 @@ logger = logging.getLogger("ravel.vm")
 class VirtualMachine:
     """The VirtualMachine is a stack of State objects. Each State controls the
     transitions that it may make. Some states will simply pop themselves off
-    the stack, reverting control the the state underneath.
+    the stack, reverting control to the state underneath.
 
     So, we first need an initial state; that's a display-possible-situations
     state. Display the possible situations available based on the current set
@@ -43,13 +46,11 @@ class VirtualMachine:
     """
 
     rulebook: types.Rulebook = field()
-    # givens: List = field(default=attr.Factory(list))
-    # metadata: Dict = field(default=attr.Factory(dict))
-    qualities: Dict = field(default=attr.Factory(dict))
-    stack: Deque[State] = field(default=attr.Factory(deque))
-    signals: Signals = field(default=attr.Factory(Signals))
+    qualities: Dict = field(factory=dict)
+    stack: Deque[State] = field(factory=deque)
+    signals: Signals = field(factory=Signals)
     begin_state: Begin = field(default=Begin)
-    queue: Deque[Callable] = field(default=attr.Factory(deque))
+    queue: Deque[Callable] = field(factory=deque)
 
     def enqueue(self, callable_action: Callable, *args, **kwargs):
         logger.debug(f"Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}")
@@ -69,7 +70,7 @@ class VirtualMachine:
         while self.queue:
             self.do_next_in_queue()
 
-    def apply_operation(self, op):
+    def apply_operation(self, op: Operation):
         logger.debug("Applying operation: %r", op)
         quality = op.quality
         initial_value = self.qualities.get(quality)
@@ -134,4 +135,4 @@ class VirtualMachine:
 
     def get_situation(self, name):
         logger.debug("Getting situation %s", name)
-        return queries.query_by_name(name, self.rulebook.concepts["Situation"])
+        return queries.query_by_name(self.rulebook, "Situation", name)

@@ -36,7 +36,7 @@ class Begin(State):
 @define
 class DisplayPossibleSituations(State):
     def query_and_display(self, vm):
-        query = queries.query("Situation", vm.qualities.items(), vm.rulebook)
+        query = queries.query(vm.rulebook, "Situation", vm.qualities.items())
         vm.send(events.begin_display_choices())
         for n, (location, situation) in enumerate(query):
             vm.send(
