@@ -1,11 +1,15 @@
 from __future__ import annotations
-from typing import Callable, TYPE_CHECKING, List, Union
+
+from typing import TYPE_CHECKING, Callable, List, Union
+
 from pyrsistent import pmap, pvector
+
 from ravel.utils.strings import get_text
 
 if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PMap
     from syml.types import Source
+
     from ravel.environments import Environment
 
 _HANDLERS = {}

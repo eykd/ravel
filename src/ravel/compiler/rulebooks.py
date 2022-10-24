@@ -88,8 +88,6 @@ def compile_preamble(environment: Environment, rulebook: Mapping):
 
 def compile_rulebook(environment: Environment, rulebook: Dict, prefix: str = "") -> PMap:
     """Compile a rulebook declaration"""
-    rules: Dict[str, Dict] = defaultdict(lambda: {"rules": [], "locations": {}})
-
     preamble = compile_preamble(environment, rulebook)
 
     concept_rules: Dict[str, List] = defaultdict(list)

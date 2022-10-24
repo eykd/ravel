@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from collections import OrderedDict, defaultdict, deque
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING
 
 import attr
-import syml
-from pyrsistent import freeze
 
 from ravel import loaders
-from ravel.compiler import rulebooks
 
 if TYPE_CHECKING:  # pragma: nocover
-    from pyrsistent import PMap
-    from syml.types import Source
-
     from ravel.loaders import BaseLoader
 
 

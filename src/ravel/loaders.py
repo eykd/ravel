@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import codecs
 from collections import defaultdict, deque
-from typing import TYPE_CHECKING, Callable, Tuple, Union, Dict
+from typing import TYPE_CHECKING, Callable, Dict, Tuple, Union
 
 import syml
-from attrs import define, field, Factory
+from attrs import Factory, define, field
 from path import Path
-from pyrsistent import PMap, freeze
+from pyrsistent import PMap
 
 from ravel import exceptions
 from ravel.compiler import rulebooks
-from ravel.types import Concept, Rulebook
 
 if TYPE_CHECKING:  # pragma: nocover
     from syml.types import Source

@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Tuple
-from collections.abc import Sequence, Mapping
+
 import logging
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:  # pragma: nocover
-    from ravel.types import Concept, Predicate, SourceStr, Rulebook
+    from ravel.types import Concept, Predicate, Rulebook, SourceStr
 
 logger = logging.getLogger("ravel.query")
 

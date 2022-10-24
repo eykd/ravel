@@ -6,8 +6,8 @@ from pyrsistent import freeze, thaw
 
 from ravel import exceptions, types
 from ravel.compiler import rulebooks
-from ravel.utils.strings import get_text_source
 from ravel.types import Rulebook
+from ravel.utils.strings import get_text_source
 
 
 class TestIsWhen:

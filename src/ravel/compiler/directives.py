@@ -4,7 +4,7 @@ import itertools as it
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Dict
 
-from pyrsistent import pmap, pvector, freeze
+from pyrsistent import freeze, pvector
 from slugify import slugify_unicode  # type: ignore
 
 from ravel import exceptions, parsers, types
@@ -15,6 +15,7 @@ from . import effects, logger, text
 
 if TYPE_CHECKING:  # pragma: nocover
     from pyrsistent import PVector
+
     from ravel.environments import Environment
 
 

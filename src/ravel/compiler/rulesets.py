@@ -6,6 +6,7 @@ from . import predicates
 
 if TYPE_CHECKING:  # pragma: nocover
     from collections.abc import Iterable
+
     from ravel.environments import Environment
     from ravel.types import Predicate, SourceStr
 

@@ -3,10 +3,8 @@ from __future__ import annotations
 import operator as op
 from typing import Optional, Union
 
-import attr
 from attrs import define, field
-from pyrsistent import PMap, PVector
-from pyrsistent import pmap, pvector
+from pyrsistent import PMap, PVector, pmap, pvector
 from syml.types import Pos, Source  # noqa
 
 from ravel.utils.data import evaluate_term

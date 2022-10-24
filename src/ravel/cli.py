@@ -46,7 +46,7 @@ def run(config, directory):  # pragma: nocover
             runner.run()
     except (KeyboardInterrupt, EOFError):
         sys.exit(0)
-    except Exception as e:
+    except Exception:
         logging.exception("Something bad happened...")
         if config.debug:
             pdb.post_mortem()

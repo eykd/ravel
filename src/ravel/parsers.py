@@ -1,14 +1,17 @@
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
+
 from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
+
 from parsimonious import Grammar, NodeVisitor
-from pyrsistent import pmap, pvector
+from pyrsistent import pvector
 
 from ravel import grammars, types
 
 if TYPE_CHECKING:  # pragma: nocover
     from parsimonious.nodes import Node
     from pyrsistent import PVector
+
     from ravel.types import SourceStr
 
 
