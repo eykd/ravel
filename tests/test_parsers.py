@@ -88,9 +88,7 @@ class TestOperationsParser:
     def test_it_should_handle_a_simple_quality_name(self, parser):
         statement = '"Man of Honor" += 3 * 2'
         print(statement)
-        expected = types.Operation(
-            "Man of Honor", "+=", types.Expression(3, "*", 2), None
-        )
+        expected = types.Operation("Man of Honor", "+=", types.Expression(3, "*", 2), None)
         result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
@@ -100,9 +98,7 @@ class TestOperationsParser:
     def test_it_should_handle_a_simple_expression(self, parser):
         statement = '"Man of Honor" += 3 * 2'
         print(statement)
-        expected = types.Operation(
-            "Man of Honor", "+=", types.Expression(3, "*", 2), None
-        )
+        expected = types.Operation("Man of Honor", "+=", types.Expression(3, "*", 2), None)
         result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
@@ -112,9 +108,7 @@ class TestOperationsParser:
     def test_it_should_handle_a_simple_expression_with_a_value(self, parser):
         statement = '"Man of Honor" += 3 * value'
         print(statement)
-        expected = types.Operation(
-            "Man of Honor", "+=", types.Expression(3, "*", types.VALUE), None
-        )
+        expected = types.Operation("Man of Honor", "+=", types.Expression(3, "*", types.VALUE), None)
         result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)
@@ -145,9 +139,7 @@ class TestOperationsParser:
             types.Expression(
                 3,
                 "+",
-                types.Expression(
-                    5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))
-                ),
+                types.Expression(5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))),
             ),
             None,
         )
@@ -180,21 +172,15 @@ class TestOperationsParser:
 
     constraints = ("min", "max")
 
-    @pytest.mark.parametrize(
-        "op,val,con,conval", list(it.product(operations, values, constraints, values))
-    )
-    def test_it_should_parse_all_operators_with_numbers_and_a_constraint(
-        self, parser, op, val, con, conval
-    ):
+    @pytest.mark.parametrize("op,val,con,conval", list(it.product(operations, values, constraints, values)))
+    def test_it_should_parse_all_operators_with_numbers_and_a_constraint(self, parser, op, val, con, conval):
         statement = '"Man of Honor" %(op)s %(val)s %(con)s %(conval)s' % {
             "op": op,
             "val": val,
             "con": con,
             "conval": conval,
         }
-        expected = types.Operation(
-            "Man of Honor", op, val, types.Constraint(con, conval)
-        )
+        expected = types.Operation("Man of Honor", op, val, types.Constraint(con, conval))
         result = parser.parse(statement)
         assert isinstance(result, types.Operation)
         assert result == expected

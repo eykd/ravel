@@ -112,9 +112,7 @@ class TestComparisonParser:
             types.Expression(
                 3,
                 "+",
-                types.Expression(
-                    5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))
-                ),
+                types.Expression(5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))),
             ),
         )
         result = parser.parse(statement)
@@ -126,9 +124,7 @@ class TestComparisonParser:
     def test_it_should_handle_a_simple_expression_with_a_value(self, parser):
         statement = '"Man of Honor" > 3 * value'
         print(statement)
-        expected = types.Comparison(
-            "Man of Honor", ">", types.Expression(3, "*", types.VALUE)
-        )
+        expected = types.Comparison("Man of Honor", ">", types.Expression(3, "*", types.VALUE))
         result = parser.parse(statement)
         print("Got", result)
         print("Exp", expected)

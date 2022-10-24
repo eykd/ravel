@@ -26,8 +26,6 @@ class Test_DummyHandler:
         rule_name = "foo"
         value = ["bar"]
 
-        result = concepts._dummy_handler(
-            environments.Environment(), "concept", rule_name, value
-        )
+        result = concepts._dummy_handler(environments.Environment(), "concept", rule_name, value)
         expected = {rule_name: value}
         assert result == expected
