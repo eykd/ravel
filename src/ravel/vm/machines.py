@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import logging
 from collections import deque
 from functools import partial
-from typing import Callable, Deque, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Deque, Dict, Optional
 
 from attrs import define, field
+from funcy import first
 
 from ravel import queries, types
 from ravel.vm import events
@@ -57,7 +59,7 @@ class VirtualMachine:
         self.queue.append(partial(callable_action, *args, **kwargs))
 
     def do_next_in_queue(self):
-        logger.debug(f"Doing next: {self.queue[0]}")
+        logger.debug(f"Doing next: {first(self.queue)}")
         self.queue.popleft()()
 
     def begin(self):

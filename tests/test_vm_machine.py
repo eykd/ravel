@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from ravel import types
-from ravel.vm import machines, runners
+from ravel.vm import machines, runners, states
 
 
 @pytest.fixture
@@ -58,21 +58,37 @@ class TestCloak:
         for _ in range(num):
             vm.do_next_in_queue()
 
-    def test_it_should_begin(self, runner, vm):
+    def test_it_should_proceed(self, runner, vm):
         assert vm.qualities == {}
         assert list(vm.stack) == []
         assert len(vm.queue) == 2
         assert runner.all_events == []
 
-    def test_it_should_set_givens(self, runner, vm):
+        # 1st
         self.advance(vm, 1)
         assert vm.qualities == {"Bar": 0, "Cloakroom": 0, "Fumbled": 0, "Location": "Intro", "Wearing Cloak": 1}
         assert list(vm.stack) == []
         assert len(vm.queue) == 1
         assert runner.all_events == []
 
-    def test_it_should_push_the_initial_state(self, runner, vm):
-        self.advance(vm, 2)
+        # 2nd
+        self.advance(vm, 1)
         assert list(vm.stack) == []
         assert len(vm.queue) == 1
         assert runner.all_events == []
+
+        # 3rd
+        self.advance(vm, 1)
+        assert list(vm.stack) == [states.Begin()]
+        assert len(vm.queue) == 1
+        assert runner.all_events == []
+
+        # 4th
+        self.advance(vm, 1)
+        assert list(vm.stack) == [states.Begin(), states.DisplayPossibleSituations()]
+        assert len(vm.queue) == 0
+        assert runner.all_events == []
+
+        # 5th
+        with pytest.raises(IndexError):
+            self.advance(vm, 1)
