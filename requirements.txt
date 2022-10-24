@@ -6,22 +6,25 @@
 #
 attrs==22.1.0
     # via
+    #   cattrs
     #   ravel (setup.py)
     #   syml
 awesome-slugify==1.6.5
     # via ravel (setup.py)
 blinker==1.5
     # via ravel (setup.py)
+cattrs==22.2.0
+    # via ravel (setup.py)
 click==8.1.3
     # via ravel (setup.py)
 colorclass==2.2.2
     # via ravel (setup.py)
+exceptiongroup==1.0.0rc9
+    # via cattrs
+funcy==1.17
+    # via ravel (setup.py)
 immutables==0.19
     # via ravel (setup.py)
-marshmallow==3.18.0
-    # via ravel (setup.py)
-packaging==21.3
-    # via marshmallow
 parsimonious==0.10.0
     # via
     #   ravel (setup.py)
@@ -30,8 +33,6 @@ path==16.5.0
     # via ravel (setup.py)
 pydash==5.1.1
     # via ravel (setup.py)
-pyparsing==3.0.9
-    # via packaging
 pyrsistent==0.18.1
     # via ravel (setup.py)
 python-dateutil==2.8.2
