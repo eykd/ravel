@@ -1,8 +1,8 @@
-from syml.utils import get_text_source
+from syml.types import Source
 
 
 def source(text):
-    return get_text_source(text, text)
+    return Source.from_text(text, text)
 
 
 class Any:

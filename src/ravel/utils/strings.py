@@ -1,5 +1,3 @@
-from syml.utils import get_text_source  # noqa
-
 from .. import exceptions
 from ..types import Pos
 

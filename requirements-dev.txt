@@ -5,6 +5,7 @@ flake8-bugbear
 flake8-isort
 flake8-comprehensions
 flake8-simplify
+funcy-stubs
 hypothesis[cli]
 isort[requirements]
 mypy

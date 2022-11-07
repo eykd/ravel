@@ -19,10 +19,12 @@ click==8.1.3
     # via ravel (setup.py)
 colorclass==2.2.2
     # via ravel (setup.py)
-exceptiongroup==1.0.0rc9
+exceptiongroup==1.0.0
     # via cattrs
 funcy==1.17
-    # via ravel (setup.py)
+    # via
+    #   ravel (setup.py)
+    #   syml
 immutables==0.19
     # via ravel (setup.py)
 parsimonious==0.10.0
@@ -47,7 +49,9 @@ straight-plugin==1.5.0
     # via ravel (setup.py)
 strictyaml==1.6.2
     # via ravel (setup.py)
-syml==0.3
+syml==0.4
     # via ravel (setup.py)
+tomli==2.0.1
+    # via syml
 unidecode==0.4.21
     # via awesome-slugify

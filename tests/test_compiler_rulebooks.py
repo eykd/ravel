@@ -6,8 +6,7 @@ from pyrsistent import freeze, thaw
 
 from ravel import exceptions, types
 from ravel.compiler import rulebooks
-from ravel.types import Rulebook
-from ravel.utils.strings import get_text_source
+from ravel.types import Rulebook, Source
 
 
 class TestIsWhen:
@@ -80,7 +79,7 @@ class TestCompileAbout:
     def test_it_should_compile_an_about_clause_with_source_objects(self):
         clause = {
             "about": {
-                "author": get_text_source("Charles Dikkens", "Charles Dikkens"),
+                "author": Source.from_text("Charles Dikkens", "Charles Dikkens"),
             }
         }
         result = rulebooks.compile_about(clause["about"])
