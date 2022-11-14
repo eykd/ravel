@@ -77,7 +77,7 @@ class end_display_choices(Event):
 @define(frozen=True)
 class waiting_for_input(Event):
     name = "waiting_for_input"
-    send_input: Callable = field()
+    send_input: Callable[[str], None] = field()
     state: State = field()
 
 
@@ -85,6 +85,6 @@ class waiting_for_input(Event):
 class quality_changed(Event):
     name = "quality_changed"
 
-    quality: str
-    initial_value: int
-    new_value: int
+    quality: str = field()
+    initial_value: int = field()
+    new_value: int = field()
