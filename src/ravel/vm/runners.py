@@ -6,8 +6,8 @@ from . import machines
 from .signals import SIGNAL, signal
 
 if TYPE_CHECKING:  # pragma: nocover
-    from ravel.events import waiting_for_input
-    from ravel.types import Choice
+    from ..events import Event, display_text, waiting_for_input
+    from ..types import Choice
 
 
 class StatefulRunner:
@@ -16,7 +16,6 @@ class StatefulRunner:
         self.vm = machines.VirtualMachine(rulebook=self.environment.load())
 
         self.running = False
-        self.waiting_for_choice = False
         self.waiter: Optional[waiting_for_input] = None
         self.choice_events: List[Choice] = []
 
@@ -92,7 +91,7 @@ class StatefulRunner:
         self.clear_event_queue()
 
     def choose(self, choice_idx: int):
-        if not self.waiting_for_choice:
+        if self.waiter is None:
             raise RuntimeError("VM is not currently waiting for a choice.")
 
         choice = self.choice_events[choice_idx]
@@ -100,7 +99,6 @@ class StatefulRunner:
 
         self.choice_events[:] = ()
         self.waiter = None
-        self.waiting_for_choice = False
 
         waiter.send_input(choice.choice)
 
@@ -108,8 +106,8 @@ class StatefulRunner:
 class QueueRunner(StatefulRunner):
     def __init__(self, env: Environment):
         super().__init__(env)
-        self.text_events = []
-        self.all_events = []
+        self.text_events: List[display_text] = []
+        self.all_events: List[Event] = []
 
     def handle_any_event(self, event):
         self.all_events.append(event)
@@ -121,5 +119,4 @@ class QueueRunner(StatefulRunner):
         self.choice_events.append(event)
 
     def handle_waiting_for_input(self, event):
-        self.waiting_for_choice = True
         self.waiter = event
