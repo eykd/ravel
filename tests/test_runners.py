@@ -44,7 +44,7 @@ class TestStatefulRunner:
                     index=0,
                 )
             ]
-            assert runner.waiting_for_choice is True
+            assert runner.waiter is not None
 
             runner.choose(0)
 
