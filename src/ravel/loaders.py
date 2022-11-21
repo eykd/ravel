@@ -30,6 +30,7 @@ def unloaded_is_up_to_date() -> bool:
 class BaseLoader:
     location_separator: str = field(default="::")
     is_up_to_date: Dict[str, Callable] = field(factory=lambda: defaultdict(lambda: unloaded_is_up_to_date))
+    cache = field(default=Factory(dict))
 
     def load(self, environment: Environment, name: str) -> PMap:
         source, is_up_to_date = self.get_source(environment, name)
@@ -82,7 +83,6 @@ class BaseLoader:
 class FileSystemLoader(BaseLoader):
     base_path: str = field(default=".")
     extension: str = field(default=".ravel")
-    cache = field(default=Factory(dict))
 
     def get_up_to_date_checker(self, filepath: Union[str, Path]) -> Callable:
         filepath = Path(filepath)
