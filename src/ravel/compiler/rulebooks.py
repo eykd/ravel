@@ -25,6 +25,16 @@ def get_list_of_texts(data):
     return [get_text(data)] if is_text(data) else [get_text(t) for t in data]
 
 
+def get_list_of_sources(data):
+    """Like get_list_of_texts, but keep syml Source objects intact.
+
+    Predicate targets travel on to compile_predicate, which reports the
+    originating file and line when a comparison fails to parse. Flattening them
+    to bare strings here is what threw that position away.
+    """
+    return [data] if is_text(data) else list(data)
+
+
 def compile_givens(environment, data):
     if is_text(data):
         data = [data]
@@ -53,7 +63,7 @@ def compile_preamble(environment, rulebook):
             key_name = get_text(rule[0])
 
             if key_name == "when":
-                common_predicates.extend(get_list_of_texts(rule[1]))
+                common_predicates.extend(get_list_of_sources(rule[1]))
             elif key_name == "include":
                 includes.extend(get_list_of_texts(rule[1]))
             elif key_name == "given":
@@ -83,11 +93,11 @@ def compile_rulebook(environment, rulebook, prefix=""):
     for rule_name, data in preamble["rulesets"]:
         if is_when(data[0]):
             concept = "Situation"
-            ruleset_predicates = get_list_of_texts(get_next(data[0].values()))
+            ruleset_predicates = get_list_of_sources(get_next(data[0].values()))
             baggage_data = data[1:]
         elif len(data) > 1 and is_when(data[1]):
             concept = data[0]
-            ruleset_predicates = get_list_of_texts(get_next(data[1].values()))
+            ruleset_predicates = get_list_of_sources(get_next(data[1].values()))
             baggage_data = data[2:]
         else:
             concept = "Situation"

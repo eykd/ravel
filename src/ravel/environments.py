@@ -63,7 +63,7 @@ class Environment:
         return True
 
     def compile_rulebook(self, source, name="", is_up_to_date=default_is_up_to_date):
-        data = syml.loads(source, filename=name)
+        data = syml.parsers.parse(source, filename=name).as_source()
 
         prefix = name + self.location_separator if name else ""
         rulebook = rulebooks.compile_rulebook(self, data, prefix)
