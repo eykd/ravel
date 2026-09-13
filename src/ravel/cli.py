@@ -1,4 +1,3 @@
-# pragma: nocover
 import logging
 import pdb
 import sys
@@ -119,9 +118,9 @@ class ConsoleRunner(runners.StatefulRunner):
         if self.verbose:
             print(Color(f"## {{green}}Resuming{{/green}} {event.state.__class__.__name__}"))
 
-    def handle_exception(self, debug=False):
-        logging.exception("Something bad happened...")
-        if debug:
+    def handle_exception(self, exc):
+        logging.exception("Something bad happened...", exc_info=exc)
+        if self.debug:
             pdb.post_mortem()
         sys.exit(1)
 
@@ -133,4 +132,3 @@ class ConsoleRunner(runners.StatefulRunner):
             sys.exit(0)
         except Exception as e:
             self.handle_exception(e)
-            sys.exit(1)
