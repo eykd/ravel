@@ -7,8 +7,8 @@ from . import machines
 from .signals import SIGNAL, signal
 
 if TYPE_CHECKING:
-    from ravel.events import waiting_for_input
     from ravel.types import Choice
+    from ravel.vm.events import Event, waiting_for_input
 
 
 class StatefulRunner:
@@ -103,14 +103,15 @@ class StatefulRunner:
         self.waiter = None
         self.waiting_for_choice = False
 
+        assert waiter is not None
         waiter.send_input(choice.choice)
 
 
 class QueueRunner(StatefulRunner):
     def __init__(self, env: Environment):
         super().__init__(env)
-        self.text_events = []
-        self.all_events = []
+        self.text_events: list[Event] = []
+        self.all_events: list[Event] = []
 
     def handle_any_event(self, event):
         self.all_events.append(event)

@@ -1,6 +1,8 @@
+from collections.abc import Callable
+
 from ravel.utils.strings import get_text
 
-_HANDLERS = {}
+_HANDLERS: dict[str, Callable] = {}
 
 
 def handler(concept):

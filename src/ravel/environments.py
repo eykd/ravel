@@ -1,4 +1,5 @@
 from collections import OrderedDict, defaultdict, deque
+from typing import Any
 
 import attr
 import syml
@@ -13,7 +14,7 @@ class Environment:
     location_separator = attr.ib(default="::")
     initializing_name = attr.ib(default="begin")
 
-    cache = attr.ib(default=attr.Factory(dict))
+    cache: dict[str, Any] = attr.ib(default=attr.Factory(dict))
 
     def load(self):
         return self.load_rulebook(self.initializing_name)
