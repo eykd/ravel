@@ -76,3 +76,12 @@ class TestCloak:
         assert list(vm.stack) == []
         assert len(vm.queue) == 1
         assert runner.all_events == []
+
+
+class TestRun:
+    def test_it_should_drain_the_queue_and_stop(self, runner):
+        """run() begins the story and returns once nothing is left to do."""
+        machine = runner.vm
+        machine.run()
+        assert not machine.queue
+        assert machine.qualities["Location"] == "Intro"

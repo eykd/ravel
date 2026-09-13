@@ -154,3 +154,21 @@ class TestOperation:
         )
         result = operation.evaluate(2)
         assert result == expected
+
+
+class TestOperationExpression:
+    def test_it_should_have_no_standalone_expression(self):
+        operation = types.Operation(quality="Foo", operator="+=", expression=1)
+        assert operation.get_expression() is None
+
+
+class TestPredicate:
+    def test_it_should_pass_when_there_is_no_predicate(self):
+        assert types.Predicate("Foo", None).check({}) is True
+
+    def test_it_should_delegate_to_its_predicate(self):
+        comparison = types.Comparison(quality="Foo", comparator=">", expression=2)
+        predicate = types.Predicate("Foo", comparison)
+
+        assert predicate.check({"Foo": 5}) is True
+        assert predicate.check({"Foo": 1}) is False

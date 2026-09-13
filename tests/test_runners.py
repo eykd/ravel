@@ -1,4 +1,8 @@
-from ravel.vm import events, states
+from unittest.mock import Mock
+
+import pytest
+
+from ravel.vm import events, runners, states
 from ravel.vm.runners import QueueRunner
 
 from .helpers import Any
@@ -108,3 +112,27 @@ class TestStatefulRunner:
                     index=0,
                 ),
             ]
+
+
+class TestBaseHandlers:
+    """StatefulRunner's event hooks are no-ops for subclasses to override."""
+
+    def test_it_should_accept_every_event_without_doing_anything(self, cloak_env):
+        runner = runners.StatefulRunner(cloak_env)
+        event = Mock()
+
+        assert runner.handle_any_event(event) is None
+        assert runner.handle_display_text(event) is None
+        assert runner.handle_display_choice(event) is None
+        assert runner.handle_waiting_for_input(event) is None
+
+
+class TestChoose:
+    def test_it_should_refuse_a_choice_when_not_waiting(self, cloak_env):
+        runner = runners.QueueRunner(cloak_env)
+        assert runner.waiting_for_choice is False
+
+        with pytest.raises(RuntimeError) as excinfo:
+            runner.choose(0)
+
+        assert "not currently waiting" in excinfo.value.args[0]

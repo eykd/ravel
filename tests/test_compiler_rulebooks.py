@@ -363,3 +363,24 @@ EXPECTED_COMPILED_RULEBOOK = {
         },
     },
 }
+
+
+class TestMissingBaggage:
+    def test_it_should_complain_when_a_rule_has_no_baggage(self, env):
+        """A file of nothing but preamble keys runs out before finding a rule."""
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                include:
+                  - foyer
+
+                when:
+                  - Location = "Intro"
+                """
+            )
+        )
+
+        with pytest.raises(exceptions.MissingBaggageError) as excinfo:
+            rulebooks.compile_preamble(env, rulebook)
+
+        assert "No baggage found after rule" in excinfo.value.args[0]

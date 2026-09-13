@@ -49,3 +49,19 @@ class TestCompileChoice:
             },
         )
         assert result == expected
+
+
+class TestCompileChoiceFailure:
+    def test_it_should_wrap_a_situation_construction_failure(self, env, monkeypatch):
+        """A broken Situation must surface as a ParseError chained from the cause."""
+
+        def explode(*args, **kwargs):
+            raise TypeError("bad situation")
+
+        monkeypatch.setattr(types, "Situation", explode)
+
+        with pytest.raises(exceptions.ParseError) as excinfo:
+            directives.compile_choice(env, "Situation", "test::rule", ["Some intro text."])
+
+        assert excinfo.value.args[0] == "TypeError: bad situation"
+        assert isinstance(excinfo.value.__cause__, TypeError)

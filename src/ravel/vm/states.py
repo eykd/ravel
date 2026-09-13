@@ -11,19 +11,19 @@ logger = logging.getLogger("vm.states")
 
 @attr.s
 class State:
-    def enter(self, vm):  # pragma: nocover
+    def enter(self, vm):
         pass
 
-    def exit(self, vm):  # pragma: nocover
+    def exit(self, vm):
         pass
 
-    def pause(self, vm):  # pragma: nocover
+    def pause(self, vm):
         pass
 
-    def resume(self, vm):  # pragma: nocover
+    def resume(self, vm):
         pass
 
-    def receive(self, vm, data):  # pragma: nocover
+    def receive(self, vm, data):
         pass
 
 
