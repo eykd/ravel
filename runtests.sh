@@ -1,10 +1,10 @@
 #!/bin/sh
 set -e
 set -x
-pytest \
+exec uv run pytest \
     --failed-first \
     --exitfirst \
     --cov=ravel \
     --cov-branch \
     --disable-warnings \
-    --no-cov-on-fail $@
+    --no-cov-on-fail "$@"
