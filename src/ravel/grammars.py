@@ -4,8 +4,8 @@ base_expression_grammar = textwrap.dedent(
     r"""
     quality               = bracketed_quality / quoted_quality / simple_quality
     quoted_quality        = ~'"[^"]+"'
-    simple_quality        = ~'[^\s]+'
-    bracketed_quality     = ~'\[[^\]]+\]'
+    simple_quality        = ~'[^\\s]+'
+    bracketed_quality     = ~'\\[[^\\]]+\\]'
 
     expression            = additive
     additive              = (multiplicative ws? (add / subtract) ws? additive)
@@ -48,16 +48,16 @@ base_expression_grammar = textwrap.dedent(
     ne                    = "!="
     eq                    = "==" / "="
 
-    ws                    = ~"\s+"
-    end                   = ~"\s*$"
+    ws                    = ~"\\s+"
+    end                   = ~"\\s*$"
 
     value                 = number / string / qvalue / bracketed_quality
 
     qvalue                = "value"
 
     number                = float / integer
-    float                 = ~"\d+\.\d*"
-    integer               = ~"\d+"
+    float                 = ~"\\d+\\.\\d*"
+    integer               = ~"\\d+"
 
     string                = ('"""
     + '"""'
@@ -97,8 +97,8 @@ intro_text_grammar = textwrap.dedent(
     r"""
     intro       = head (suffix tail)?
 
-    head        = ~"[^\[]*"
-    suffix      = "[" ~"[^\]]*" "]"
+    head        = ~"[^\\[]*"
+    suffix      = "[" ~"[^\\]]*" "]"
     tail        = ~".*"
 """
 )
