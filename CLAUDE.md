@@ -19,18 +19,35 @@ uv run pytest
 ```
 
 - Full suite with coverage: `./runtests.sh` (adds `--failed-first --exitfirst --cov=ravel
-  --cov-branch --no-cov-on-fail`; forwards extra args)
+  --cov-branch --no-cov-on-fail`; forwards extra args). Coverage is at 100% and
+  `fail_under = 100` in `pyproject.toml` holds it there — new code needs tests, and there are
+  no `# pragma: no cover` marks left in `src/` to imitate.
 - One file / one test: `uv run pytest tests/test_parsers.py` ·
   `uv run pytest tests/test_parsers.py::test_name`
 - Watch mode: `uv run --with pytest-watcher ptw .`
 - Lint + format: `uv run pre-commit run --all-files` — ruff (check + format) replaces the old
   isort/flake8/black trio. Line length 120. `UP031` (printf-style `%` formatting) is ignored
   deliberately; the codebase uses it throughout for error messages.
-- Type check: `uv run mypy` (config in `pyproject.toml`). mypy is commented out of
-  `.pre-commit-config.yaml` and is **not clean** — 6 errors, 4 of them in
-  `src/ravel/vm/runners.py`. Typing is in-progress work, not a passing gate.
+- Type check: `uv run mypy` (config in `pyproject.toml`). Clean, and enforced as a `local`
+  pre-commit hook — not `mirrors-mypy`, which runs in an isolated venv where `attr`, `click`,
+  and `blinker` all become missing-stub errors. Typing is still partial (most function bodies
+  are unannotated, so `check_untyped_defs` never looks inside them), but it is a passing gate.
 - Run a story: `uv run ravel run examples/cloak` (console script `ravel = ravel.cli:main`;
   `--verbose`/`--debug` are group-level flags, before the subcommand).
+- CI: `.github/workflows/main.yml` runs pytest with branch coverage, `ruff check`,
+  `ruff format --check`, and `mypy` on every push and pull request. Single job — no matrix,
+  since `requires-python = ">=3.14"`.
+
+`src/ravel/grammars.py` holds the PEG text in raw strings, so every regex backslash must be
+doubled (`~'[^\\s]+'`): parsimonious `literal_eval`s the token text, and a single backslash
+raises `SyntaxWarning` today and `SyntaxError` on a future Python. `tests/test_grammars.py`
+rebuilds all five grammars under an error filter to catch a regression. The exception is
+`plain_text_grammar`'s `"\n"`, which is a valid escape and must stay single.
+
+Rulebooks load through `syml.parsers.parse(...).as_source()`, not `syml.loads`, so nodes keep
+their `Source` (filename, line, column) and parse errors can name where the bad text came from.
+Predicate targets must reach `compile_predicate` unflattened for that to survive — use
+`get_list_of_sources`, not `get_list_of_texts`.
 
 `src/ravel/vm/events.py` imports `State` and `Choice` under `if TYPE_CHECKING:` and then uses
 them as annotations in attrs `field()` declarations. That only works because PEP 649 defers
