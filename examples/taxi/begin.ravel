@@ -34,4 +34,3 @@ intro:
     - effect: Intro = 0
     - I opened the box, and looked inside.
     - effect: "Looking at Mail" = 1
-

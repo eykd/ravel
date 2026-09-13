@@ -25,13 +25,12 @@ Clone the repository::
 
     git clone https://github.com/eykd/ravel.git
 
-Install Python 3.10. Create a Python virtual environment in the repo, and install the requirements::
+Install `uv <https://docs.astral.sh/uv/>`_, then let it build the environment.
+It fetches Python 3.14 itself, so there is nothing else to install::
 
     cd ravel
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
+    uv sync
 
 Test that everything works by running the demo::
 
-    ravel run examples/cloak
+    uv run ravel run examples/cloak
