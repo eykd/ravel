@@ -1,3 +1,74 @@
-[tool.black]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ravel"
+version = "0.1.dev0"
+description = "Yet another framework for choice-based interactive fiction."
+readme = "README.rst"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "David Eyk", email = "david@worldsenoughstudios.com" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "attrs",
+    "blinker",
+    "click",
+    "colorclass",
+    "parsimonious>=0.10,<0.11",
+    "python-slugify",
+    "syml>=0.6",
+]
+
+[project.scripts]
+ravel = "ravel.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/eykd/ravel"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ravel"]
+
+[dependency-groups]
+dev = ["coverage", "ipython", "mypy", "pdbpp", "pre-commit", "pytest", "pytest-cov", "ruff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["ravel"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
 line-length = 120
-target-version = ['py310']
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "C4", "SIM", "I", "UP"]
+# printf-style formatting is used pervasively for error messages; rewriting it
+# is unrelated to the 3.14 migration.
+ignore = ["UP031"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ravel"]
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["parsimonious.*", "syml.*", "colorclass.*", "slugify.*"]
+ignore_missing_imports = true

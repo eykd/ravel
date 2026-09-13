@@ -1,7 +1,7 @@
-import codecs
+import os.path
+from pathlib import Path
 
 import attr
-from path import Path
 
 from . import exceptions
 
@@ -23,14 +23,13 @@ class FileSystemLoader(BaseLoader):
     def get_up_to_date_checker(self, filepath):
         filepath = Path(filepath)
         try:
-            mtime = filepath.getmtime()
+            mtime = os.path.getmtime(filepath)
         except OSError:
             mtime = 0.0
 
         def is_up_to_date():
             try:
-                print("was %s, now %s" % (mtime, filepath.getmtime()))
-                return mtime == filepath.getmtime()
+                return mtime == os.path.getmtime(filepath)
             except OSError:
                 return False
 
@@ -41,7 +40,7 @@ class FileSystemLoader(BaseLoader):
         if not filepath.exists():
             raise exceptions.RulebookNotFound(name)
 
-        with codecs.open(filepath, encoding="utf-8") as fi:
+        with filepath.open(encoding="utf-8") as fi:
             source = fi.read()
 
         is_up_to_date = self.get_up_to_date_checker(filepath)

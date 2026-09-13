@@ -1,7 +1,7 @@
 import operator as op
 
 import attr
-from syml.types import Pos, Source  # noqa
+from syml.basetypes import Pos, Source  # noqa
 
 from ravel.utils.data import evaluate_term
 

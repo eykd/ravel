@@ -55,12 +55,7 @@ class BaseExpressionParser(BaseParser):
 
 
 class ComparisonParser(BaseExpressionParser):
-    grammar = Grammar(
-        (
-            "comparison = ws? quality ws comparator ws expression ws?"
-            + grammars.base_expression_grammar
-        )
-    )
+    grammar = Grammar("comparison = ws? quality ws comparator ws expression ws?" + grammars.base_expression_grammar)
 
     def visit_comparator(self, node, children):
         return node.text

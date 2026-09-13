@@ -18,12 +18,8 @@ class TestComparison:
         )
         assert repr(comp) == "('Test' > 5)"
 
-    @pytest.mark.parametrize(
-        "cmp, expected", [("=", False), (">=", False), ("<=", True), ("<", True)]
-    )
-    def test_it_should_perform_a_simple_comparison_on_a_default_value(
-        self, cmp, expected
-    ):
+    @pytest.mark.parametrize("cmp, expected", [("=", False), (">=", False), ("<=", True), ("<", True)])
+    def test_it_should_perform_a_simple_comparison_on_a_default_value(self, cmp, expected):
         comparison = types.Comparison(
             quality="Foo",
             comparator=cmp,
@@ -32,12 +28,8 @@ class TestComparison:
         result = comparison.evaluate(None)
         assert result == expected
 
-    @pytest.mark.parametrize(
-        "cmp, expected", [("=", False), (">=", False), ("<=", True), ("<", True)]
-    )
-    def test_it_should_perform_a_complex_comparison_on_a_default_value(
-        self, cmp, expected
-    ):
+    @pytest.mark.parametrize("cmp, expected", [("=", False), (">=", False), ("<=", True), ("<", True)])
+    def test_it_should_perform_a_complex_comparison_on_a_default_value(self, cmp, expected):
         comparison = types.Comparison(
             quality="Foo",
             comparator=cmp,
@@ -50,12 +42,8 @@ class TestComparison:
         result = comparison.evaluate(None)
         assert result == expected
 
-    @pytest.mark.parametrize(
-        "cmp, expected", [("=", True), (">=", True), ("<=", True), ("<", False)]
-    )
-    def test_it_should_perform_a_simple_comparison_on_an_existing_value(
-        self, cmp, expected
-    ):
+    @pytest.mark.parametrize("cmp, expected", [("=", True), (">=", True), ("<=", True), ("<", False)])
+    def test_it_should_perform_a_simple_comparison_on_an_existing_value(self, cmp, expected):
         comparison = types.Comparison(
             quality="Foo",
             comparator=cmp,
@@ -64,12 +52,8 @@ class TestComparison:
         result = comparison.evaluate(2)
         assert result == expected
 
-    @pytest.mark.parametrize(
-        "cmp, expected", [("=", True), (">=", True), ("<=", True), ("<", False)]
-    )
-    def test_it_should_perform_a_complex_comparison_on_an_existing_value(
-        self, cmp, expected
-    ):
+    @pytest.mark.parametrize("cmp, expected", [("=", True), (">=", True), ("<=", True), ("<", False)])
+    def test_it_should_perform_a_complex_comparison_on_an_existing_value(self, cmp, expected):
         comparison = types.Comparison(
             quality="Foo",
             comparator=cmp,
@@ -119,12 +103,8 @@ class TestExpression:
 
 
 class TestOperation:
-    @pytest.mark.parametrize(
-        "op, expected", [("=", 2), ("+=", 2), ("-=", -2), ("*=", 0)]
-    )
-    def test_it_should_perform_a_simple_operation_on_a_default_value(
-        self, op, expected
-    ):
+    @pytest.mark.parametrize("op, expected", [("=", 2), ("+=", 2), ("-=", -2), ("*=", 0)])
+    def test_it_should_perform_a_simple_operation_on_a_default_value(self, op, expected):
         operation = types.Operation(
             quality="Foo",
             operator=op,
@@ -134,12 +114,8 @@ class TestOperation:
         result = operation.evaluate(None)
         assert result == expected
 
-    @pytest.mark.parametrize(
-        "op, expected", [("=", 2), ("+=", 2), ("-=", -2), ("*=", 0)]
-    )
-    def test_it_should_perform_a_complex_operation_on_a_default_value(
-        self, op, expected
-    ):
+    @pytest.mark.parametrize("op, expected", [("=", 2), ("+=", 2), ("-=", -2), ("*=", 0)])
+    def test_it_should_perform_a_complex_operation_on_a_default_value(self, op, expected):
         operation = types.Operation(
             quality="Foo",
             operator=op,
@@ -153,12 +129,8 @@ class TestOperation:
         result = operation.evaluate(None)
         assert result == expected
 
-    @pytest.mark.parametrize(
-        "op, expected", [("=", 2), ("+=", 4), ("-=", 0), ("*=", 4)]
-    )
-    def test_it_should_perform_a_simple_operation_on_an_existing_value(
-        self, op, expected
-    ):
+    @pytest.mark.parametrize("op, expected", [("=", 2), ("+=", 4), ("-=", 0), ("*=", 4)])
+    def test_it_should_perform_a_simple_operation_on_an_existing_value(self, op, expected):
         operation = types.Operation(
             quality="Foo",
             operator=op,
@@ -168,12 +140,8 @@ class TestOperation:
         result = operation.evaluate(2)
         assert result == expected
 
-    @pytest.mark.parametrize(
-        "op, expected", [("=", 2), ("+=", 4), ("-=", 0), ("*=", 4)]
-    )
-    def test_it_should_perform_a_complex_operation_on_an_existing_value(
-        self, op, expected
-    ):
+    @pytest.mark.parametrize("op, expected", [("=", 2), ("+=", 4), ("-=", 0), ("*=", 4)])
+    def test_it_should_perform_a_complex_operation_on_an_existing_value(self, op, expected):
         operation = types.Operation(
             quality="Foo",
             operator=op,

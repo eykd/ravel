@@ -1,7 +1,11 @@
-from syml.utils import get_text_source  # noqa
+from syml.basetypes import Source
 
 from .. import exceptions
 from ..types import Pos
+
+
+def get_text_source(text, substring=None, **kwargs):
+    return Source.from_text(text, substring, **kwargs)
 
 
 def get_coords_of_str_index(s, index):

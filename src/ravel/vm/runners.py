@@ -1,5 +1,6 @@
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from ..environments import Environment
 from . import machines
@@ -17,10 +18,10 @@ class StatefulRunner:
 
         self.running = False
         self.waiting_for_choice = False
-        self.waiter: Optional[waiting_for_input] = None
-        self.choice_events: List[Choice] = []
+        self.waiter: waiting_for_input | None = None
+        self.choice_events: list[Choice] = []
 
-        self._handlers: Dict[str, List[Callable]] = defaultdict(list)
+        self._handlers: dict[str, list[Callable]] = defaultdict(list)
 
     def __enter__(self):
         self.running = True

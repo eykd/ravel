@@ -5,8 +5,11 @@ from collections.abc import Mapping
 from ravel import exceptions, types
 from ravel.utils.strings import get_text, is_text
 
-from . import situations  # noqa
-from . import concepts, effects
+from . import (
+    concepts,
+    effects,
+    situations,  # noqa
+)
 from .rulesets import compile_ruleset
 
 
@@ -15,11 +18,7 @@ def get_next(seq):
 
 
 def is_when(data):
-    return (
-        isinstance(data, Mapping)
-        and len(data) == 1
-        and get_text(get_next(data.keys())) == "when"
-    )
+    return isinstance(data, Mapping) and len(data) == 1 and get_text(get_next(data.keys())) == "when"
 
 
 def get_list_of_texts(data):
@@ -48,10 +47,8 @@ def compile_preamble(environment, rulebook):
         last_rule = rule
         try:
             rule = next(rulesets)
-        except StopIteration:
-            raise exceptions.MissingBaggageError(
-                "No baggage found after rule: %r" % last_rule
-            )
+        except StopIteration as e:
+            raise exceptions.MissingBaggageError("No baggage found after rule: %r" % last_rule) from e
         else:
             key_name = get_text(rule[0])
 
@@ -111,9 +108,7 @@ def compile_rulebook(environment, rulebook, prefix=""):
                 ),
             )
         )
-        rules[concept]["locations"].update(
-            concepts.compile_baggage(environment, concept, rule_name, baggage_data)
-        )
+        rules[concept]["locations"].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
 
     for ruleset in rules.values():
         ruleset["rules"].sort()

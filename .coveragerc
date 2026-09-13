@@ -1,7 +1,0 @@
-[run]
-branch = True
-source = ravel/
-
-[report]
-show_missing = True
-skip_covered = True

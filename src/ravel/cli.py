@@ -71,7 +71,7 @@ class ConsoleRunner(runners.StatefulRunner):
             if chosen.isdigit():
                 try:
                     choice = self.choice_events[int(chosen) - 1]
-                except (ValueError, IndexError):
+                except ValueError, IndexError:
                     print(Color("{red}That's not an option.{/red}"))
                     choice = None
             elif chosen == "s":
@@ -129,7 +129,7 @@ class ConsoleRunner(runners.StatefulRunner):
         try:
             while True:
                 self.vm.run()
-        except (KeyboardInterrupt, EOFError):
+        except KeyboardInterrupt, EOFError:
             sys.exit(0)
         except Exception as e:
             self.handle_exception(e)

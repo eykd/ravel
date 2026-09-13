@@ -1,7 +1,7 @@
 import itertools as it
 from collections.abc import Mapping, Sequence
 
-from slugify import slugify_unicode  # type: ignore
+from slugify import slugify
 
 from ravel import exceptions, parsers, types
 from ravel.utils.data import merge_dicts
@@ -58,7 +58,7 @@ def compile_choice(environment, concept, parent_rule, directives):
     if is_text(directives):
         directives = [directives]
     intro, directives, subsituations = compile_directives(environment, concept, parent_rule, directives)
-    subrule = environment.location_separator.join([parent_rule, slugify_unicode(get_text(intro), to_lower=True)])
+    subrule = environment.location_separator.join([parent_rule, slugify(get_text(intro), allow_unicode=True)])
     try:
         return (
             types.Choice(subrule),
@@ -68,4 +68,4 @@ def compile_choice(environment, concept, parent_rule, directives):
             },
         )
     except Exception as e:
-        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, e.args[0]))
+        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, e.args[0])) from e

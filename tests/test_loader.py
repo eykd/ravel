@@ -1,8 +1,9 @@
+import shutil
 import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from path import Path
 
 from ravel import exceptions, loaders
 
@@ -11,7 +12,7 @@ from ravel import exceptions, loaders
 def tempdir():
     _tempdir = Path(tempfile.mkdtemp())
     yield _tempdir
-    _tempdir.rmtree()
+    shutil.rmtree(_tempdir)
 
 
 @pytest.fixture
@@ -38,18 +39,14 @@ class TestGetUpToDateChecker:
         fp.write_text("foo")
         assert is_up_to_date() is False
 
-    def test_it_should_return_an_up_to_date_checker_that_fails_for_non_existent_file(
-        self, tempdir, fs_loader
-    ):
+    def test_it_should_return_an_up_to_date_checker_that_fails_for_non_existent_file(self, tempdir, fs_loader):
         fp = tempdir / "foo.txt"
         is_up_to_date = fs_loader.get_up_to_date_checker(fp)
         assert is_up_to_date() is False
 
 
 class TestGetSource:
-    def test_it_should_return_the_file_source_and_up_to_date_checker(
-        self, tempdir, fs_loader
-    ):
+    def test_it_should_return_the_file_source_and_up_to_date_checker(self, tempdir, fs_loader):
         env = Mock()
         (tempdir / "test.ravel").write_text("test!")
         with patch("os.path.getmtime") as getmtime:
@@ -60,9 +57,7 @@ class TestGetSource:
 
         assert is_up_to_date() is False
 
-    def test_it_should_raise_when_getting_source_of_nonexistent_rulebook(
-        self, tempdir, fs_loader
-    ):
+    def test_it_should_raise_when_getting_source_of_nonexistent_rulebook(self, tempdir, fs_loader):
         env = Mock()
         with pytest.raises(exceptions.RulebookNotFound):
             fs_loader.get_source(env, "foo")

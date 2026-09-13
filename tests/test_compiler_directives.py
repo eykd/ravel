@@ -8,9 +8,7 @@ from ravel.compiler import directives
 
 class TestCompileDirective:
     def test_it_should_handle_text_directives(self, env):
-        result = directives.compile_directive(
-            env, "Situation", Mock(), {"text": "Hello world"}
-        )
+        result = directives.compile_directive(env, "Situation", Mock(), {"text": "Hello world"})
         expected = [(types.Text(text="Hello world"), {})]
         assert result == expected
 

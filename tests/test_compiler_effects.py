@@ -9,9 +9,7 @@ class TestCompileEffect:
         assert effect == expected
 
     def test_it_should_parse_an_effect_with_complex_expression(self, env):
-        effect = effects.compile_effect(
-            env, "Situation", "test", "Quality += value * 2"
-        )
+        effect = effects.compile_effect(env, "Situation", "test", "Quality += value * 2")
         expected = (
             types.Operation(
                 "Quality",
@@ -26,9 +24,7 @@ class TestCompileEffect:
 
 class TestCompileEffects:
     def test_it_should_compile_effects(self, env):
-        effect = effects.compile_effects(
-            env, "Situation", "test", ["Quality += 1", '"Other Quality" += 5']
-        )
+        effect = effects.compile_effects(env, "Situation", "test", ["Quality += 1", '"Other Quality" += 5'])
         expected = [
             (types.Operation("Quality", "+=", 1, None), {}),
             (types.Operation("Other Quality", "+=", 5, None), {}),

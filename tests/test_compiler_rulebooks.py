@@ -88,7 +88,7 @@ class TestCompileAbout:
 
 class TestCompileRulebook:
     def test_it_should_compile_a_situation_rulebook(self, env):
-        rulebook = syml.loads(TEST_RULEBOOK_SYML, raw=False)
+        rulebook = syml.loads(TEST_RULEBOOK_SYML)
         compiled = rulebooks.compile_rulebook(env, rulebook)
         assert compiled == EXPECTED_COMPILED_RULEBOOK
 
@@ -102,13 +102,11 @@ class TestCompileRulebook:
               - Some intro text.
         """
         )
-        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml, raw=False))
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml))
         assert len(result["rulebook"]) == 1
         assert "Situation" in result["rulebook"]
 
-    def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(
-        self, env
-    ):
+    def test_it_should_compile_a_situation_and_add_the_prefix_to_the_location(self, env):
         rulebook_syml = textwrap.dedent(
             """
             intro:
@@ -119,9 +117,7 @@ class TestCompileRulebook:
         """
         )
         prefix = "prefix-"
-        result = rulebooks.compile_rulebook(
-            env, syml.loads(rulebook_syml, raw=False), prefix
-        )
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml), prefix)
         assert "prefix-intro" in result["rulebook"]["Situation"]["locations"]
 
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
@@ -137,7 +133,7 @@ class TestCompileRulebook:
         """
         )
         with pytest.raises(exceptions.ParseError):
-            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml, raw=False))
+            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml))
 
     def test_it_should_fail_to_compile_a_multipronged_directive(self, env):
         bad_rulebook_syml = textwrap.dedent(
@@ -155,7 +151,7 @@ class TestCompileRulebook:
         """
         )
         with pytest.raises(exceptions.ParseError):
-            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml, raw=False))
+            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml))
 
     def test_it_should_fail_to_compile_with_missing_intro_text(self, env):
         bad_rulebook = {
@@ -182,7 +178,7 @@ class TestCompileRulebook:
         """
         )
         with pytest.raises(exceptions.MissingBaggageError):
-            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml, raw=False))
+            rulebooks.compile_rulebook(env, syml.loads(bad_rulebook_syml))
 
 
 TEST_RULEBOOK_SYML = textwrap.dedent(
@@ -309,10 +305,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                             predicate=None,
                         ),
                         types.Text(
-                            text=(
-                                "The fluorescent glare hurt my eyes after the evening "
-                                "of headlight glare."
-                            ),
+                            text=("The fluorescent glare hurt my eyes after the evening of headlight glare."),
                             sticky=False,
                             predicate=None,
                         ),

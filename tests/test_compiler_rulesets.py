@@ -24,15 +24,11 @@ class TestCompileRuleset:
             ),
             types.Predicate(
                 name="blah",
-                predicate=types.Comparison(
-                    quality="blah", comparator="==", expression="boo"
-                ),
+                predicate=types.Comparison(quality="blah", comparator="==", expression="boo"),
             ),
             types.Predicate(
                 name="foo",
-                predicate=types.Comparison(
-                    quality="foo", comparator="==", expression=9
-                ),
+                predicate=types.Comparison(quality="foo", comparator="==", expression=9),
             ),
         ]
 

@@ -1,7 +1,7 @@
 import logging
 from collections import deque
+from collections.abc import Callable
 from functools import partial
-from typing import Callable, Deque, Dict, List, Optional
 
 import attr
 from attrs import define, field
@@ -42,14 +42,14 @@ class VirtualMachine:
 
     """
 
-    rulebook: Dict = field()
-    givens: List = field(default=attr.Factory(list))
-    metadata: Dict = field(default=attr.Factory(dict))
-    qualities: Dict = field(default=attr.Factory(dict))
-    stack: Deque[State] = field(default=attr.Factory(deque))
+    rulebook: dict = field()
+    givens: list = field(default=attr.Factory(list))
+    metadata: dict = field(default=attr.Factory(dict))
+    qualities: dict = field(default=attr.Factory(dict))
+    stack: deque[State] = field(default=attr.Factory(deque))
     signals: Signals = field(default=attr.Factory(Signals))
     begin_state: Begin = field(default=attr.Factory(Begin))
-    queue: Deque[Callable] = field(default=attr.Factory(deque))
+    queue: deque[Callable] = field(default=attr.Factory(deque))
 
     def enqueue(self, callable_action: Callable, *args, **kwargs):
         logger.debug(f"Enqueuing action {callable_action.__name__}: {args!r}, {kwargs!r}")
@@ -62,7 +62,7 @@ class VirtualMachine:
     def begin(self):
         logger.debug("Beginning...")
         self.enqueue(self.initialize_from_givens)
-        self.enqueue(self.push, self.begin_state())
+        self.enqueue(self.push, self.begin_state)
 
     def run(self):  # pragma: nocover
         self.begin()
@@ -92,7 +92,7 @@ class VirtualMachine:
         self.qualities = state
 
     @property
-    def top_state(self) -> Optional[State]:
+    def top_state(self) -> State | None:
         return self.stack[-1] if self.stack else None
 
     def push(self, state: State):

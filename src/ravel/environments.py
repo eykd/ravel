@@ -29,11 +29,7 @@ class Environment:
             if name not in loaded_rulebooks:
                 rulebook = loaded_rulebooks[name] = self.get_rulebook(name)
                 names_to_load.extend(
-                    [
-                        include_name
-                        for include_name in rulebook["includes"]
-                        if include_name not in loaded_rulebooks
-                    ]
+                    [include_name for include_name in rulebook["includes"] if include_name not in loaded_rulebooks]
                 )
                 metadata.update(rulebook["metadata"])
                 givens.extend(rulebook["givens"])

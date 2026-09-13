@@ -23,9 +23,7 @@ def query_predicates(query, predicates):
                 matched = predicate(qvalue)
                 matches.append(bool(matched))
                 if matched:
-                    logger.debug(
-                        "Matched rule for `%s %r`: %s", rkey, predicate, qvalue
-                    )
+                    logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
                 break
         else:
             assert rkey not in qkeys
@@ -61,9 +59,7 @@ def query(concept, q, rules, how_many=None):
         reverse=True,
     )
     for score, rname, result in accepted_rules[:how_many]:
-        logger.debug(
-            "Query result: (rule %s with score of %s) %r", rname, score, result
-        )
+        logger.debug("Query result: (rule %s with score of %s) %r", rname, score, result)
         yield rname, result
 
 

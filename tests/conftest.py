@@ -1,10 +1,11 @@
+from pathlib import Path
+
 import pytest
-from path import Path
 
 from ravel.environments import Environment
 from ravel.loaders import FileSystemLoader
 
-PATH = Path(__file__).abspath().dirname()
+PATH = Path(__file__).resolve().parent
 
 
 @pytest.fixture

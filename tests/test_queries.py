@@ -71,17 +71,11 @@ class TestQueryTop:
         result = queries.query_top("onTest", [("foo", "bar")], rules=rules)
         assert result == ("foo-bar", ["baz"])
 
-    def test_it_should_query_a_rules_database_and_return_the_higher_scoring_rule(
-        self, rules
-    ):
-        result = queries.query_top(
-            "onTest", [("foo", "bar"), ("blah", "boo")], rules=rules
-        )
+    def test_it_should_query_a_rules_database_and_return_the_higher_scoring_rule(self, rules):
+        result = queries.query_top("onTest", [("foo", "bar"), ("blah", "boo")], rules=rules)
         assert result == ("foo-bar-blah-boo", ["blah"])
 
-    def test_it_should_query_a_rules_database_and_return_None_for_no_matches(
-        self, rules
-    ):
+    def test_it_should_query_a_rules_database_and_return_None_for_no_matches(self, rules):
         result = queries.query_top("onTest", [("foo", "blah")], rules=rules)
         assert result is None
 

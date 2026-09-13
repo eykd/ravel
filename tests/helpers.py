@@ -1,4 +1,4 @@
-from syml.utils import get_text_source
+from ravel.utils.strings import get_text_source
 
 
 def source(text):
