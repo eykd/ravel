@@ -155,8 +155,7 @@ class TestHandleException:
             runner.handle_exception(ValueError("boom"))
         post_mortem.assert_called_once_with()
 
-    def test_it_should_route_story_failures_through_handle_exception(self, cloak_env, monkeypatch):
-        monkeypatch.setattr(cloak_env, "load", Mock(side_effect=RuntimeError("nope")))
+    def test_it_should_route_story_failures_through_handle_exception(self):
         runner = cli.ConsoleRunner.__new__(cli.ConsoleRunner)
         runner.debug = False
         runner.vm = Mock(run=Mock(side_effect=RuntimeError("nope")))

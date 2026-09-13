@@ -30,8 +30,8 @@ uv run pytest
   deliberately; the codebase uses it throughout for error messages.
 - Type check: `uv run mypy` (config in `pyproject.toml`). Clean, and enforced as a `local`
   pre-commit hook — not `mirrors-mypy`, which runs in an isolated venv where `attr`, `click`,
-  and `blinker` all become missing-stub errors. Typing is still partial (most function bodies
-  are unannotated, so `check_untyped_defs` never looks inside them), but it is a passing gate.
+  and `blinker` all become missing-stub errors. Typing is still partial: most function
+  bodies are unannotated, so mypy skips them unless `check_untyped_defs` is turned on.
 - Run a story: `uv run ravel run examples/cloak` (console script `ravel = ravel.cli:main`;
   `--verbose`/`--debug` are group-level flags, before the subcommand).
 - CI: `.github/workflows/main.yml` runs pytest with branch coverage, `ruff check`,
