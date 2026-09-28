@@ -350,8 +350,10 @@ so no save can crash the CLI, soft-lock the engine, or smuggle control sequences
   with the canonical save prefix `SAVE_MAGIC = b'{"format":"ravel-save"'` (every v1 save starts with
   it: `sort_keys` puts `format` first). Otherwise it raises `FileExistsError` and the CLI prints
   `Could not save: <path> exists and is not a ravel save`. This stops `save pyproject.toml` or
-  `save examples/cloak/begin.ravel` from destroying files; the default `ravel-save.json` still
-  overwrites freely (US5-AS3).
+  `save examples/cloak/begin.ravel` from destroying files. The guard applies to every name,
+  including the default: US5-AS3's "overwriting any existing file" is read as "any existing
+  save" (a foreign `ravel-save.json` is refused, not clobbered); its overwrite test uses an
+  existing save file.
 - Atomic write: `tempfile.mkstemp(dir=target.parent)` + `os.replace`; the temp file is removed if
   anything fails before the replace; the new file gets mode `0o666 & ~umask` (not mkstemp's
   `0o600`). `os.replace` onto a symlink replaces the link, never its target.
@@ -363,7 +365,8 @@ so no save can crash the CLI, soft-lock the engine, or smuggle control sequences
 Checked for the **whole stack**, bottom → top, so a hand-edited save can never replay an intro,
 reach an unhandled directive, or index out of range:
 
-- every frame location is a `Situation` location in the story;
+- every frame location is a `Situation` location in the story, and the **bottom** frame is a
+  `Situation` *rule* (queryable), since only a query menu can start a stack;
 - every **non-top** frame `f[i]` has `1 <= ip <= len(directives)` with `directives[ip - 1]` a
   `GetChoice`, and `f[i+1].location` is one of that choice block's `Choice` locations (the frame
   above is a child that frame really offered);
@@ -487,7 +490,7 @@ the permanent "every example loads" test passes locally and fails in CI.
 | 19 | (red team) Commit the whitespace-only working-copy re-indent of `examples/taxi/mail.ravel` in US1 | HEAD's copy fails under syml 1.0, so CI would fail the "every example loads" test | Easy: it is the same re-indent US1 applies elsewhere |
 | 20 | (red team) `validate_resumable` checks every frame, not just the top; halted labels must be story `End` labels | A tampered lower frame could replay an intro or hit an unhandled directive | Easy |
 | 21 | (red team) Saves capped at 1 MiB; strict UTF-8; NaN/Infinity/duplicate keys refused; every decode failure is a `LoadRefusedError` | SC-006: a bad `load` must never kill the live game | Easy |
-| 22 | (red team) `save FILE` only overwrites empty files or existing ravel saves | `save pyproject.toml` would otherwise destroy a file | Easy: drop the guard |
+| 22 | (red team) `save FILE` only overwrites empty files or existing ravel saves, default name included (narrows US5-AS3's "any existing file" to "any existing save") | `save pyproject.toml` would otherwise destroy a file | Easy: drop the guard |
 | 23 | (red team) Int qualities bounded to signed 64-bit | Unbounded ints crash `json.dumps` past 4300 digits | Easy |
 | 24 | (red team) Constraints, `value`, and `[Quality]` expression gaps stay unfixed and documented | Pre-existing, no example uses them, not in D1–D20 | Easy: one choke point + `IR_VERSION` bump |
 | 25 | (red team) Save-sourced strings print via `repr()` in the CLI | Hostile saves cannot inject terminal control sequences | Easy |

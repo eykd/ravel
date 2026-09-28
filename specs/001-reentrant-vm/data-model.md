@@ -74,7 +74,7 @@ Invariants (checked by `engine.validate_resumable(story, state)`, used by save l
 | Status | stack | offered | outcome |
 |---|---|---|---|
 | `WAITING`, query menu | `()` | non-empty; equals the re-derived query menu | `None` |
-| `WAITING`, in-situation | non-empty; every frame location is a `Situation`; every non-top frame has `directives[ip-1]` a `GetChoice` and the frame above it is one of that block's `Choice` locations; top `ip` → a `GetChoice` | non-empty; equals the top block's `Choice` locations in source order | `None` |
+| `WAITING`, in-situation | non-empty; every frame location is a `Situation`; the bottom frame is a `Situation` rule; every non-top frame has `directives[ip-1]` a `GetChoice` and the frame above it is one of that block's `Choice` locations; top `ip` → a `GetChoice` | non-empty; equals the top block's `Choice` locations in source order | `None` |
 | `HALTED` | `()` | `()` | set; `label ∈ story.end_labels`, or `dead_end` with `label == ""` |
 | `RUNNING` | never valid at rest → `InvalidStateError` | | |
 

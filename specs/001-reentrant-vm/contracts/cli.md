@@ -49,7 +49,7 @@ class ConsoleUI:
 |---|---|
 | `N` (1 ≤ N ≤ menu size) | `session.choose(menu[N-1].location)`, print separator, render |
 | other number | `That's not an option.`; re-prompt |
-| `save` / `save FILE` | `session.save(FILE or "ravel-save.json")` → `Saved to <path>.`; same menu stays; OSError → `Could not save: <msg>`; clobber guard (`FileExistsError`) → `Could not save: <path> exists and is not a ravel save` |
+| `save` / `save FILE` | `session.save(FILE or "ravel-save.json")` → `Saved to <path>.`; same menu stays; OSError → `Could not save: <msg>`; clobber guard (`FileExistsError`, applies to the default name too) → `Could not save: <path> exists and is not a ravel save` |
 | `load` / `load FILE` | `session.load(...)` → render the re-presented menu (or halt → end line, exit 0). `LoadRefusedError` → `Could not load: <msg>`; current game continues |
 | `s` | print qualities, one `<name!r> = <value!r>` per line, sorted (repr escapes control characters from hand-edited saves and shows `1` vs `1.0` vs `'1'`) |
 | `help` / `?` | list the commands above |

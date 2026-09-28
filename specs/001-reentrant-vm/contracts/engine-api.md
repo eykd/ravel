@@ -136,7 +136,8 @@ Re-presents a resting state without running anything (used after load, FR-023):
 ## `validate_resumable(story, state)`
 
 Raises `InvalidStateError` naming the first violated invariant from the data-model table,
-checking the **whole stack** bottom → top: unknown or non-`Situation` location; status `RUNNING`;
+checking the **whole stack** bottom → top: unknown or non-`Situation` location; a bottom frame
+that is not a `Situation` rule; status `RUNNING`;
 halted with frames/offered; a non-top frame whose `ip - 1` is not a `GetChoice` or whose child
 (the next frame up) is not one of that block's choices; top ip not on `GetChoice`; `offered` ≠
 re-derived menu; outcome/status mismatch; a halted label not in `story.end_labels` (or a dead end
