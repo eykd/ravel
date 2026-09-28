@@ -1,0 +1,31 @@
+given:
+  - Count += 1
+  - Location = "Fork"
+
+fork:
+  - when:
+      - Location = "Fork"
+  - You stand at a fork.
+  - choice:
+      - [Go left]You go left.
+  - choice:
+      - [Go right]You go right.
+      - effect: Location = "Nowhere"
+  - The road rejoins.
+  - effect: Place = "Middle"
+
+crossroads:
+  - when:
+      - Location = "Fork"
+      - Count = 1
+  - [Study the signpost]The signpost points every which way.
+
+bridge:
+  - when:
+      - Location = "Fork"
+  - [Cross the bridge]You cross the bridge.
+
+dead-end:
+  - when:
+      - Location = "Never"
+  - [Wander off]This situation's predicate never holds.
