@@ -57,6 +57,13 @@ Then: if `state.stack` is non-empty, the top frame's ip is set to `GetChoice_ind
 | `Operation` | `new = op.evaluate(old, qualities=...)`; validate; emit `QualityChanged`; ip+1 |
 | `BeginChoices` | gather the consecutive `Choice`s; ip ← index of `GetChoice`; emit `ChoicesOffered`; status `WAITING`; return |
 | `End` | stack ← `()`, offered ← `()`, outcome ← `Outcome(end.outcome)`; emit `Halted(label, False)`; status `HALTED`; return |
+| `Choice` / `GetChoice` reached directly, unknown directive type, ip out of range, unknown location | `InvalidStateError` (unreachable from engine-produced states; covered with hand-built states). Never `IndexError`/`KeyError` |
+
+In-situation menus keep the block's source order; only query menus are sorted. "Location ID
+descending" is Python `str` order (code points). Operations run through one private
+`_apply_operation`: result must be in `QUALITY_TYPES = (int, float, str)`, not `bool`, finite if
+float, and `-(2**63) <= v < 2**63` if int, else `InvalidQualityValueError`. `min`/`max` constraints
+are **not** applied (inherited gap, documented in the VM spec).
 
 **Gather example** (US2-AS3; fixture `mini`):
 
@@ -128,10 +135,15 @@ Re-presents a resting state without running anything (used after load, FR-023):
 
 ## `validate_resumable(story, state)`
 
-Raises `InvalidStateError` naming the first violated invariant from the data-model table
-(unknown location, status `RUNNING`, halted with frames, top ip not on `GetChoice`, `offered`
-≠ re-derived menu, outcome/status mismatch). Pure: re-derives the menu with the same code path
-the run loop uses.
+Raises `InvalidStateError` naming the first violated invariant from the data-model table,
+checking the **whole stack** bottom → top: unknown or non-`Situation` location; status `RUNNING`;
+halted with frames/offered; a non-top frame whose `ip - 1` is not a `GetChoice` or whose child
+(the next frame up) is not one of that block's choices; top ip not on `GetChoice`; `offered` ≠
+re-derived menu; outcome/status mismatch; a halted label not in `story.end_labels` (or a dead end
+with a non-empty label); a quality value failing `Qualities` validation. Pure: re-derives the menu
+with the same code path the run loop uses. `TypeError`/`ValueError`/`ZeroDivisionError` raised
+while re-deriving a query menu over odd quality types are re-raised as `InvalidStateError`
+(chained).
 
 ## Determinism and isolation
 

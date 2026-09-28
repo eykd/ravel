@@ -66,3 +66,11 @@ On `End(outcome)` at any stack depth: stack → `()`, offered → `()`, outcome 
 
 `End` is an attrs instance, so `fingerprint()` covers it automatically; adding the type does not
 bump `IR_VERSION` (no existing save can contain it — there are no saves yet).
+
+## Save validation
+
+`Story.end_labels: frozenset[str]` collects every compiled `End.outcome` (all situations,
+including choice bodies). A halted save is accepted only if `outcome.label in story.end_labels`
+(or `dead_end` with label `""`), so a save cannot carry arbitrary text for the CLI's end line.
+`End.outcome` is an exact `str` (`get_text(...).strip()` already returns `str`; syml 1.0's
+`Source` is not a `str` subclass and must never reach a compiled value).

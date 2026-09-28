@@ -392,6 +392,10 @@ Dated 2026-09-27, taken without the principal (asleep); each is summarised in pl
   move an ip or change semantics refuses the load (FR-022, FR-024).
 - **Alternatives**: hash of source bytes (comment edits break saves); mtimes (non-deterministic);
   include metadata (title typo fixes would break saves).
+- **Correction (sp:04 red team, 2026-09-27)**: syml 1.0's `Source` is a frozen dataclass, not a
+  `str` subclass, so "str subclasses (syml `Source`) → str" does not cover it. The encoder raises
+  `TypeError` on any unlisted type (no fallback) and refuses sets; tests pin path-, whitespace-,
+  and `PYTHONHASHSEED`-independence. See data-model.md § Story.
 
 ### PD-07. Quality values
 

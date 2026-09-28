@@ -49,13 +49,17 @@ class ConsoleUI:
 |---|---|
 | `N` (1 ≤ N ≤ menu size) | `session.choose(menu[N-1].location)`, print separator, render |
 | other number | `That's not an option.`; re-prompt |
-| `save` / `save FILE` | `session.save(FILE or "ravel-save.json")` → `Saved to <path>.`; same menu stays; OSError → `Could not save: <msg>` |
+| `save` / `save FILE` | `session.save(FILE or "ravel-save.json")` → `Saved to <path>.`; same menu stays; OSError → `Could not save: <msg>`; clobber guard (`FileExistsError`) → `Could not save: <path> exists and is not a ravel save` |
 | `load` / `load FILE` | `session.load(...)` → render the re-presented menu (or halt → end line, exit 0). `LoadRefusedError` → `Could not load: <msg>`; current game continues |
-| `s` | print qualities, one `name = value` per line, sorted |
+| `s` | print qualities, one `<name!r> = <value!r>` per line, sorted (repr escapes control characters from hand-edited saves and shows `1` vs `1.0` vs `'1'`) |
 | `help` / `?` | list the commands above |
 | `q` | exit 0 |
 | EOF / Ctrl-C | print newline, exit 0 |
 | anything else | `I'm sorry, what?`; re-prompt |
+
+Parsing: the first whitespace-separated word is the command, matched case-insensitively; for
+`save`/`load` the filename is the **rest of the line, stripped** (spaces allowed, no quoting, no
+`~` expansion, case preserved), resolved against the current directory; absolute paths allowed.
 
 The menu is never asked twice at startup (D1): the UI renders exactly the outputs the session
 returns, once.
@@ -65,6 +69,12 @@ returns, once.
 - Unexpected exception anywhere in `run`: log it; `--debug` → `pdb.post_mortem()`; exit 1
   (`handle_exception`, kept).
 - `ravel.exceptions.*` compile errors at startup take the same path.
+- Author errors raised by `session.choose` (`TypeError`, `ZeroDivisionError`,
+  `InvalidQualityValueError`) take the same path (a story bug, not player input).
+- `--load FILE` failures: every `LoadRefusedError` (incl. `SaveUnreadableError` for a directory,
+  FIFO, or unreadable file) prints `Error: <message>` to stderr and exits 1; never a traceback.
+- The in-game `load` command catches `LoadRefusedError` only; `session.load` guarantees nothing
+  else escapes, so a bad file can never end the live game (SC-006).
 
 ## Example transcript (US6-AS4, abbreviated)
 

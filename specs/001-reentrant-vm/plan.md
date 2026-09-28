@@ -175,8 +175,9 @@ old package survives, a new name makes stale imports fail loudly, and it lets th
 deleted in one commit once the CLI switches over.
 
 **Dependency rule** (enforced by `tests/engine/test_layering.py`, an AST import scan):
-`ravel.engine` may import only stdlib `{abc, collections, dataclasses, enum, hashlib, json,
-math, typing, types}`, `attrs`/`attr`, `ravel.types`, `ravel.queries`, and itself. It must not
+`ravel.engine` may import only stdlib `{__future__, abc, collections, dataclasses, enum,
+functools, hashlib, itertools, json, math, operator, typing, types}`, `attrs`/`attr`,
+`ravel.types`, `ravel.queries`, `ravel.utils`, and itself (relative imports resolved). It must not
 import `blinker`, `click`, `colorclass`, `os`, `io`, `pathlib`, `sys`, `logging`, `ravel.app`,
 `ravel.adapters`, `ravel.cli`, `ravel.environments`, `ravel.loaders`. `ravel.app` must not
 import `ravel.adapters`, `ravel.cli`, `click`, `os`, `pathlib`. (`ravel.queries` uses `logging`;
@@ -213,7 +214,7 @@ module = ["parsimonious.*", "colorclass.*", "slugify.*"]   # syml.* removed (FR-
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["ravel.engine.*", "ravel.app.*", "ravel.adapters.*", "ravel.cli", "ravel.types", "ravel.queries"]
+module = ["ravel.engine.*", "ravel.app.*", "ravel.adapters.*", "ravel.cli", "ravel.types", "ravel.queries", "ravel.utils.*"]
 check_untyped_defs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
@@ -244,8 +245,9 @@ tests/
 ## Delivery Order (fixed)
 
 1. **US1 — syml 1.0** (hard prerequisite, its own commits, suite green at 100% branch before any
-   engine code): bump `syml>=1.0,<2`, relock, re-indent `examples/**` (except
-   `taxi/mail.ravel`, dirty, untouched), 19+ inline fixture lines, spec examples; drop
+   engine code): bump `syml>=1.0,<2`, relock, re-indent `examples/**` (commit the existing
+   whitespace-only working-copy re-indent of `taxi/mail.ravel` as-is; see Edge Cases), 19+
+   inline fixture lines, spec examples; drop
    `syml.*` from the mypy override; delete `rooms.ravel`; optionally `syml.parse(...)`. SC-009
    one-time check: capture 0.6.2 `as_data()` dumps into the scratchpad **before** the bump,
    compare after, record the result in the commit message. Not a permanent test.
@@ -272,10 +274,193 @@ CLI. Cloak scripts choose by location ID, never by menu position.
 | US3: end directive | `tests/acceptance/test_us03_end.py` | engine on mini + Cloak; spec-doc grep for `end` in §9/§10.2/§11.2 | 6 |
 | US4: save/load | `tests/acceptance/test_us04_save_load.py` | `GameSession` + `FileSaveStore(tmp_path)` | 6 |
 | US5: CLI | `tests/acceptance/test_us05_cli.py` | `CliRunner().invoke(main, ["run", …], input=…)`, `monkeypatch.chdir(tmp_path)` | 8 |
-| US6: end to end | `tests/acceptance/test_us06_end_to_end.py` (routes + CLI transcript), `tests/acceptance/test_us06_save_load_property.py` (hypothesis, `max_examples=200`, `deadline=None`, `derandomize=True`) | session + CLI | 4 |
+| US6: end to end | `tests/acceptance/test_us06_end_to_end.py` (routes + CLI transcript), `tests/acceptance/test_us06_save_load_property.py` (hypothesis, `max_examples=200`, `deadline=None`, `derandomize=True`, `database=None`; in-memory save store) | session + CLI | 4 |
 
 US1-AS1's "equals the 0.6.2 parse" half is the one-time SC-009 check (not permanent, CI has no
 0.6.2); the permanent test asserts every example loads.
+
+## Diagnosis Traceability (D1–D20 → fix → proving test)
+
+| # | Fix in this design | Proving test |
+|---|---|---|
+| D1 double begin | `start()` is the only place givens run; `ConsoleUI` renders the session's outputs once; no `while True` re-run | US2-AS1 (givens once), US5-AS1 (menu shown once), mini `Count += 1` → 1 |
+| D2 no stop at choice | `BeginChoices` parks ip on `GetChoice` and returns (YIELD) | US2-AS2, US2-AS3 (gather not run before `choose`) |
+| D3 queue-dependent pop | `ip >= len(directives)` pops unconditionally; no queue exists | US2-AS4 |
+| D4 event order | `_Run` appends outputs in execution order; `SituationEntered` precedes the child's text | US2-AS3 exact output tuple |
+| D5 merged menus | one `offered` tuple per state; `choose` validates against it | `NotOfferedError` when choosing a location from an earlier menu (`begin::intro` while `press-onward` is offered) |
+| D6 global signals | no signals, no module-level mutable state | US2-AS7 interleaved games; layering test forbids `blinker` |
+| D7 `send_input` callable | input is `choose(story, state, loc)`; states are immutable, so a "stale" state just yields the same `Step` again | `choose` twice on one state → equal `Step`s, original state unchanged |
+| D8 live state in events | outputs are frozen plain values | US2-AS8 deep type walk (exact `str`/`int`/`float`/`bool`/`None`/tuple) |
+| D9 wrong annotations | strict per-module mypy (Typing) | `uv run mypy` in CI |
+| D10 cannot end | `- end:` → HALT | US3-AS1…AS5 |
+| D11 empty-menu soft lock | zero query matches → dead-end halt; in-situation blocks are never empty (compiler) | US2-AS6, US5-AS6 dead-end line |
+| D12 index semantics | location IDs everywhere; menu numbers exist only in `ConsoleUI` | US5-AS2; saves hold IDs (US4-AS1) |
+| D13 givens alias live dict | givens fold over a fresh immutable `Qualities()` | covered by D1 tests |
+| D14 `IndexError` as control flow | explicit bounds checks; layering test also rejects `except IndexError` / bare `except` in `ravel.engine` | `test_layering.py` |
+| D15 broken runner base class | no runner hierarchy; `ConsoleUI` composes `GameSession` | `tests/test_cli.py` |
+| D16 glue ignored | still ignored: explicit non-goal; the flag is carried on `TextShown.sticky` | `TextShown` carries `sticky` (unit) |
+| D17 menu tie order | kept, documented (VM §7.3), pinned | `tests/engine/test_engine_query.py` |
+| D18 mixed concerns | `Story` (immutable data) / `GameState` (play state) / outputs (values) / session (the one mutable holder) | layering test |
+| D19 orphan `rooms.ravel` | deleted in US1 | US1 acceptance (file absent, every example loads) |
+| D20 shared `Bar` quality | out of scope (story semantics); only the two `end`s are added | US6 routes pin current behavior |
+
+## Security Considerations
+
+Threat model: a single local player at their own terminal (no privilege boundary), plus a save
+file that may come from someone else (shared, hand-edited, truncated, or hostile). Saves are
+**not** integrity-protected: editing qualities to cheat is allowed by design. The load checks exist
+so no save can crash the CLI, soft-lock the engine, or smuggle control sequences to the terminal.
+
+### Input validation (save decoding, `contracts/save-format.md`)
+
+- **Size cap**: `decode_save` refuses `len(data) > MAX_SAVE_BYTES` (1 MiB) before parsing;
+  `FileSaveStore.read` reads at most `MAX_SAVE_BYTES + 1` bytes and refuses non-regular files
+  (FIFOs, devices, directories: `load /dev/zero` must not hang or exhaust memory).
+- **Strict JSON**: bytes are decoded as strict UTF-8 first (no UTF-16/32 auto-detection, a BOM is
+  refused), then `json.loads(text, parse_constant=<reject>, object_pairs_hook=<reject duplicate
+  keys>)`. `NaN`/`Infinity` and duplicate keys (`{"format_version":1,"format_version":2}`) are
+  `SaveCorruptError`. `RecursionError` (deeply nested arrays) and `ValueError` (e.g. a >4300-digit
+  int) raised by the parser are caught and mapped to `SaveCorruptError`.
+- **Types**: `bool` is refused everywhere an int is expected (`format_version`, `ip`, quality
+  values); quality values go through the same `Qualities` validation as the engine (finite floats,
+  bounded ints).
+- **Whole-stack invariants** (not just the top frame): see Edge Cases → Resting-state invariants.
+- **Outcome labels**: a halted save's `outcome.label` must be one of the story's compiled `End`
+  labels (`dead_end: true` requires `label == ""`). This removes the only place a save could inject
+  free text that the CLI prints verbatim.
+- **Exception containment**: every exception raised while decoding or validating a save —
+  including `TypeError`/`ValueError`/`ZeroDivisionError` from re-deriving the query menu over
+  tampered quality types (`Bar = "x"` makes `Bar >= 2` raise) — surfaces as a `LoadRefusedError`
+  subclass (chained). The CLI's `load` handler catches only `LoadRefusedError`, so anything else
+  would kill the live game and break SC-006.
+
+### Terminal output (CLI)
+
+- Strings that can originate from a save (quality names and values in the `s` listing, locations
+  and values quoted in error messages) are rendered with `repr()`, which escapes control
+  characters. Story text, labels, and outcome lines come from the compiled story (trusted author
+  content, re-derived on load) and print verbatim.
+
+### File-system writes (`save FILE`)
+
+- The filename is the rest of the line after the command word, stripped; no quoting, no `~`
+  expansion; relative paths resolve against the current directory; absolute paths are allowed (the
+  player is the file owner).
+- **Clobber guard**: `FileSaveStore.write` replaces an existing file only if it is empty or starts
+  with the canonical save prefix `SAVE_MAGIC = b'{"format":"ravel-save"'` (every v1 save starts with
+  it: `sort_keys` puts `format` first). Otherwise it raises `FileExistsError` and the CLI prints
+  `Could not save: <path> exists and is not a ravel save`. This stops `save pyproject.toml` or
+  `save examples/cloak/begin.ravel` from destroying files; the default `ravel-save.json` still
+  overwrites freely (US5-AS3).
+- Atomic write: `tempfile.mkstemp(dir=target.parent)` + `os.replace`; the temp file is removed if
+  anything fails before the replace; the new file gets mode `0o666 & ~umask` (not mkstemp's
+  `0o600`). `os.replace` onto a symlink replaces the link, never its target.
+
+## Edge Cases & Error Handling
+
+### Resting-state invariants (`engine.validate_resumable`)
+
+Checked for the **whole stack**, bottom → top, so a hand-edited save can never replay an intro,
+reach an unhandled directive, or index out of range:
+
+- every frame location is a `Situation` location in the story;
+- every **non-top** frame `f[i]` has `1 <= ip <= len(directives)` with `directives[ip - 1]` a
+  `GetChoice`, and `f[i+1].location` is one of that choice block's `Choice` locations (the frame
+  above is a child that frame really offered);
+- the **top** frame's ip indexes a `GetChoice`, and `offered` equals that block's locations in
+  source order;
+- an empty stack while `WAITING` requires `offered` to equal the re-derived query menu;
+- `HALTED` ⇔ `outcome` set ⇔ `stack == () and offered == ()`; the label rule above.
+
+### Engine robustness
+
+- `choose` trusts its input state (it comes from `start`/`choose`/`decode_save`) and does not
+  re-run `validate_resumable`, but every "impossible" condition — an unknown location, an ip past
+  the end of a block, a bare `Choice`/`GetChoice` reached by the run loop, an unknown directive
+  type — raises `InvalidStateError`, never `IndexError`/`KeyError`. These branches are covered by
+  tests that pass hand-built states.
+- **Quality range**: `int` quality values must satisfy `-(2**63) <= v < 2**63`
+  (`InvalidQualityValueError` otherwise). Unbounded ints would make `json.dumps` raise `ValueError`
+  past 4300 digits (a `save` crash) and lose precision in any non-Python save reader.
+- Author errors in an operation or predicate (`TypeError`, `ZeroDivisionError`) and
+  `InvalidQualityValueError` propagate from `choose`; the session keeps the previous state; the
+  CLI treats them as unexpected errors (`handle_exception`, `--debug` → pdb, exit 1).
+
+### Menus
+
+- Query menus: predicate count descending, then location ID descending by Python `str` ordering
+  (code points, not locale). In-situation menus: the block's `Choice`s in source order (no sort).
+- Two choices in one block whose labels slugify identically compile to one location (the
+  compiler's `merge_dicts` keeps the last body). Pre-existing; not fixed here; noted in the
+  language spec as a known limitation.
+- `present()` after `load` shows only the menu (or halt line), not the text that preceded it.
+  Accepted UX (US4-AS2): the save stores no transcript.
+
+### Inherited language gaps (not fixed; documented)
+
+The rewrite interprets existing compiled directives and inherits three latent gaps that no example
+triggers: `min`/`max` constraints are parsed but never applied (LANGUAGE §7.3); the `value`
+keyword compiles to the `types.VALUE` class and never evaluates to the quality's value (§4.3); a
+`[Quality]` reference in an expression yields the quality's *name*. The engine applies operations
+through one private `_apply_operation` choke point so a follow-up can fix them behind an
+`IR_VERSION` bump; any operation that yields a non-quality value (e.g. the `VALUE` class) raises
+`InvalidQualityValueError`. The VM spec marks all three "not implemented".
+
+### Examples under syml 1.0 (US1)
+
+The committed `examples/taxi/mail.ravel` **fails** under syml 1.0 (verified: `OutOfContextNodeError`
+at 17:4); only the uncommitted working copy parses. That working-copy diff is whitespace-only
+(`git diff -w` is empty) and is exactly the item-17 re-indent, so US1 commits it as-is. At
+implementation time, re-check `git diff -w examples/taxi/mail.ravel` is still empty; if not, stop
+and re-indent HEAD's version instead of committing someone else's content change. Without this,
+the permanent "every example loads" test passes locally and fails in CI.
+
+## Test Strategy Hardening
+
+- **Type-aware oracles.** `1 == 1.0` and `0.0 == -0.0` in Python, so `GameState`/output equality
+  cannot see type drift. Round-trip and property tests compare `encode_save` bytes of every
+  resting state and `repr()` of output tuples (attrs reprs distinguish `1` from `1.0`), not just
+  `==`. The save-format law is stated as "equal bytes ⇒ equal states", not "iff".
+- **Property test mechanics.** Hypothesis rejects function-scoped fixtures (`tmp_path`) under
+  `@given` (`HealthCheck.function_scoped_fixture`), so the property test uses an in-memory
+  `SaveStore` fake; `FileSaveStore` is covered by its own adapter tests. Settings add
+  `database=None` (no `.hypothesis/` writes; also add it to `.gitignore`). The resumed session uses
+  a **second, independently compiled** `Story` of Cloak, so compile nondeterminism would show up.
+  The split point is drawn with `st.data()` after the uninterrupted run fixes the path length.
+- **Identity stability tests** (`tests/engine/test_story.py`): same id for (a) Cloak copied to a
+  different absolute directory, (b) a whitespace/comment-only edit, (c) a subprocess run under
+  `PYTHONHASHSEED=0` and `=1`; different id for a one-character text edit and for a changed given.
+- **Coverage of exhaustive dispatch.** No `assert_never` default branches that coverage cannot
+  reach and no new `exclude_also` patterns: each `match` ends in a `case _:` that raises a real
+  error and is covered by a test passing a foreign object (tests are not type-checked).
+- **Other branches needing deliberate tests**: `KeyboardInterrupt` via the injected `read_line`;
+  atomic-write failure (monkeypatched `os.replace`) removes the temp file; clobber guard (empty
+  file, save file, foreign file); `FileSaveStore(base=None)` → cwd; non-regular file and oversize
+  reads; each `validate_resumable` rule; each decode step.
+- **Layering test**: resolves relative imports (`from ..app import x`) against the module's
+  package, scans `import a.b` and `from a import b` forms, and uses the allowlist
+  `{__future__, abc, collections, dataclasses, enum, functools, hashlib, itertools, json, math,
+  operator, typing, types}` + `attrs`/`attr` + `ravel.types`, `ravel.queries`, `ravel.utils`, and
+  `ravel.engine` itself.
+
+## Typing Pitfalls (Python 3.14, attrs 26, mypy 2.x)
+
+- Keep `order=True` on `types.Rule`, `types.Predicate`, and `types.Comparison`: the compiler sorts
+  them (`ruleset["rules"].sort()`, `sorted(predicates)`). `attr.s` gives order by default;
+  `attrs.define` does **not**. Annotate them as `@attr.s(slots=True, auto_attribs=True)` or
+  `@define(order=True)`.
+- With `auto_attribs`, an annotated class attribute becomes a field: annotate `_comparators` /
+  `_operators` as `ClassVar[...]`.
+- PEP 695 `type` aliases are not runtime classes: `isinstance(v, QualityValue)` raises. Validate
+  with a module constant `QUALITY_TYPES = (int, float, str)` plus an explicit `bool` exclusion.
+- `Story` holds a dict: declare `rulebook: CompiledRulebook = field(eq=False)` so `Story`
+  equality/hash use `identity` only (hashing a frozen attrs instance with a dict field raises).
+- Add `ravel.utils.*` to the strict override: `types.py` calls `evaluate_term`, whose unannotated
+  `Any` return would trip `warn_return_any`.
+- `Ruleset.locations` is `dict[str, object]` (non-`Situation` concepts store lists of strings via
+  `_dummy_handler`); `Story.situation()` narrows with `isinstance(..., types.Situation)`.
+- Engine value types use only engine-local names in annotations (no `TYPE_CHECKING`-only imports),
+  so the 3.14 deferred-annotation caveat in CLAUDE.md never applies to them.
 
 ## Decided while you slept
 
@@ -299,6 +484,13 @@ US1-AS1's "equals the 0.6.2 parse" half is the one-time SC-009 check (not perman
 | 16 | CLI keeps `ravel.cli:main` entry point and module path | Console script and `TestMain` stay stable | Easy |
 | 17 | syml from PyPI; git-tag source fallback, never path | Reproducible lock in CI | Easy |
 | 18 | Menu numbering and `save`/`load`/`s`/`q`/`help` parsing live only in `ConsoleUI` | FR-026 thin adapter | Easy |
+| 19 | (red team) Commit the whitespace-only working-copy re-indent of `examples/taxi/mail.ravel` in US1 | HEAD's copy fails under syml 1.0, so CI would fail the "every example loads" test | Easy: it is the same re-indent US1 applies elsewhere |
+| 20 | (red team) `validate_resumable` checks every frame, not just the top; halted labels must be story `End` labels | A tampered lower frame could replay an intro or hit an unhandled directive | Easy |
+| 21 | (red team) Saves capped at 1 MiB; strict UTF-8; NaN/Infinity/duplicate keys refused; every decode failure is a `LoadRefusedError` | SC-006: a bad `load` must never kill the live game | Easy |
+| 22 | (red team) `save FILE` only overwrites empty files or existing ravel saves | `save pyproject.toml` would otherwise destroy a file | Easy: drop the guard |
+| 23 | (red team) Int qualities bounded to signed 64-bit | Unbounded ints crash `json.dumps` past 4300 digits | Easy |
+| 24 | (red team) Constraints, `value`, and `[Quality]` expression gaps stay unfixed and documented | Pre-existing, no example uses them, not in D1–D20 | Easy: one choke point + `IR_VERSION` bump |
+| 25 | (red team) Save-sourced strings print via `repr()` in the CLI | Hostile saves cannot inject terminal control sequences | Easy |
 
 ## Complexity Tracking
 

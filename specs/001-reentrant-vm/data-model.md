@@ -6,8 +6,11 @@ All domain values are `attrs.frozen` (slots, eq, hashable) unless stated. Module
 ## Scalars (`engine/state.py`)
 
 ```python
-type QualityValue = int | float | str  # never bool, never NaN/±inf (InvalidQualityValueError)
+type QualityValue = int | float | str  # never bool, never NaN/±inf, ints in [-(2**63), 2**63)
 type LocationId = str  # e.g. "begin::intro::press-onward"
+
+QUALITY_TYPES: Final = (int, float, str)  # runtime check; PEP 695 aliases can't be used with isinstance
+INT_QUALITY_RANGE: Final = range(-(2**63), 2**63)
 ```
 
 ## Qualities
@@ -71,8 +74,8 @@ Invariants (checked by `engine.validate_resumable(story, state)`, used by save l
 | Status | stack | offered | outcome |
 |---|---|---|---|
 | `WAITING`, query menu | `()` | non-empty; equals the re-derived query menu | `None` |
-| `WAITING`, in-situation | non-empty; top `ip` → a `GetChoice`; every frame location exists | non-empty; equals that block's `Choice` locations in order | `None` |
-| `HALTED` | `()` | `()` | set |
+| `WAITING`, in-situation | non-empty; every frame location is a `Situation`; every non-top frame has `directives[ip-1]` a `GetChoice` and the frame above it is one of that block's `Choice` locations; top `ip` → a `GetChoice` | non-empty; equals the top block's `Choice` locations in source order | `None` |
+| `HALTED` | `()` | `()` | set; `label ∈ story.end_labels`, or `dead_end` with `label == ""` |
 | `RUNNING` | never valid at rest → `InvalidStateError` | | |
 
 State transitions:
@@ -92,8 +95,9 @@ State transitions:
 ```python
 @frozen
 class Story:
-    rulebook: CompiledRulebook  # Environment.load() result; treated read-only, never mutated
+    rulebook: CompiledRulebook = field(eq=False)  # Environment.load() result; read-only; eq/hash via identity
     identity: str  # "sha256:<64 hex>"
+    end_labels: frozenset[str]  # every compiled End.outcome; validates halted saves
 
     @classmethod
     def from_rulebook(cls, rulebook: CompiledRulebook) -> Story: ...  # computes identity
@@ -111,14 +115,23 @@ def fingerprint(rulebook: CompiledRulebook) -> str: ...
 
 `fingerprint` encodes `{"ir": IR_VERSION, "rulebook": <all concepts: sorted rules as
 [name, [predicates]], locations as {id: situation}>, "givens": [...]}` with a canonical encoder
-(attrs instances → `{"type": ClassName, **fields}`; the `types.VALUE` sentinel → `{"type":
-"VALUE"}`; `str` subclasses → `str`; tuples/lists → lists; dict keys sorted), then
-`json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False)` → SHA-256. `metadata`
-(`about:`) and syml source positions are excluded.
+(attrs instances → `{"type": ClassName, **fields}` iterating `attrs.fields(type(obj))`, so class
+attributes such as `_comparators` are excluded and `repr=False` fields such as `Text.predicate`
+are included; the `types.VALUE` sentinel — a **class** object, `parsers.visit_qvalue` returns
+`types.VALUE` itself — → `{"type": "VALUE"}`; `str` and `str` subclasses → `str`; `bool`/`int`/
+`float`/`None` as-is; tuples/lists → lists; `Mapping` with `str` keys → object, keys sorted),
+then `json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)` →
+SHA-256. **Any other type raises `TypeError`** — no `repr`/`str` fallback. In particular syml
+1.0's `Source` is a frozen dataclass, **not** a `str` subclass, and carries `filename` (an
+absolute path) and positions; if one ever reached a compiled value, a fallback would make the
+identity path- and whitespace-dependent. Sets are refused (their order varies with
+`PYTHONHASHSEED`). `metadata` (`about:`) and source positions are excluded.
 
 `types.py` additions: `CompiledRulebook(TypedDict)` = `{"metadata": dict[str, str], "rulebook":
 dict[str, Ruleset], "givens": list[Operation]}`, `Ruleset(TypedDict)` = `{"rules": list[Rule],
-"locations": dict[str, Situation]}`, and `End(outcome: str)`.
+"locations": dict[str, object]}` (non-`Situation` concepts store lists of strings;
+`Story.situation()` narrows with `isinstance`), and `End(outcome: str)`. `Rule`, `Predicate`, and
+`Comparison` keep `order=True` (the compiler sorts them).
 
 ## Outputs (`engine/outputs.py`)
 
@@ -193,12 +206,14 @@ allow_nan=False).encode("utf-8") + b"\n"`.
 | `format_version` | int | `== 1`, else `UnsupportedSaveVersionError` (bool rejected) |
 | `story_id` | str | `== story.identity`, else `StoryChangedError` |
 | `state.qualities` | object str → int/float/str | JSON int stays int, JSON float (`1.0`) stays float; bool/null/array rejected |
-| `state.stack` | array of `{"location": str, "ip": int >= 0}` | bottom → top; locations must exist |
+| `state.stack` | array of `{"location": str, "ip": int >= 0}` (bool refused) | bottom → top; locations must exist; whole-stack invariants above |
 | `state.status` | `"waiting_input"` \| `"halted"` | `"running"` refused |
 | `state.offered` | array of str | locations must exist; must equal the re-derived menu |
-| `state.outcome` | null \| `{"label": str, "dead_end": bool}` | non-null iff halted |
+| `state.outcome` | null \| `{"label": str, "dead_end": bool}` | non-null iff halted; label ∈ `story.end_labels` (or `""` with `dead_end`) |
 
-Extra unknown keys are refused (`SaveCorruptError`), so v1 files stay canonical.
+Extra unknown keys and duplicate keys are refused (`SaveCorruptError`); `NaN`/`Infinity` literals
+are refused; the whole file is capped at `MAX_SAVE_BYTES` (1 MiB). Every canonical v1 save starts
+with `SAVE_MAGIC = b'{"format":"ravel-save"'` (used by the `FileSaveStore` clobber guard).
 
 ## Session (`app/session.py`)
 

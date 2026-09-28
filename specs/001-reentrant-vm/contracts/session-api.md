@@ -9,7 +9,7 @@ class StorySource(Protocol):
 
 class SaveStore(Protocol):
     def write(self, name: str, data: bytes) -> str: ...  # returns a display path; OSError propagates
-    def read(self, name: str) -> bytes: ...  # FileNotFoundError → mapped by session
+    def read(self, name: str) -> bytes: ...  # at most MAX_SAVE_BYTES + 1 bytes; OSError → mapped by session
 ```
 
 Adapters (`ravel.adapters`):
@@ -22,7 +22,13 @@ class FileSystemStorySource:  # story_source.py
 
 class FileSaveStore:  # save_store.py
     def __init__(self, base: Path | None = None) -> None: ...  # None → Path.cwd() at call time
-    def write(self, name: str, data: bytes) -> str: ...  # temp file in same dir + os.replace (atomic, overwrites)
+    # write: temp file (mkstemp in the target dir) + os.replace; temp removed on failure;
+    # mode 0o666 & ~umask. Clobber guard: an existing non-empty file that does not start
+    # with SAVE_MAGIC → FileExistsError.
+    def write(self, name: str, data: bytes) -> str: ...
+
+    # read: refuses non-regular files (os.stat + S_ISREG before open: FIFOs/devices/dirs →
+    # OSError); reads at most MAX_SAVE_BYTES + 1 bytes (decode_save rejects the oversize).
     def read(self, name: str) -> bytes: ...
 ```
 
@@ -51,6 +57,11 @@ Rules:
 - `save` requires a state (`NoGameError` otherwise) and writes `encode_save(story, state)`.
 - `load` = `saves.read` → `decode_save(story, data)` → assign → `engine.present`. It never calls
   `engine.start`, so givens are never re-applied (FR-023).
+- `load` raises **only** `LoadRefusedError` subclasses: `FileNotFoundError` → `SaveNotFoundError`;
+  any other `OSError` from `read` (permission, directory, not a regular file) →
+  `SaveUnreadableError`; everything `decode_save` raises is already a `LoadRefusedError`.
+- `choose` propagating an author error (`TypeError`, `ZeroDivisionError`,
+  `InvalidQualityValueError`) keeps the previous state.
 - A session built for a CLI run compiles the story once; later `load`s check against that
   compilation even if files changed on disk (edge case "story edited during session").
 
@@ -69,6 +80,9 @@ class LoadRefusedError(SessionError): ...  # base: every refused load
 class SaveNotFoundError(LoadRefusedError): ...  # "no save file at 'x'"
 
 
+class SaveUnreadableError(LoadRefusedError): ...  # "cannot read save file 'x': <strerror>"
+
+
 class SaveCorruptError(LoadRefusedError): ...  # "not valid JSON: …" / "missing field 'state.stack'" / "…must be an int"
 
 
@@ -79,6 +93,9 @@ class StoryChangedError(LoadRefusedError): ...  # "the story has changed since t
 
 
 class UnknownLocationError(LoadRefusedError): ...  # "save refers to location 'x', which the story does not have"
+
+
+# Every message quotes save-sourced strings with repr() (%r), so control characters are escaped.
 ```
 
 `InvalidStateError` from `engine.validate_resumable` is re-raised as `SaveCorruptError` (chained).
