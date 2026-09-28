@@ -48,7 +48,7 @@ markers = ["acceptance: end-to-end user-story tests"]
 [tool.coverage.run]
 branch = true
 source = ["ravel", "tools"]
-omit = ["*/test*.py", "*/conftest.py", "*/capture_syml062.py"]
+omit = ["*/test*.py", "*/conftest.py"]
 
 [tool.coverage.report]
 show_missing = true
