@@ -322,8 +322,8 @@ so no save can crash the CLI, soft-lock the engine, or smuggle control sequences
   `SaveCorruptError`. `RecursionError` (deeply nested arrays) and `ValueError` (e.g. a >4300-digit
   int) raised by the parser are caught and mapped to `SaveCorruptError`.
 - **Types**: `bool` is refused everywhere an int is expected (`format_version`, `ip`, quality
-  values); quality values go through the same `Qualities` validation as the engine (finite floats,
-  bounded ints).
+  values); quality names and values go through the same `Qualities` validation as the engine
+  (finite floats, bounded ints, and **no lone surrogates** in any name or string value).
 - **Whole-stack invariants** (not just the top frame): see Edge Cases → Resting-state invariants.
 - **Outcome labels**: a halted save's `outcome.label` must be one of the story's compiled `End`
   labels (`dead_end: true` requires `label == ""`). This removes the only place a save could inject
@@ -385,6 +385,15 @@ reach an unhandled directive, or index out of range:
 - **Quality range**: `int` quality values must satisfy `-(2**63) <= v < 2**63`
   (`InvalidQualityValueError` otherwise). Unbounded ints would make `json.dumps` raise `ValueError`
   past 4300 digits (a `save` crash) and lose precision in any non-Python save reader.
+- **Surrogate-free strings**: every quality name and every `str` value must be UTF-8 encodable,
+  i.e. contain no code point in U+D800–U+DFFF (`InvalidQualityValueError` otherwise). A save that
+  is pure ASCII can still carry `"\udc80"` as a JSON escape: strict UTF-8 decoding accepts it,
+  `json.loads` turns it into a lone surrogate, and the next `encode_save` raises
+  `UnicodeEncodeError` (a `ValueError` the CLI's `save` handler does not catch), killing the live
+  game. The invariant this buys: **any `GameState` that passes validation encodes without
+  raising**, so `cli.md`'s narrow `except` stays correct. Story text cannot produce a surrogate
+  (source files are strict UTF-8), so the engine branch is covered with a hand-built
+  `Qualities.set`.
 - Author errors in an operation or predicate (`TypeError`, `ZeroDivisionError`) and
   `InvalidQualityValueError` propagate from `choose`; the session keeps the previous state; the
   CLI treats them as unexpected errors (`handle_exception`, `--debug` → pdb, exit 1).
@@ -440,6 +449,10 @@ the permanent "every example loads" test passes locally and fails in CI.
   atomic-write failure (monkeypatched `os.replace`) removes the temp file; clobber guard (empty
   file, save file, foreign file); `FileSaveStore(base=None)` → cwd; non-regular file and oversize
   reads; each `validate_resumable` rule; each decode step.
+- **Surrogate tests**: `decode_save` refuses a lone high (`"\ud800"`) and a lone low
+  (`"\udc80"`) surrogate, both as a quality value and as a quality name (`SaveCorruptError`), and
+  **accepts** a valid pair escape (`"\ud83d\ude00"` → one astral character), which must
+  round-trip byte-identically; `Qualities.set("q", "\udc80")` raises `InvalidQualityValueError`.
 - **Layering test**: resolves relative imports (`from ..app import x`) against the module's
   package, scans `import a.b` and `from a import b` forms, and uses the allowlist
   `{__future__, abc, collections, dataclasses, enum, functools, hashlib, itertools, json, math,
@@ -495,6 +508,7 @@ the permanent "every example loads" test passes locally and fails in CI.
 | 24 | (red team) Constraints, `value`, and `[Quality]` expression gaps stay unfixed and documented | Pre-existing, no example uses them, not in D1–D20 | Easy: one choke point + `IR_VERSION` bump |
 | 25 | (red team) Save-sourced strings print via `repr()` in the CLI | Hostile saves cannot inject terminal control sequences | Easy |
 | 26 | (deepen-plan-loop, decided while you slept) `contracts/cli.md`'s `save` row now reads `session.save(FILE or DEFAULT_SAVE_NAME)` instead of the literal `"ravel-save.json"` | `session-api.md` already names the constant `DEFAULT_SAVE_NAME: Final = "ravel-save.json"`; the CLI contract had drifted to a duplicated literal | Easy: rename only |
+| 27 | (red team, iteration 2) Quality names and `str` values must be surrogate-free (UTF-8 encodable) | A JSON `\udc80` escape loads fine and then crashes the next `save` with `UnicodeEncodeError`; validation must guarantee that every valid state encodes | Easy: one check in `Qualities` |
 
 ## Complexity Tracking
 

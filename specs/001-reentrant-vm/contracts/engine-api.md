@@ -118,7 +118,8 @@ class GameOverError(EngineError): ...
 class NotWaitingError(EngineError): ...
 
 
-class InvalidQualityValueError(EngineError): ...  # bool, NaN, ±inf, non int/float/str result
+# bool, NaN, ±inf, int outside signed 64-bit, str/name with a lone surrogate, non int/float/str
+class InvalidQualityValueError(EngineError): ...
 
 
 class InvalidStateError(EngineError): ...  # validate_resumable failures

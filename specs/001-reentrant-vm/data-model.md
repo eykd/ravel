@@ -6,7 +6,7 @@ All domain values are `attrs.frozen` (slots, eq, hashable) unless stated. Module
 ## Scalars (`engine/state.py`)
 
 ```python
-type QualityValue = int | float | str  # never bool, never NaN/±inf, ints in [-(2**63), 2**63)
+type QualityValue = int | float | str  # never bool, never NaN/±inf, ints in [-(2**63), 2**63), strs surrogate-free
 type LocationId = str  # e.g. "begin::intro::press-onward"
 
 QUALITY_TYPES: Final = (int, float, str)  # runtime check; PEP 695 aliases can't be used with isinstance
@@ -23,7 +23,8 @@ class Qualities:
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, QualityValue]) -> Qualities: ...
     def get(self, name: str) -> QualityValue | None: ...  # None = unset (reads as 0 in predicates/ops)
-    def set(self, name: str, value: QualityValue) -> Qualities: ...  # validates value
+    # set() validates the value; the name and any str value must be surrogate-free (UTF-8 encodable)
+    def set(self, name: str, value: QualityValue) -> Qualities: ...
     def as_dict(self) -> dict[str, QualityValue]: ...  # fresh dict each call
 ```
 
@@ -205,7 +206,7 @@ allow_nan=False).encode("utf-8") + b"\n"`.
 | `format` | `"ravel-save"` | exact |
 | `format_version` | int | `== 1`, else `UnsupportedSaveVersionError` (bool rejected) |
 | `story_id` | str | `== story.identity`, else `StoryChangedError` |
-| `state.qualities` | object str → int/float/str | JSON int stays int, JSON float (`1.0`) stays float; bool/null/array rejected |
+| `state.qualities` | object str → int/float/str | JSON int stays int, JSON float (`1.0`) stays float; bool/null/array rejected; names and str values containing a lone surrogate (U+D800–U+DFFF, e.g. from a `\udc80` escape) rejected, so every loaded state re-encodes |
 | `state.stack` | array of `{"location": str, "ip": int >= 0}` (bool refused) | bottom → top; locations must exist; whole-stack invariants above |
 | `state.status` | `"waiting_input"` \| `"halted"` | `"running"` refused |
 | `state.offered` | array of str | locations must exist; must equal the re-derived menu |

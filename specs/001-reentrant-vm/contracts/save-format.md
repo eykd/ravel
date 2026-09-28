@@ -30,7 +30,7 @@ UTF-8, plus a trailing `\n`. Equal bytes ⇒ equal states (FR-022, FR-025). The 
 | 2 | `format == "ravel-save"` | `SaveCorruptError("not a ravel save file")` |
 | 3 | `format_version` present, an `int` (not bool), `== 1` | `UnsupportedSaveVersionError(<value>)` |
 | 4 | `story_id == story.identity` | `StoryChangedError` |
-| 5 | exact key sets and types for `state` and each nested object; `bool` refused wherever an int is expected (`ip`, quality values); quality values pass `Qualities` validation (finite float, int in signed 64-bit range, str) | `SaveCorruptError("<path>: <problem>")` |
+| 5 | exact key sets and types for `state` and each nested object; `bool` refused wherever an int is expected (`ip`, quality values); quality names and values pass `Qualities` validation (finite float, int in signed 64-bit range, str with no lone surrogate) | `SaveCorruptError("<path>: <problem>")` |
 | 6 | every `stack[*].location` and `offered[*]` exists in `story` | `UnknownLocationError(<location>)` |
 | 7 | `engine.validate_resumable(story, state)` — whole-stack invariants, offered menu, halted outcome label ∈ story `End` labels | `SaveCorruptError` (chained `InvalidStateError`) |
 | — | any other exception raised during 1–7 (e.g. `TypeError` re-deriving a query menu over tampered quality types) | `SaveCorruptError` (chained) — `decode_save` raises **only** `LoadRefusedError` subclasses |
@@ -58,4 +58,5 @@ b'{..."qualities":{"Bar":NaN}...}'  → SaveCorruptError: not valid JSON: NaN/In
 b'{..."stack":[{"location":"begin::intro","ip":0},{"location":"begin::intro::press-onward","ip":2}]...}'  → SaveCorruptError: stack[0]: ip 0 does not follow a choice block
 b'{..."status":"halted","outcome":{"label":"\u001b]52;c;...","dead_end":false}...}'  → SaveCorruptError: outcome label is not an ending this story has
 b'[' * 100_000  → SaveCorruptError: not valid JSON: maximum recursion depth exceeded
+b'{..."qualities":{"Location":"\udc80"}...}'  → SaveCorruptError: state.qualities['Location']: string contains a lone surrogate  (a valid pair escape such as "\ud83d\ude00" is accepted)
 ```
