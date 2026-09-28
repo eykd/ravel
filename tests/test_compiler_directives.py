@@ -82,6 +82,30 @@ class TestCompileChoice:
         ]
 
 
+class TestCompileChoiceNestingDepth:
+    @staticmethod
+    def _build_nested_choice_body(depth):
+        """Build a choice body nested ``depth`` levels deep, without a giant fixture file."""
+        body = "Innermost text."
+        for _ in range(depth):
+            body = ["Intro text.", {"choice": body}]
+        return body
+
+    def test_it_should_raise_parse_error_at_the_boundary_depth(self, env):
+        """One level past the configured limit must raise ParseError, not RecursionError."""
+        body = self._build_nested_choice_body(directives.MAX_CHOICE_NESTING_DEPTH + 1)
+
+        with pytest.raises(exceptions.ParseError):
+            directives.compile_choice(env, "Situation", "parent", body)
+
+    def test_it_should_compile_at_exactly_the_boundary_depth(self, env):
+        """Nesting depth exactly at the configured limit must still compile successfully."""
+        body = self._build_nested_choice_body(directives.MAX_CHOICE_NESTING_DEPTH)
+
+        # Should not raise.
+        directives.compile_choice(env, "Situation", "parent", body)
+
+
 class TestCompileChoiceFailure:
     def test_it_should_wrap_a_situation_construction_failure(self, env, monkeypatch):
         """A broken Situation must surface as a ParseError chained from the cause."""
