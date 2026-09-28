@@ -19,8 +19,8 @@ intro:
 
   - choice:
 
-    - [Press onward!]You press onward, until you reach the double doors and let
-      yourself in.
+      - [Press onward!]You press onward, until you reach the double doors and let
+        yourself in.
 
-    - effect:
-        - Location = "Foyer"
+      - effect:
+          - Location = "Foyer"

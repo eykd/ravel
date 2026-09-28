@@ -20,8 +20,8 @@ look:
 
 look-at-message:
   - when:
-    - Bar >= 2
-    - Fumbled = 0
+      - Bar >= 2
+      - Fumbled = 0
 
   - There seems to be some sort of message scrawled in the sawdust on the
     floor.[] The message, neatly marked in the sawdust, reads…
@@ -31,8 +31,8 @@ look-at-message:
 
 look-at-scrambled-message:
   - when:
-    - Bar >= 2
-    - Fumbled >= 1
+      - Bar >= 2
+      - Fumbled >= 1
 
   - There seems to have been some sort of message scrawled in the sawdust on
     the floor.[] Unfortunately, some fool has scrambled it up, probably by
@@ -46,4 +46,4 @@ leave:
   - [The opulence of the Foyer beckons you.]You leave the Bar.
 
   - effect:
-    - Location = "Foyer"
+      - Location = "Foyer"

@@ -5,6 +5,6 @@ include:
 intro:
   - Situation
   - when:
-    - Intro == 1
+      - Intro == 1
 
   - Test!

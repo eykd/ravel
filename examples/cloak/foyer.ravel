@@ -29,7 +29,7 @@ cloakroom:
   - {"Wearing Cloak" == 0}You enter the cloak room.
 
   - effect:
-    - Location = "Cloakroom"
+      - Location = "Cloakroom"
 
 
 bar:
@@ -39,4 +39,4 @@ bar:
   - {"Wearing Cloak" == 0}You wander over to the bar.
 
   - effect:
-    - Location = "Bar"
+      - Location = "Bar"

@@ -73,5 +73,5 @@ mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
 files = ["src", "tools"]
 
 [[tool.mypy.overrides]]
-module = ["parsimonious.*", "syml.*", "colorclass.*", "slugify.*"]
+module = ["parsimonious.*", "colorclass.*", "slugify.*"]
 ignore_missing_imports = true

@@ -97,7 +97,7 @@ class TestCompileRulebook:
             """
             intro:
               - when:
-                - Intro == 0
+                  - Intro == 0
 
               - Some intro text.
         """
@@ -111,7 +111,7 @@ class TestCompileRulebook:
             """
             intro:
               - when:
-                - Intro == 0
+                  - Intro == 0
 
               - Some intro text.
         """
@@ -126,7 +126,7 @@ class TestCompileRulebook:
             intro:
               - Situation
               - when:
-                - Intro == 0
+                  - Intro == 0
 
               - Some intro text.
               - foo: bar
@@ -141,7 +141,7 @@ class TestCompileRulebook:
             intro:
               - Situation
               - when:
-                - Intro == 0
+                  - Intro == 0
 
               - Some intro text.
               - choice:
@@ -174,7 +174,7 @@ class TestCompileRulebook:
             intro:
               - Situation
               - when:
-                - Intro == 0
+                  - Intro == 0
         """
         )
         with pytest.raises(exceptions.MissingBaggageError):
@@ -192,19 +192,19 @@ TEST_RULEBOOK_SYML = textwrap.dedent(
     intro:
       - Situation
       - when:
-        - [Intro] == 0
+          - [Intro] == 0
 
       - It was raining steadily by the time I dropped my last rider off[...] and swung by the post office on my way home.
       - choice:
-        - The post office was closed[.], but I let myself in to the PO box room.
-        - The fluorescent glare hurt my eyes after the evening of headlight
-          glare.
-        - choice:
-          - I quietly cursed the light, wishing for the dark.
-          - effect: Dark += 1
-        - choice:
-          - I quietly gave thanks for the light.
-          - effect: Light += 1
+          - The post office was closed[.], but I let myself in to the PO box room.
+          - The fluorescent glare hurt my eyes after the evening of headlight
+            glare.
+          - choice:
+              - I quietly cursed the light, wishing for the dark.
+              - effect: Dark += 1
+          - choice:
+              - I quietly gave thanks for the light.
+              - effect: Light += 1
       - I found my box, lucky 1313. <>
       - {Dark > 0}What a lovely number.
       - {Light > 0}What a joke. The number mocked me.

@@ -21,8 +21,8 @@ look:
 the-hook:
 
   - when:
-    - Cloakroom >= 2
-    - "Wearing Cloak" = 1
+      - Cloakroom >= 2
+      - "Wearing Cloak" = 1
 
   - There's a brass hook on the wall.[] Useful for hanging things on it.
 
@@ -35,8 +35,8 @@ the-hook:
 hang-up-cloak:
 
   - when:
-    - Cloakroom >= 3
-    - "Wearing Cloak" >= 1
+      - Cloakroom >= 3
+      - "Wearing Cloak" >= 1
 
   - [Hang up your cloak.]You hang the dripping velvet cloak on the small brass
     hook.
@@ -47,8 +47,8 @@ hang-up-cloak:
 put-on-cloak:
 
   - when:
-    - Cloakroom >= 2
-    - "Wearing Cloak" == 0
+      - Cloakroom >= 2
+      - "Wearing Cloak" == 0
 
   - [Put on your cloak.]You take the dripping velvet cloak from the small brass
     hook and put it on.
@@ -59,7 +59,7 @@ put-on-cloak:
 look-at-cloak:
 
   - when:
-    - "Wearing Cloak" == 0
+      - "Wearing Cloak" == 0
 
   - Your cloak hangs from a brass hook.[] A handsome cloak, of velvet trimmed
     with satin, and slightly spattered with raindrops. Its blackness is so deep
@@ -72,4 +72,4 @@ leave:
   - [The warm glow of the Foyer beckons you out.]You leave the cloakroom.
 
   - effect:
-    - Location = "Foyer"
+      - Location = "Foyer"

@@ -74,7 +74,7 @@ about:
 rule-name:
   - Situation                    # Concept declaration
   - when:                        # Rule-specific predicates
-    - Quality > threshold
+      - Quality > threshold
   - Intro text here              # Directives begin
   - More content...
 ```
@@ -275,8 +275,8 @@ Predicates determine when a rule/situation is available:
 ```yaml
 look-around:
   - when:
-    - Location = "Foyer"
-    - Visited >= 1
+      - Location = "Foyer"
+      - Visited >= 1
   - You look around the familiar foyer.
 ```
 
@@ -345,8 +345,8 @@ A rule is a named entry in the rulebook with associated predicates and content:
 rule-name:
   - Concept                  # Optional: defaults to "Situation"
   - when:                    # Optional: rule-specific predicates
-    - predicate1
-    - predicate2
+      - predicate1
+      - predicate2
   - directive1               # Content begins here
   - directive2
   - ...
@@ -453,19 +453,19 @@ Choices present options to the player within a situation:
 
 ```yaml
 - choice:
-  - [Go to the bar]You head toward the neon sign advertising the bar.
-  - effect:
-    - Location = "Bar"
+    - [Go to the bar]You head toward the neon sign advertising the bar.
+    - effect:
+        - Location = "Bar"
 ```
 
 **Structure:**
 ```yaml
 - choice:
-  - [Choice Text]Description after choosing
-  - text: (optional additional text)
-  - effect:
-    - operation1
-    - operation2
+    - [Choice Text]Description after choosing
+    - text: (optional additional text)
+    - effect:
+        - operation1
+        - operation2
 ```
 
 **Choice Text**: The bracketed text `[...]` appears as the selectable option.
@@ -480,17 +480,17 @@ Multiple `choice:` blocks in sequence create a choice menu:
 
 ```yaml
 - choice:
-  - [Head north]You walk northward.
-  - effect:
-    - Location = "North"
+    - [Head north]You walk northward.
+    - effect:
+        - Location = "North"
 
 - choice:
-  - [Head south]You turn and walk south.
-  - effect:
-    - Location = "South"
+    - [Head south]You turn and walk south.
+    - effect:
+        - Location = "South"
 
 - choice:
-  - [Stay here]You decide to remain.
+    - [Stay here]You decide to remain.
 ```
 
 ### 9.3 Effect Directives
@@ -499,8 +499,8 @@ Standalone effects outside of choices:
 
 ```yaml
 - effect:
-  - Visited += 1
-  - "Has Seen Intro" = 1
+    - Visited += 1
+    - "Has Seen Intro" = 1
 
 - effect: Score += 10    # Single-line form
 ```
@@ -559,16 +559,16 @@ about: {key: value, ...}
 rule-name:
   - Concept                    # Optional, defaults to Situation
   - when:                      # Optional predicates
-    - comparison
-    - comparison
+      - comparison
+      - comparison
   - text directive             # First text uses intro syntax
   - {comparison}conditional text
   - choice:
-    - [choice text]result text
-    - effect:
-      - operation
+      - [choice text]result text
+      - effect:
+          - operation
   - effect:
-    - operation
+      - operation
 ```
 
 ---
@@ -623,14 +623,14 @@ When multiple situations match:
 # Score: 1 (one predicate)
 generic-look:
   - when:
-    - Location = "Bar"
+      - Location = "Bar"
   - The bar is dimly lit.
 
 # Score: 2 (two predicates)
 dark-bar-look:
   - when:
-    - Location = "Bar"
-    - "Has Light" = 0
+      - Location = "Bar"
+      - "Has Light" = 0
   - The bar is pitch black. You cannot see a thing.
 ```
 
@@ -666,9 +666,9 @@ intro:
     you'd worn your opera cloak.
 
   - choice:
-    - [Press onward!]You press onward to the entrance.
-    - effect:
-      - Location = "Foyer"
+      - [Press onward!]You press onward to the entrance.
+      - effect:
+          - Location = "Foyer"
 ```
 
 ### foyer.ravel
@@ -681,14 +681,14 @@ foyer:
     and gold, with glittering chandeliers overhead.
 
   - choice:
-    - [Go to the cloakroom]You head toward the small room off the hall.
-    - effect:
-      - Location = "Cloakroom"
+      - [Go to the cloakroom]You head toward the small room off the hall.
+      - effect:
+          - Location = "Cloakroom"
 
   - choice:
-    - [Go to the bar]The neon sign beckons.
-    - effect:
-      - Location = "Bar"
+      - [Go to the bar]The neon sign beckons.
+      - effect:
+          - Location = "Bar"
 ```
 
 ### cloakroom.ravel
@@ -702,15 +702,15 @@ look:
 
 hang-up-cloak:
   - when:
-    - "Wearing Cloak" >= 1
+      - "Wearing Cloak" >= 1
   - [Hang up your cloak.]You hang your cloak on the hook.
   - effect:
-    - "Wearing Cloak" = 0
+      - "Wearing Cloak" = 0
 
 return-to-foyer:
   - [Return to the foyer]You step back into the main hall.
   - effect:
-    - Location = "Foyer"
+      - Location = "Foyer"
 ```
 
 ---
