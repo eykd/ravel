@@ -135,6 +135,11 @@ class TestFingerprint:
         with pytest.raises(TypeError):
             fingerprint(rulebook)
 
+    def test_it_refuses_a_mapping_with_a_non_str_key(self):
+        rulebook = rulebook_with("Situation", {}, givens=[types.Operation("q", "=", {1: 2})])
+        with pytest.raises(TypeError):
+            fingerprint(rulebook)
+
     def test_it_refuses_a_source_position(self):
         position = types.Pos(index=0, line=1, column=1)
         source = types.Source(filename="/abs/path/story.ravel", start=position, end=position, text="x")
