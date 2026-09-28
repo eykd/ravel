@@ -494,6 +494,7 @@ the permanent "every example loads" test passes locally and fails in CI.
 | 23 | (red team) Int qualities bounded to signed 64-bit | Unbounded ints crash `json.dumps` past 4300 digits | Easy |
 | 24 | (red team) Constraints, `value`, and `[Quality]` expression gaps stay unfixed and documented | Pre-existing, no example uses them, not in D1–D20 | Easy: one choke point + `IR_VERSION` bump |
 | 25 | (red team) Save-sourced strings print via `repr()` in the CLI | Hostile saves cannot inject terminal control sequences | Easy |
+| 26 | (deepen-plan-loop, decided while you slept) `contracts/cli.md`'s `save` row now reads `session.save(FILE or DEFAULT_SAVE_NAME)` instead of the literal `"ravel-save.json"` | `session-api.md` already names the constant `DEFAULT_SAVE_NAME: Final = "ravel-save.json"`; the CLI contract had drifted to a duplicated literal | Easy: rename only |
 
 ## Complexity Tracking
 
