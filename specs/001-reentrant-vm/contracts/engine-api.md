@@ -7,8 +7,17 @@ Pure functions. No I/O, no callbacks, no module-level mutable state. Same inputs
 def start(story: Story) -> Step: ...
 def choose(story: Story, state: GameState, location: LocationId) -> Step: ...
 def present(story: Story, state: GameState) -> tuple[Output, ...]: ...
-def validate_resumable(story: Story, state: GameState) -> None: ...  # raises InvalidStateError
+def resume(story: Story, saved: SavedGame) -> Step: ...  # 2026-09-28; replaces validate_resumable on the load path
+def choice_blocks(
+    situation: types.Situation,
+) -> tuple[ChoiceBlock, ...]: ...  # 2026-09-28; shared by begin_choices, encode_save, resume
 ```
+
+**2026-09-28 revision**: `validate_resumable` is **removed**. It existed to hard-refuse a save
+whose stack, offered menu, or halted label didn't match what the engine would derive. That job is
+now split: `decode_save` still does cheap, story-free shape checks (save-format.md), and `resume`
+does the story-dependent part — but by *truncating*, never by raising. Nothing on the load path
+raises `InvalidStateError` any more.
 
 ## `start(story)`
 
@@ -122,7 +131,11 @@ class NotWaitingError(EngineError): ...
 class InvalidQualityValueError(EngineError): ...
 
 
-class InvalidStateError(EngineError): ...  # validate_resumable failures
+class InvalidStateError(EngineError):
+    ...  # unreachable-state errors from the run loop itself
+    # (unknown location, bad ip, bare Choice/GetChoice);
+    # no longer raised for loaded saves (2026-09-28) —
+    # resume() truncates instead
 ```
 
 A `ZeroDivisionError`/`TypeError` raised by an author's operation propagates unchanged (a story
@@ -130,22 +143,55 @@ bug, not an engine state); the CLI's `--debug` path handles it.
 
 ## `present(story, state)`
 
-Re-presents a resting state without running anything (used after load, FR-023):
+Re-presents a resting state without running anything, from a `GameState` whose `offered` is
+already correct (used by `resume` for the non-empty-stack case; `resume` handles the empty-stack
+query case itself since a saved state no longer carries an `offered` to re-derive labels from):
 - `WAITING` → `(ChoicesOffered(...labels re-derived from story for state.offered...),)`
 - `HALTED` → `(Halted(outcome.label, outcome.dead_end),)`
 
-## `validate_resumable(story, state)`
+## `choice_blocks(situation)`
 
-Raises `InvalidStateError` naming the first violated invariant from the data-model table,
-checking the **whole stack** bottom → top: unknown or non-`Situation` location; a bottom frame
-that is not a `Situation` rule; status `RUNNING`;
-halted with frames/offered; a non-top frame whose `ip - 1` is not a `GetChoice` or whose child
-(the next frame up) is not one of that block's choices; top ip not on `GetChoice`; `offered` ≠
-re-derived menu; outcome/status mismatch; a halted label not in `story.end_labels` (or a dead end
-with a non-empty label); a quality value failing `Qualities` validation. Pure: re-derives the menu
-with the same code path the run loop uses. `TypeError`/`ValueError`/`ZeroDivisionError` raised
-while re-deriving a query menu over odd quality types are re-raised as `InvalidStateError`
-(chained).
+Returns every choice block in `situation`, source order, as `ChoiceBlock(choices, get_choice_ip)`
+(data-model.md § Choice blocks, anchors, and saved frames). `begin_choices` (the run loop's
+`BeginChoices` handler) is refactored to use this instead of gathering choices inline, so the
+exact same source-order scan backs the run loop, `encode_save`'s anchor computation, and
+`resume`'s anchor resolution — one definition of "which block is this", not three.
+
+## `resume(story, saved)` — 2026-09-28
+
+Turns a `SavedGame` (from `decode_save`, story-free) into a `Step`, resolving every saved frame
+against `story` and **never raising**. This is the whole of what used to be
+"`present` after a hard-validated load"; it now does the validating-by-truncating itself.
+
+1. If `saved.status is HALTED`: `saved.stack` is empty by construction (decode-time invariant).
+   Build `GameState(qualities=saved.qualities, stack=(), status=HALTED, offered=(), outcome=saved.outcome)`
+   and return `Step(state, (Halted(saved.outcome.label, saved.outcome.dead_end),))`. No anchor
+   resolution happens for a halted save — there is no stack to resolve, and (2026-09-28) no
+   check that `outcome.label` is one of the story's `End` labels: a stale label just loads as
+   that halt.
+2. Otherwise (`WAITING`), walk `saved.stack` bottom → top. For each `SavedFrame(location, anchor)`:
+   - if `story.has_location(location)` is false, or `choice_blocks(story.situation(location))` has
+     no block whose `choices` equals `anchor.choices`: **truncate** — stop resolving; this frame
+     and every `SavedFrame` above it (in source/save order) are **dropped**.
+   - otherwise resolve to the `anchor.ordinal`-th matching block (or the first match if `ordinal`
+     is out of range), producing a real `Frame(location, get_choice_ip)`.
+3. Every resolved frame except the last (the new top) gets `ip + 1` (mirrors `choose`'s "advance
+   past the GetChoice before pushing the child", so a still-valid ancestor frame is correctly
+   mid-gather, not re-waiting).
+4. If the resolved stack is non-empty: `offered` = the new top frame's resolved block's `choices`
+   (already known from step 2, no re-query needed); output via `present`-style
+   `ChoicesOffered(...)`.
+   If the resolved stack is empty (either `saved.stack` was already empty, or every frame got
+   dropped): re-query the story fresh from `qualities` (the same private query the run loop uses
+   for empty-stack — a dead end here halts with `Outcome("", dead_end=True)`, same as any query).
+5. If any frames were dropped in step 2, prepend `StoryChanged(dropped=<their locations, in the
+   order they were dropped, deepest-kept-adjacent first>)` to the outputs. An unchanged story
+   (nothing dropped) emits exactly what `present` would have emitted for that state — no
+   `StoryChanged`, ever.
+
+**Determinism**: for an unchanged story, `resume(story, decode_save(encode_save(story, s)))`
+resolves every frame back to its exact original `ip`, so `.state == s` and `.outputs` matches
+`present(story, s)` exactly (FR-025, save-format.md round-trip laws).
 
 ## Determinism and isolation
 

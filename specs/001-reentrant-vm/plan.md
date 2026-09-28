@@ -106,8 +106,11 @@ façade is cost with no caller; (d) a façade keeps blinker as a runtime depende
 ### Proposed constitution amendment v1.1.0 → v1.2.0 (MINOR) — needs David's sign-off
 
 - **VI**: public surface becomes `Environment.load()`/`load_rulebook()`, the `Loader` interface,
-  the compiled rulebook shape, `Source`/`Pos`, **`ravel.engine`'s `start`/`choose`/`present`, its
-  state and output value types, `ravel.app.GameSession`, and the save-file format (version 1)**.
+  the compiled rulebook shape, `Source`/`Pos`, **`ravel.engine`'s `start`/`choose`/`present`/
+  `resume`/`choice_blocks` (2026-09-28), its state and output value types (incl. `StoryChanged`,
+  `Anchor`, `SavedFrame`, `SavedGame`), `ravel.app.GameSession`, and the save-file format
+  (version 1, revised 2026-09-28: no story identity, no `offered`, anchored frames)**.
+  `validate_resumable` is removed from the surface (2026-09-28), superseded by `resume`.
 - **VII**: domain core = `types.py`, `queries.py`, `compiler/`, `ravel.engine`; application =
   `ravel.app`; adapters = `ravel.adapters`, `cli.py`, `loaders.FileSystemLoader`, `environments.py`.
 - **II**: state that `ravel.engine.*`, `ravel.app.*`, `ravel.adapters.*`, `ravel.cli`,
@@ -147,16 +150,21 @@ src/ravel/
 ├── environments.py, loaders.py, parsers.py, grammars.py  # unchanged (syml.parse switch only)
 ├── engine/             # DOMAIN — pure; imports only stdlib (hashlib, json, enum, typing), attrs, ravel.types, ravel.queries
 │   ├── __init__.py     # re-exports the public engine API
-│   ├── story.py        # Story (compiled rulebook + identity), fingerprint()
-│   ├── state.py        # QualityValue, LocationId, Qualities, Frame, Status, Outcome, GameState
-│   ├── outputs.py      # TextShown, ChoiceOption, ChoicesOffered, QualityChanged, SituationEntered, SituationExited, Halted, Output
-│   ├── engine.py       # start(), choose(), present(), validate_resumable(); private _Run interpreter
+│   ├── story.py        # Story (compiled rulebook + identity); identity/fingerprint()/IR_VERSION/end_labels
+│   │                    # unused by save/load as of 2026-09-28 — dead code, removed in the US4 Green leaf
+│   ├── state.py        # QualityValue, LocationId, Qualities, Frame, Status, Outcome, GameState,
+│   │                    # + 2026-09-28: ChoiceBlock, Anchor, SavedFrame, SavedGame
+│   ├── outputs.py      # TextShown, ChoiceOption, ChoicesOffered, QualityChanged, SituationEntered, SituationExited,
+│   │                    # Halted, StoryChanged (2026-09-28), Output
+│   ├── engine.py       # start(), choose(), present(), choice_blocks(), resume() (2026-09-28); private _Run interpreter
+│   │                    # validate_resumable() removed 2026-09-28 (superseded by resume()'s truncation)
 │   └── errors.py       # EngineError, NotOfferedError, GameOverError, NotWaitingError, InvalidQualityValueError, InvalidStateError
 ├── app/                # APPLICATION
 │   ├── __init__.py
 │   ├── ports.py        # StorySource, SaveStore (Protocols)
-│   ├── saves.py        # SAVE_FORMAT, SAVE_FORMAT_VERSION, encode_save(), decode_save(), LoadRefusedError family
-│   └── session.py      # GameSession (new_game, choose, save, load, state, menu)
+│   ├── saves.py        # SAVE_FORMAT, SAVE_FORMAT_VERSION, encode_save(story, state), decode_save(data) [story-free, 2026-09-28],
+│   │                    # LoadRefusedError family (StoryChangedError/UnknownLocationError removed 2026-09-28)
+│   └── session.py      # GameSession (new_game, choose, save, load, state, menu); load calls engine.resume (2026-09-28)
 ├── adapters/           # ADAPTERS
 │   ├── __init__.py
 │   ├── story_source.py # FileSystemStorySource (Environment + FileSystemLoader → Story)
@@ -325,9 +333,14 @@ so no save can crash the CLI, soft-lock the engine, or smuggle control sequences
   values); quality names and values go through the same `Qualities` validation as the engine
   (finite floats, bounded ints, and **no lone surrogates** in any name or string value).
 - **Whole-stack invariants** (not just the top frame): see Edge Cases → Resting-state invariants.
-- **Outcome labels**: a halted save's `outcome.label` must be one of the story's compiled `End`
-  labels (`dead_end: true` requires `label == ""`). This removes the only place a save could inject
-  free text that the CLI prints verbatim.
+- **Outcome labels** *(2026-09-28: the story-membership check is removed)*: a halted save's
+  `outcome.label` is no longer checked against the story's compiled `End` labels — an unexpected
+  label is no worse than a player editing their own qualities (accepted by design). It is still a
+  validated-shape `str` (decode-time, save-format.md). To close the one gap this reopens — a
+  hand-edited save's `outcome.label` reaching the CLI's end-of-game line, previously guaranteed
+  to be story-trusted text — `contracts/cli.md`'s `Halted` row now escapes any control character
+  in `<outcome>` the way `repr()` would, leaving ordinary text (every label a real story ever
+  produces) untouched.
 - **Exception containment**: every exception raised while decoding or validating a save —
   including `TypeError`/`ValueError`/`ZeroDivisionError` from re-deriving the query menu over
   tampered quality types (`Bar = "x"` makes `Bar >= 2` raise) — surfaces as a `LoadRefusedError`
@@ -360,28 +373,26 @@ so no save can crash the CLI, soft-lock the engine, or smuggle control sequences
 
 ## Edge Cases & Error Handling
 
-### Resting-state invariants (`engine.validate_resumable`)
+### Resting-state invariants — superseded 2026-09-28
 
-Checked for the **whole stack**, bottom → top, so a hand-edited save can never replay an intro,
-reach an unhandled directive, or index out of range:
-
-- every frame location is a `Situation` location in the story, and the **bottom** frame is a
-  `Situation` *rule* (queryable), since only a query menu can start a stack;
-- every **non-top** frame `f[i]` has `1 <= ip <= len(directives)` with `directives[ip - 1]` a
-  `GetChoice`, and `f[i+1].location` is one of that choice block's `Choice` locations (the frame
-  above is a child that frame really offered);
-- the **top** frame's ip indexes a `GetChoice`, and `offered` equals that block's locations in
-  source order;
-- an empty stack while `WAITING` requires `offered` to equal the re-derived query menu;
-- `HALTED` ⇔ `outcome` set ⇔ `stack == () and offered == ()`; the label rule above.
+`engine.validate_resumable` **is removed**. It used to check the whole stack, bottom → top,
+against a *hard-loaded* `GameState`, so a hand-edited save could never replay an intro, reach an
+unhandled directive, or index out of range — refusing the load otherwise. That job now lives in
+two places instead: `decode_save`'s cheap, story-free shape checks (save-format.md), and
+`engine.resume`'s anchor resolution (engine-api.md § `resume`), which produces a `GameState`
+satisfying these same invariants **by construction** (a frame it can't resolve to a real choice
+block is truncated, never assigned), rather than validating an already-assigned one after the
+fact. The invariant table itself is unchanged (data-model.md § GameState) — only how a loaded
+state is made to satisfy it changed.
 
 ### Engine robustness
 
-- `choose` trusts its input state (it comes from `start`/`choose`/`decode_save`) and does not
-  re-run `validate_resumable`, but every "impossible" condition — an unknown location, an ip past
-  the end of a block, a bare `Choice`/`GetChoice` reached by the run loop, an unknown directive
-  type — raises `InvalidStateError`, never `IndexError`/`KeyError`. These branches are covered by
-  tests that pass hand-built states.
+- `choose` trusts its input state (it comes from `start`/`choose`/`engine.resume`) — every
+  "impossible" condition — an unknown location, an ip past the end of a block, a bare
+  `Choice`/`GetChoice` reached by the run loop, an unknown directive type — raises
+  `InvalidStateError`, never `IndexError`/`KeyError`. These branches are covered by tests that
+  pass hand-built states; a *loaded* save can no longer reach them (2026-09-28), since `resume`
+  only ever assigns a `Frame` it has itself resolved to a real `GetChoice` in the current story.
 - **Quality range**: `int` quality values must satisfy `-(2**63) <= v < 2**63`
   (`InvalidQualityValueError` otherwise). Unbounded ints would make `json.dumps` raise `ValueError`
   past 4300 digits (a `save` crash) and lose precision in any non-Python save reader.
@@ -448,7 +459,8 @@ the permanent "every example loads" test passes locally and fails in CI.
 - **Other branches needing deliberate tests**: `KeyboardInterrupt` via the injected `read_line`;
   atomic-write failure (monkeypatched `os.replace`) removes the temp file; clobber guard (empty
   file, save file, foreign file); `FileSaveStore(base=None)` → cwd; non-regular file and oversize
-  reads; each `validate_resumable` rule; each decode step.
+  reads; each `resume` resolution/truncation branch (2026-09-28, replaces `validate_resumable`);
+  each decode step.
 - **Surrogate tests**: `decode_save` refuses a lone high (`"\ud800"`) and a lone low
   (`"\udc80"`) surrogate, both as a quality value and as a quality name (`SaveCorruptError`), and
   **accepts** a valid pair escape (`"\ud83d\ude00"` → one astral character). Because
@@ -490,10 +502,10 @@ the permanent "every example loads" test passes locally and fails in CI.
 | 2 | Engine interprets existing directives; `GetChoice` is the YIELD point; no IR opcodes | Smallest change that satisfies FR-009; the §8.2 IR buys nothing yet | Easy: an IR can compile to the same frames later |
 | 3 | Halt clears stack and offered; no exit events on halt | "No further directives" and a canonical halted save | Easy |
 | 4 | Dead end = `Outcome(label="", dead_end=True)` | Spec wants a distinguishable flag, not a magic label | Easy |
-| 5 | Story identity = `sha256:` of canonical JSON of rules+locations+givens + `IR_VERSION`; excludes positions and `about:` | Whitespace/metadata edits keep saves valid; any semantic edit refuses | Moderate: changes invalidate existing saves (none exist) |
-| 6 | Save format v1 with `"format": "ravel-save"`; loader validates version → story → shape → locations → resumability, in that order | Most specific error first; tampered saves can't soft-lock | Easy before release |
-| 7 | Saved `status: "running"` is refused | Snapshots are only taken at rest | Easy |
-| 8 | `offered` must match what the engine re-derives from the saved state | Catches tampering and IR drift the hash missed | Easy |
+| 5 | ~~Story identity = `sha256:` of canonical JSON of rules+locations+givens + `IR_VERSION`~~ **SUPERSEDED by row 28 (2026-09-28)**: saves carry no story identity at all | Whitespace/metadata edits keep saves valid; any semantic edit refuses | Moderate: changes invalidate existing saves (none exist) |
+| 6 | ~~Save format v1 … loader validates version → story → shape → locations → resumability~~ **SUPERSEDED by row 28**: version → shape → (stack consistency); no story step, no locations step, no resumability-refusal step | Most specific error first; tampered saves can't soft-lock | Easy before release |
+| 7 | Saved `status: "running"` is refused | Snapshots are only taken at rest | Still true |
+| 8 | ~~`offered` must match what the engine re-derives from the saved state~~ **SUPERSEDED by row 28**: `offered` is dropped from the save entirely; always re-derived on load | Catches tampering and IR drift the hash missed | Easy |
 | 9 | Non-finite floats and bools are rejected as quality values | JSON can't round-trip them; saves must be byte-stable | Easy |
 | 10 | `- end:` needs no PEG change; outcome is the stripped inline text; a block value is a `ParseError`; no warning for directives after `end` | YAGNI, Principle V | Easy |
 | 11 | blinker dropped entirely; colorclass kept | Nothing uses blinker; swapping colorclass is unrelated churn | Easy |
@@ -505,7 +517,7 @@ the permanent "every example loads" test passes locally and fails in CI.
 | 17 | syml from PyPI; git-tag source fallback, never path | Reproducible lock in CI | Easy |
 | 18 | Menu numbering and `save`/`load`/`s`/`q`/`help` parsing live only in `ConsoleUI` | FR-026 thin adapter | Easy |
 | 19 | (red team) Commit the whitespace-only working-copy re-indent of `examples/taxi/mail.ravel` in US1 | HEAD's copy fails under syml 1.0, so CI would fail the "every example loads" test | Easy: it is the same re-indent US1 applies elsewhere |
-| 20 | (red team) `validate_resumable` checks every frame, not just the top; halted labels must be story `End` labels | A tampered lower frame could replay an intro or hit an unhandled directive | Easy |
+| 20 | ~~(red team) `validate_resumable` checks every frame, not just the top; halted labels must be story `End` labels~~ **SUPERSEDED by row 28**: `validate_resumable` is removed; frame resolution truncates instead of refusing, and halted labels are no longer checked against `story.end_labels` | A tampered lower frame could replay an intro or hit an unhandled directive | Easy |
 | 21 | (red team) Saves capped at 1 MiB; strict UTF-8; NaN/Infinity/duplicate keys refused; every decode failure is a `LoadRefusedError` | SC-006: a bad `load` must never kill the live game | Easy |
 | 22 | (red team) `save FILE` only overwrites empty files or existing ravel saves, default name included (narrows US5-AS3's "any existing file" to "any existing save") | `save pyproject.toml` would otherwise destroy a file | Easy: drop the guard |
 | 23 | (red team) Int qualities bounded to signed 64-bit | Unbounded ints crash `json.dumps` past 4300 digits | Easy |
@@ -513,6 +525,7 @@ the permanent "every example loads" test passes locally and fails in CI.
 | 25 | (red team) Save-sourced strings print via `repr()` in the CLI | Hostile saves cannot inject terminal control sequences | Easy |
 | 26 | (deepen-plan-loop, decided while you slept) `contracts/cli.md`'s `save` row now reads `session.save(FILE or DEFAULT_SAVE_NAME)` instead of the literal `"ravel-save.json"` | `session-api.md` already names the constant `DEFAULT_SAVE_NAME: Final = "ravel-save.json"`; the CLI contract had drifted to a duplicated literal | Easy: rename only |
 | 27 | (red team, iteration 2) Quality names and `str` values must be surrogate-free (UTF-8 encodable) | A JSON `\udc80` escape loads fine and then crashes the next `save` with `UnicodeEncodeError`; validation must guarantee that every valid state encodes | Easy: one check in `Qualities` |
+| 28 | **2026-09-28 — rulebook-independent anchored saves, approved by David.** Drop story identity and `offered` from the save entirely. Frames save as `location` + `Anchor(choices, ordinal)` (the choice block's ordered targets + a disambiguating ordinal), never a raw `ip`. A new pure `engine.resume(story, saved)` resolves each frame bottom→top against whichever story is loaded; an unresolvable frame (situation gone, or no matching choice block) truncates the stack at that frame — drops it and everything above — instead of refusing the load. Truncation emits an informational `StoryChanged(dropped=...)` output; the CLI renders it as a one-line notice. `decode_save` becomes story-free. `validate_resumable`, `StoryChangedError`, and `UnknownLocationError` are removed; `Story.identity`/`fingerprint()`/`IR_VERSION`/`end_labels` become dead code, removed in the US4 Green leaf. Supersedes rows 5, 6, 8, 20. Still format version 1 (nothing has shipped) | David's own words: "make the save independent of the rulebook, and a change to the rules intertwined with the current stack survivable." A rulebook-hash refusal makes every save one-edit-fragile; per-situation hashing still refuses on any change to that situation. Anchoring by choice-block content survives everything except an edit to the exact block a frame is waiting at, and even then degrades gracefully instead of refusing | Moderate: it's the save-format contract, but nothing has shipped, so no migration is owed |
 
 ## Complexity Tracking
 

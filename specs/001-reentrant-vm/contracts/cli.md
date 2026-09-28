@@ -40,8 +40,9 @@ class ConsoleUI:
 | `ChoicesOffered` | `1: <label>` … numbered in order; the CLI keeps `offered` for number→location mapping |
 | `QualityChanged` | verbose only: `## <name> was <old>, now <new>` |
 | `SituationEntered` / `SituationExited` | verbose only: `## Entering <location>` / `## Exiting <location>` |
-| `Halted(outcome, dead_end=False)` | `*** The End (outcome: <outcome>) ***` (`*** The End ***` when outcome is `""`); exit 0 |
+| `Halted(outcome, dead_end=False)` | `*** The End (outcome: <outcome>) ***` (`*** The End ***` when outcome is `""`); exit 0. **2026-09-28**: any control character (anything failing `str.isprintable()`, other than plain spaces) in `<outcome>` is escaped the same way `repr()` would escape it, leaving ordinary printable text untouched — because a loaded save's `outcome.label` is no longer checked against the story's `End` labels (plan.md § Security Considerations), so a hand-edited save could otherwise smuggle terminal control sequences into this line. A live halt's outcome always comes from the compiled story, so this never visibly changes rendering except for a tampered save. |
 | `Halted(dead_end=True)` | `*** The story has nowhere left to go. ***`; exit 0 |
+| `StoryChanged(dropped)` | **2026-09-28, always rendered (not verbose-only)**: `The story has changed since this save; resuming at <place>.` printed once, before the outputs that follow it (the re-presented menu or halt). `<place>` is the intro label (`get_text(situation.intro)`, the same text used for menu labels) of the new top frame's location, when the resumed stack is non-empty; when resuming lands at the top level (the whole stack was dropped), `<place>` is `the top level`. |
 
 ## Prompt: `What'll it be? `
 

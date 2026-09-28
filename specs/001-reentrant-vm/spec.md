@@ -151,11 +151,14 @@ fresh session, and continue. Compare the result with an uninterrupted run.
 1. **Given** a game waiting at a menu, **When** it is saved, **Then** the file is JSON in a
    canonical form. It holds:
    - the format version;
-   - the story identity;
    - the qualities, with their exact int, float, or string types;
-   - the frame stack (location and position);
-   - the status and outcome;
-   - the offered choices as location IDs.
+   - the frame stack — each frame's location and the choice block it is waiting at, named by its
+     ordered choice targets plus a disambiguating ordinal, never a raw instruction position;
+   - the status and outcome.
+
+   **(2026-09-28 revision, approved by David)**: the save carries no story identity and no
+   `offered` list. "Make the save independent of the rulebook, and a change to the rules
+   intertwined with the current stack survivable."
 2. **Given** that save file, **When** it is loaded against the same story, **Then**:
    - the restored state equals the saved state;
    - no given is re-applied (a `+=` given is not applied a second time);
@@ -164,12 +167,27 @@ fresh session, and continue. Compare the result with an uninterrupted run.
 3. **Given** a save made mid-game, **When** it is loaded and the same choices are made as in an
    uninterrupted run, **Then** every subsequent output is identical and the final state is
    equal. Saving both final states gives byte-identical files.
-4. **Given** a save made against a story that has since been edited so that its compiled form
-   differs, **When** it is loaded, **Then** the load is refused with an error saying the story
-   has changed, and no game state is changed.
-5. **Given** a file that isn't valid JSON, is missing fields, has an unsupported format version,
-   or names locations the story doesn't have, **When** it is loaded, **Then** the load is refused
-   with an error naming the problem, and no game state is changed.
+4. **(2026-09-28 revision, replaces the old "refused" scenario)** **Given** a save made against a
+   story that has since been edited, **When** it is loaded, **Then** the load is never refused
+   merely because the story changed. Instead the engine resolves each saved frame, bottom to top,
+   against the current story:
+   - **(a)** a benign edit elsewhere in the story (lines added or removed above or below the
+     saved choice block, or anywhere else) resumes at the exact same menu, with no notice;
+   - **(b)** if the saved situation itself no longer exists, that frame and every frame above it
+     are dropped; play resumes at the deepest surviving frame's menu, or at the top-level query
+     menu if none survive; an informational `StoryChanged` output names what was dropped, and the
+     CLI prints a one-line notice;
+   - **(c)** if the situation still exists but that choice block's set of choices has changed,
+     the same dropping and notice happen, truncating to the parent frame;
+   - **(d)** two identical choice blocks in the same situation are disambiguated by a stored
+     ordinal, so a duplicate-block edit resolves to the right one.
+
+   No game state is changed except by successfully resuming (possibly truncated); this scenario
+   never leaves the game unloaded.
+5. **Given** a file that isn't valid JSON, is missing fields, or has an unsupported format
+   version, **When** it is loaded, **Then** the load is refused with an error naming the problem,
+   and no game state is changed. (Naming a location the story doesn't have is no longer a refusal
+   — see AS4.)
 6. **Given** a save of a halted game, **When** it is loaded, **Then** the game is halted with the
    same outcome, and no choice is accepted.
 
@@ -252,10 +270,12 @@ US4, and US5 for the CLI transcript test.
 
 - **Corrupt save** (not JSON, truncated, wrong types, missing fields): refused with a message
   that names the problem. The live game is untouched, and a CLI `--load` exits non-zero.
-- **Story changed since save** (the compiled identity differs): refused with a "story has
-  changed" error. Instruction positions are only meaningful against the same compilation.
+- **Story changed since save (2026-09-28 revision)**: never refused. Frames are saved by anchor
+  (the choice block's ordered targets plus an ordinal), not by raw position, so a save is only as
+  fragile as the exact choice block it's waiting at. A frame whose situation is gone, or whose
+  choice block no longer matches, is dropped along with every frame above it; play resumes at the
+  deepest surviving frame (or the top level), with an informational notice. See US4-AS4.
 - **Save from a newer or unknown format version**: refused with the version named.
-- **Save naming a location the story lacks** (in the stack or in the offered choices): refused.
 - **Choosing a location that isn't offered**: rejected with an error. The state is unchanged,
   and the same menu is still waiting.
 - **Choosing after the game has halted**: rejected with a "game is over" error. The state is
@@ -338,25 +358,31 @@ US4, and US5 for the CLI transcript test.
 
 - **FR-021**: The application MUST provide session use cases for new game, choose, save, and
   load, over ports for the story source and the save store.
-- **FR-022**: A save MUST be JSON in a canonical form (sorted keys, fixed separators) and MUST
-  contain:
+- **FR-022** *(2026-09-28 revision)*: A save MUST be JSON in a canonical form (sorted keys, fixed
+  separators) and MUST contain:
   - a format version;
-  - the story identity, derived from the compiled story rather than file paths or timestamps;
   - the qualities, preserving int, float, and string types;
-  - the frame stack;
-  - the status and outcome;
-  - the offered choices as location IDs.
-- **FR-023**: Loading MUST restore the saved state exactly, MUST NOT re-apply givens, and MUST
-  re-present the pending menu, with labels re-derived from the saved location IDs.
-- **FR-024**: Loading MUST be refused with a specific error when:
-  - the story identity differs;
-  - the data is malformed or missing fields;
-  - the format version is unsupported;
-  - a saved location doesn't exist in the story.
+  - the frame stack, each frame as a location plus the choice block it is waiting at (its ordered
+    choice targets and a disambiguating ordinal) — **never** a raw instruction position and
+    **never** a story identity;
+  - the status and outcome.
 
-  A refused load MUST leave no partially loaded state.
-- **FR-025**: For any sequence of choices, save-then-load-then-continue MUST produce outputs
-  identical to continuing uninterrupted, and a final state that saves to byte-identical data.
+  It MUST NOT contain a story identity or the offered choices as a separate list (both dropped;
+  menus are always re-derived from the current story, never stored).
+- **FR-023**: Loading MUST restore the saved qualities and stack exactly, MUST NOT re-apply
+  givens, and MUST re-present the pending menu, with labels re-derived from the current story.
+- **FR-024** *(2026-09-28 revision)*: Loading MUST NEVER be refused because the story has
+  changed. Instead, loading MUST resolve every saved frame, bottom to top, against the current
+  story: a frame whose situation no longer exists, or whose saved choice block matches no choice
+  block in that situation, MUST be dropped along with every frame above it, and play MUST resume
+  at the deepest surviving frame's menu (or the top-level query menu if none survive). When any
+  frame is dropped, the outputs MUST include an informational notice naming what was dropped.
+  Loading MUST still be refused, with no partially loaded state, when:
+  - the data is malformed or missing fields;
+  - the format version is unsupported.
+- **FR-025**: For any sequence of choices against an **unchanged** story, save-then-load-then-
+  continue MUST produce outputs identical to continuing uninterrupted (with no truncation
+  notice), and a final state that saves to byte-identical data.
 
 **CLI (US5)**
 
@@ -422,21 +448,28 @@ US4, and US5 for the CLI transcript test.
 ### Key Entities
 
 - **Compiled story (rulebook)**: The immutable result of compiling a story directory. It holds
-  the situations keyed by location ID, their predicates and directives, and the givens. It has
-  an **identity**: a stable fingerprint of its compiled content.
+  the situations keyed by location ID, their predicates and directives, and the givens. It still
+  has an identity (a stable fingerprint of its compiled content), but *(2026-09-28)* nothing on
+  the save/load path reads it any more.
 - **Location ID**: A situation's unique name, such as `begin::intro::press-onward`. It's used in
   frames, menus, choices, and saves.
-- **Frame**: One entry on the stack. It is a location ID plus the position of the next directive
-  to run in that situation.
+- **Frame**: One entry on the *running* stack. It is a location ID plus the position of the next
+  directive to run in that situation.
+- **Anchor** *(2026-09-28)*: What a *saved* frame carries instead of a raw position — the
+  ordered choice targets of the block it's waiting at, plus an ordinal disambiguating duplicate
+  blocks in the same situation. Resolved against whichever story is loaded; never refuses, only
+  truncates when it can't be resolved.
 - **Game state**: The qualities, the frame stack, the status (running, waiting for input, or
   halted), the offered choices, and the outcome. It is immutable, and it is everything needed to
   resume.
 - **Output**: A plain value describing something the player should see or that happened: text,
-  a menu, a quality change, situation entry or exit, or a halt.
+  a menu, a quality change, situation entry or exit, a halt, or *(2026-09-28)* a notice that
+  loading dropped some frames because the story changed.
 - **Outcome**: The label attached to a halt. It is either the author's `end` label or the
   dead-end marker.
-- **Save file (snapshot)**: The canonical JSON form of a game state, plus the format version and
-  story identity.
+- **Save file (snapshot)**: The canonical JSON form of a game state (qualities, anchored frame
+  stack, status, outcome), plus the format version. *(2026-09-28: no story identity, no offered
+  list.)*
 - **Session**: The application-level use cases (new game, choose, save, load) that tie a compiled
   story, a game state, and a save store together.
 
@@ -457,8 +490,10 @@ User-facing outcomes:
   choice is asked exactly once per new game (D1).
 - **SC-005**: A player can start Cloak at the terminal, save, quit, restart with the save, and
   win, with no given re-applied and no state lost.
-- **SC-006**: 100% of refused loads (a changed story, corruption, an unknown version, or an
-  unknown location) print an error naming the cause and leave the current game playable.
+- **SC-006** *(2026-09-28 revision)*: 100% of refused loads (corruption or an unknown format
+  version — the only remaining refusal causes) print an error naming the cause and leave the
+  current game playable. A changed story is never a refusal: it truncates to the deepest
+  still-valid frame and prints a one-line notice (US4-AS4), and the load always succeeds.
 
 Engineering gates (these are included on purpose, because the principal's request makes coverage,
 typing, and architecture explicit deliverables):
@@ -542,3 +577,21 @@ from his request and the diagnosis, and they stand in for the interview.
 | 11 | A refused load keeps the live game, and a refused `--load` exits non-zero | Never lose a live game to a bad file | Easy |
 | 12 | The engine and saves use location IDs, never menu indices | Stable across menu order, which is why D17 can wait | Moderate: it's the save-format contract |
 | 13 | A minimal fixture story is added for the gather, dead-end, given-once, and end-in-choice cases | Cloak can't exercise them | Easy |
+
+### Session 2026-09-28
+
+David reviewed the US4 design (story-identity refusal, raw-`ip` frames) mid-implementation and
+approved a different direction: "make the save independent of the rulebook, and a change to the
+rules intertwined with the current stack survivable." This spec, plan.md, data-model.md, and the
+contracts are revised in place (marked `2026-09-28 revision` at each touched point) rather than
+appended as a new user story, since it changes *what US4 delivers*, not a new story.
+
+- Q: Should a save still refuse when the story has changed? → A: No. Frames are saved by
+  **anchor** (the choice block's ordered targets + a disambiguating ordinal), resolved against
+  whichever story is loaded. A frame that can't be resolved is dropped, along with every frame
+  above it, with an informational notice — never a refusal.
+- Q: Does the save format still need a story identity / rulebook hash? → A: No — dropped
+  entirely, along with `offered` (menus are always re-derived, never stored).
+- Q: What about `Story.identity`/`fingerprint()`/`IR_VERSION`/`end_labels` in `src/`? → A: They
+  become dead code once the US4 Green leaf lands (no other consumer); removal is that leaf's job.
+- Q: Is this a format version bump? → A: No — nothing has shipped yet, still format version 1.

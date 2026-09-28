@@ -64,13 +64,19 @@ On `End(outcome)` at any stack depth: stack → `()`, offered → `()`, outcome 
 
 ## Identity
 
-`End` is an attrs instance, so `fingerprint()` covers it automatically; adding the type does not
-bump `IR_VERSION` (no existing save can contain it — there are no saves yet).
+*(Historical: `fingerprint()`/`IR_VERSION` are dead code as of the 2026-09-28 save-format
+revision — see § Save validation below — so this no longer matters to anything. Kept as a record:
+`End` was an attrs instance, so `fingerprint()` covered it automatically without an `IR_VERSION`
+bump.)*
 
 ## Save validation
 
-`Story.end_labels: frozenset[str]` collects every compiled `End.outcome` (all situations,
-including choice bodies). A halted save is accepted only if `outcome.label in story.end_labels`
-(or `dead_end` with label `""`), so a save cannot carry arbitrary text for the CLI's end line.
-`End.outcome` is an exact `str` (`get_text(...).strip()` already returns `str`; syml 1.0's
-`Source` is not a `str` subclass and must never reach a compiled value).
+**2026-09-28 revision — this section describes something now removed.** `Story.end_labels` and
+the "halted save accepted only if its label is a known `End` label" check are gone: saves no
+longer carry a story identity, and loading is never refused for story drift (data-model.md §
+Story, save-format.md, engine-api.md § `resume`). A halted save's `outcome.label` is still shape-
+checked (must be a `str`) at decode time, but not checked against any story's compiled labels.
+`contracts/cli.md`'s `Halted` rendering row now escapes control characters in the label instead,
+to close the gap this reopens for a hand-edited save. `Story.end_labels`/`_collect_end_labels`
+become dead code, removed alongside `identity`/`fingerprint()`/`IR_VERSION` in the US4 Green leaf.
+`End.outcome` is still an exact `str` (`get_text(...).strip()`), unaffected otherwise.

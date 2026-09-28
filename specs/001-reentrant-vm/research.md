@@ -513,3 +513,36 @@ Dated 2026-09-27, taken without the principal (asleep); each is summarised in pl
   check), a `fork` situation (choice block + gather + effect), a choice whose body ends in
   `- end: escaped`, and a route that sets `Location = "Nowhere"` to reach a dead end.
 - **Rationale**: FR-033; Cloak can't reach these.
+
+### PD-21. Rulebook-independent anchored saves (2026-09-28, approved by David)
+
+- **Decision**: drop the story-identity hash and the `offered` list from the save entirely.
+  Frames save as `location` + `Anchor(choices, ordinal)` — the choice block's ordered choice
+  targets plus a disambiguating ordinal — never a raw `ip`. A new pure `engine.resume(story,
+  saved)` resolves each saved frame bottom→top against whichever story is loaded; a frame whose
+  situation is gone, or whose anchor matches no choice block in that situation, is dropped along
+  with every frame above it (truncation), never refused. Truncation emits `StoryChanged(dropped=
+  ...)`, rendered by the CLI as a one-line notice. `decode_save` becomes story-free (parses and
+  shape-checks only); `validate_resumable`, `StoryChangedError`, and `UnknownLocationError` are
+  removed. `Story.identity`/`fingerprint()`/`IR_VERSION`/`end_labels` lose their only consumer and
+  become dead code, deleted in the US4 Green leaf.
+- **Rationale**: David's own framing — "make the save independent of the rulebook, and a change
+  to the rules intertwined with the current stack survivable." Supersedes PD-06 (story identity)
+  and PD-08/PD-09 (save format/resting-state validation) for the save-format parts specifically;
+  PD-07 (quality value domain) and PD-10 (`end` compilation) are unaffected.
+- **Alternatives considered**:
+  - **Whole-story hash** (the original design, PD-06): a SHA-256 of the entire compiled rulebook.
+    **Rejected**: too brittle — any edit anywhere in the story (a typo fix, an unrelated new
+    situation, a comment) invalidates every existing save, even ones nowhere near the edit.
+  - **Per-situation hash**: hash only the situation(s) a frame's location touches, refusing only
+    when *that* situation's compiled form differs. **Rejected**: still refuses on any edit to the
+    situation the frame is in, including edits that don't touch the choice block the frame is
+    actually waiting at (e.g. a wording fix to unrelated text in the same situation, or a new
+    unrelated choice block added later in the same file); it's a smaller blast radius than a
+    whole-story hash but still an unnecessary refusal, and it still refuses rather than degrading.
+  - **Anchored frames** (chosen): identify a frame's choice block by its content (ordered choice
+    targets) rather than by hashing anything, with an ordinal for duplicates. Survives every edit
+    except one that changes the exact block a frame is waiting at, and even then degrades to
+    truncation with a notice instead of refusing the whole load. No hash to keep in sync with
+    `IR_VERSION` or compiler changes; the failure mode (drop and notify) is strictly softer than
+    the two hash-based alternatives' failure mode (refuse outright).
