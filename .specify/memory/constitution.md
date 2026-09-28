@@ -2,6 +2,29 @@
 
 <!--
 Sync Impact Report:
+- Version: 1.1.0 → 1.2.0 (MINOR - no principle removed or redefined; each
+  keeps its existing rule and only its enumerated file/surface list changes,
+  to track the pure re-entrant engine introduced by feature 001-reentrant-vm):
+  - VI (Public API Stability): public surface becomes `Environment.load()`/
+    `load_rulebook()`, the `Loader` interface, the compiled rulebook shape,
+    `Source`/`Pos`, `ravel.engine`'s `start`/`choose`/`present`, its state and
+    output value types, `ravel.app.GameSession`, and the save-file format
+    (version 1). The old `vm/events.py`/`vm/signals.py`/`send_input` wording
+    is removed — that surface is deleted by the same feature.
+  - VII (Clean Architecture): domain core = `types.py`, `queries.py`,
+    `compiler/`, `ravel.engine`; application = `ravel.app`; adapters =
+    `ravel.adapters`, `cli.py`, `loaders.FileSystemLoader`, `environments.py`.
+    The stale `vm/machines.py` file list is removed (that package is deleted
+    by the same feature).
+  - II (Type Safety): `ravel.engine.*`, `ravel.app.*`, `ravel.adapters.*`,
+    `ravel.cli`, `ravel.types`, `ravel.queries` are now strict per-module
+    (see the feature's plan.md § Typing for the exact mypy override block);
+    the rest of the codebase stays "stay clean" as before.
+  - Amended 2026-09-28 for feature 001-reentrant-vm, per plan.md's
+    "Proposed constitution amendment v1.1.0 → v1.2.0 (MINOR)" — applied
+    without the principal's live sign-off (he was asleep and unreachable);
+    the amendment text was fully specified in the plan and only tracks
+    surfaces the same feature deletes/adds, not a principle redefinition.
 - Version: 1.0.0 → 1.1.0 (MINOR - principle VII made mechanism-neutral:
   the core exposes immutable plain-data outputs and must not depend on a
   pub/sub library or module globals; blinker/signals are no longer mandated.
@@ -81,12 +104,18 @@ implementation — not the test — is correct.
 ### II. Type Safety
 
 `uv run mypy` runs over `files = ["src", "tools"]` (per `pyproject.toml`);
-`tests/` is **not** type-checked, and mypy is not run in strict mode —
-`disallow_untyped_defs`/`disallow_any_generics`/`check_untyped_defs` are not
-set, so most function bodies are unannotated by design and mypy skips them
-unless a type error is otherwise surfaced. New code under `src/`/`tools/`
-MUST still pass `uv run mypy` with zero errors; this is a "stay clean" gate,
-not a "annotate everything" mandate.
+`tests/` is **not** type-checked. `ravel.engine.*`, `ravel.app.*`,
+`ravel.adapters.*`, `ravel.cli`, `ravel.types`, and `ravel.queries` are
+strict per-module (`check_untyped_defs`, `disallow_untyped_defs`,
+`disallow_incomplete_defs`, `disallow_any_generics`, `warn_return_any`,
+`strict_equality`, but deliberately not `disallow_untyped_calls`, since
+adapters call unannotated `Environment`/compiler functions) — see the mypy
+override block in `pyproject.toml`. The rest of the codebase is not run in
+strict mode: those same strict flags are not set elsewhere, so most function
+bodies outside the modules above are unannotated by design and mypy skips
+them unless a type error is otherwise surfaced. New code under `src/`/`tools/`
+MUST still pass `uv run mypy` with zero errors; outside the strict modules
+this is a "stay clean" gate, not an "annotate everything" mandate.
 
 **Rationale**: A small engine library benefits from precise types on its
 public surface (`Source`, `Pos`, the compiled rulebook shape, VM events)
@@ -145,11 +174,11 @@ every added grammar dialect, value type, or dependency claws that back.
 `Environment.load()`/`Environment.load_rulebook()`, the `Loader` interface
 (`BaseLoader.load`/`get_source`), the compiled rulebook shape (`{"rules":
 [...], "locations": {...}}` per concept, plus flattened `metadata`/`givens`),
-the semantics of `Source`/`Pos`, and the VM's public event surface
-(`vm/events.py`, `vm/signals.py`, the `send_input` callable on
-`waiting_for_input`) are the project's public API. A breaking change to any
-of them MUST be listed explicitly in the plan's Constitution Check section,
-with the alternative (non-breaking) approach it rejected.
+the semantics of `Source`/`Pos`, `ravel.engine`'s `start`/`choose`/`present`
+and its state and output value types, `ravel.app.GameSession`, and the
+save-file format (version 1) are the project's public API. A breaking change
+to any of them MUST be listed explicitly in the plan's Constitution Check
+section, with the alternative (non-breaking) approach it rejected.
 
 **Rationale**: This project is an engine other code (a `Runner`, a game, a
 tool) is built against; silent signature or semantics drift breaks callers
@@ -158,17 +187,17 @@ who pinned a version in good faith.
 ### VII. Clean Architecture
 
 The domain core — the compiled rulebook types (`types.py`), the query/scoring
-logic (`queries.py`), and the VM state machine (`vm/machines.py`,
-`vm/states.py`, `vm/events.py`) — MUST NOT import from or depend on I/O, the
-CLI, or presentation concerns. Adapters — the CLI (`cli.py`), `ConsoleRunner`
-and other `vm/runners.py` runners, and the file-based loaders
-(`loaders.py`'s `FileSystemLoader`) — depend inward on the core; the core
-never imports them. Everything the VM's core exposes outward does so through
-immutable output values holding only plain data (no live state objects, no
-callables), never by a runner reaching into VM internals directly. The
-delivery mechanism (returned values, a pub/sub library, etc.) is an adapter
-choice; the core MUST NOT depend on a pub/sub library or module-level global
-state.
+logic (`queries.py`), the compiler (`compiler/`), and the pure engine
+(`ravel.engine`) — MUST NOT import from or depend on I/O, the CLI, or
+presentation concerns. The application layer (`ravel.app`) depends inward on
+the core. Adapters — `ravel.adapters`, the CLI (`cli.py`), and the file-based
+loaders (`loaders.py`'s `FileSystemLoader`, `environments.py`) — depend
+inward on the core and application layer; the core never imports them.
+Everything the engine's core exposes outward does so through immutable
+output values holding only plain data (no live state objects, no callables),
+never by an adapter reaching into engine internals directly. The delivery
+mechanism (returned values, a pub/sub library, etc.) is an adapter choice;
+the core MUST NOT depend on a pub/sub library or module-level global state.
 
 **Rationale**: Keeping the compiler and VM's core free of I/O and
 presentation dependencies is what lets a new `Runner` (a web frontend, a
@@ -210,4 +239,4 @@ This constitution follows semantic versioning:
   silent exception.
 - Use `CLAUDE.md` for day-to-day runtime guidance to Claude Code.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-27 | **Last Amended**: 2026-09-27
+**Version**: 1.2.0 | **Ratified**: 2026-09-27 | **Last Amended**: 2026-09-28
