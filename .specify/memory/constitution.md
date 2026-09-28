@@ -2,6 +2,11 @@
 
 <!--
 Sync Impact Report:
+- Version: 1.0.0 → 1.1.0 (MINOR - principle VII made mechanism-neutral:
+  the core exposes immutable plain-data outputs and must not depend on a
+  pub/sub library or module globals; blinker/signals are no longer mandated.
+  Amended 2026-09-27 for feature 001-reentrant-vm, which removes blinker
+  from the core.)
 - Version: (none) → 1.0.0 (initial ravel constitution, ported from syml's
   constitution v2.0.0 by the spec-kit harness port)
 - Ported and retargeted:
@@ -159,8 +164,11 @@ CLI, or presentation concerns. Adapters — the CLI (`cli.py`), `ConsoleRunner`
 and other `vm/runners.py` runners, and the file-based loaders
 (`loaders.py`'s `FileSystemLoader`) — depend inward on the core; the core
 never imports them. Everything the VM's core exposes outward does so through
-frozen `attrs` events (`vm/events.py`) sent over `blinker` signals
-(`vm/signals.py`), never by a runner reaching into VM internals directly.
+immutable output values holding only plain data (no live state objects, no
+callables), never by a runner reaching into VM internals directly. The
+delivery mechanism (returned values, a pub/sub library, etc.) is an adapter
+choice; the core MUST NOT depend on a pub/sub library or module-level global
+state.
 
 **Rationale**: Keeping the compiler and VM's core free of I/O and
 presentation dependencies is what lets a new `Runner` (a web frontend, a
@@ -202,4 +210,4 @@ This constitution follows semantic versioning:
   silent exception.
 - Use `CLAUDE.md` for day-to-day runtime guidance to Claude Code.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-27 | **Last Amended**: 2026-09-27
+**Version**: 1.1.0 | **Ratified**: 2026-09-27 | **Last Amended**: 2026-09-27
