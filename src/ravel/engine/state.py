@@ -17,7 +17,7 @@ QUALITY_TYPES: Final = (int, float, str)
 INT_QUALITY_RANGE: Final = range(-(2**63), 2**63)
 
 
-def _is_surrogate_free(text: str) -> bool:
+def is_surrogate_free(text: str) -> bool:
     """Return whether ``text`` encodes as UTF-8, i.e. holds no lone surrogate."""
     try:
         text.encode("utf-8")
@@ -34,12 +34,12 @@ def _is_storable(value: object) -> bool:
         return value in INT_QUALITY_RANGE
     if isinstance(value, float):
         return math.isfinite(value)
-    return _is_surrogate_free(value)
+    return is_surrogate_free(value)
 
 
 def _validate_quality(name: str, value: object) -> None:
     """Raise ``InvalidQualityValueError`` unless ``name`` and ``value`` are storable."""
-    if not _is_surrogate_free(name):
+    if not is_surrogate_free(name):
         raise InvalidQualityValueError("Quality name %r holds a lone surrogate" % name)
     if not _is_storable(value):
         raise InvalidQualityValueError("Quality %r has an unstorable value %r" % (name, value))

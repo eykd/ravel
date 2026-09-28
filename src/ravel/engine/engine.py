@@ -202,8 +202,8 @@ def choose(story: Story, state: GameState, location: LocationId) -> Step:
 def present(story: Story, state: GameState) -> tuple[Output, ...]:
     """Re-present a resting ``state`` without running anything.
 
-    Used by ``resume`` for the non-empty-stack case; ``resume`` handles the empty-stack query
-    case itself since a saved state no longer carries an ``offered`` to re-derive labels from.
+    Used by ``resume`` for the halted case; ``resume`` handles the resting cases itself, since a
+    saved state no longer carries an ``offered`` to re-derive labels from.
     """
     if state.status is Status.HALTED:
         outcome = state.outcome

@@ -27,6 +27,7 @@ from ravel.engine.state import (
     SavedFrame,
     SavedGame,
     Status,
+    is_surrogate_free,
 )
 from ravel.engine.story import Story
 
@@ -66,14 +67,6 @@ class UnsupportedSaveVersionError(LoadRefusedError):
     def __init__(self, version: object) -> None:
         super().__init__("unsupported save format version %r (this ravel reads %d)" % (version, SAVE_FORMAT_VERSION))
         self.version = version
-
-
-def _is_surrogate_free(text: str) -> bool:
-    try:
-        text.encode("utf-8")
-    except UnicodeEncodeError:
-        return False
-    return True
 
 
 # --- encoding ---------------------------------------------------------------------------------
@@ -184,7 +177,7 @@ def _decode_qualities(raw: object) -> Qualities:
     items: dict[str, QualityValue] = {}
     for name, value in raw.items():
         # ``name`` is always ``str``: JSON object keys can only ever be strings.
-        if not _is_surrogate_free(name):
+        if not is_surrogate_free(name):
             raise SaveCorruptError("state.qualities: %r is not a valid quality name" % (name,))
         if isinstance(value, bool) or not isinstance(value, (int, float, str)):
             raise SaveCorruptError("state.qualities[%r]: must be an int, float, or string" % name)
@@ -192,7 +185,7 @@ def _decode_qualities(raw: object) -> Qualities:
             raise SaveCorruptError("state.qualities[%r]: int is out of the signed 64-bit range" % name)
         if isinstance(value, float) and not math.isfinite(value):
             raise SaveCorruptError("state.qualities[%r]: float must be finite" % name)
-        if isinstance(value, str) and not _is_surrogate_free(value):
+        if isinstance(value, str) and not is_surrogate_free(value):
             raise SaveCorruptError("state.qualities[%r]: string contains a lone surrogate" % name)
         items[name] = value
     return Qualities.from_mapping(items)
