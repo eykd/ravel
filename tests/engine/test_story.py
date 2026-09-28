@@ -90,8 +90,8 @@ class TestFromRulebook:
         rulebook = cloak_env.load()
         assert Story.from_rulebook(rulebook).rulebook is rulebook
 
-    def test_cloak_has_no_end_labels(self, cloak):
-        assert cloak.end_labels == frozenset()
+    def test_cloak_has_the_win_and_loss_end_labels(self, cloak):
+        assert cloak.end_labels == frozenset({"won", "lost"})
 
 
 class TestIdentityStability:

@@ -136,6 +136,10 @@ class _Run:
     def unreachable(self, frame: Frame, directive: object) -> None:
         raise InvalidStateError("%r reached %r outside a choice block" % (frame.location, directive))
 
+    def end(self, _frame: Frame, end: types.End) -> Step:
+        """Halt immediately on ``End(outcome)``, at any stack depth."""
+        return self.halt(Outcome(end.outcome, dead_end=False))
+
 
 # Keyed by directive type, so each handler receives exactly the directive type it declares.
 _DISPATCH: dict[type, Callable[[_Run, Frame, Any], Step | None]] = {
@@ -144,6 +148,7 @@ _DISPATCH: dict[type, Callable[[_Run, Frame, Any], Step | None]] = {
     types.BeginChoices: _Run.begin_choices,
     types.Choice: _Run.unreachable,
     types.GetChoice: _Run.unreachable,
+    types.End: _Run.end,
 }
 
 

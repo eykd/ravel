@@ -13,6 +13,12 @@ from . import effects, logger, text
 def compile_directives(environment, concept, parent_rule, raw_directives):
     intro, *the_rest = raw_directives
     intro, first_text = parsers.IntroTextParser().parse(unwrap(get_text(intro)))
+    directives, subsituations = _compile_directive_bodies(environment, concept, parent_rule, first_text, the_rest)
+    return intro, directives, subsituations
+
+
+def _compile_directive_bodies(environment, concept, parent_rule, first_text, the_rest):
+    """Compile a situation's (or choice's) directive list, given its own already-namespaced rule."""
     directives = []
     subsituations = []
     if the_rest:
@@ -28,7 +34,7 @@ def compile_directives(environment, concept, parent_rule, raw_directives):
                 last_directive = directive
         if isinstance(last_directive, types.Choice):
             directives.append(types.GetChoice())
-    return intro, list(it.chain([first_text], directives)), subsituations
+    return list(it.chain([first_text], directives)), subsituations
 
 
 def compile_directive(environment, concept, parent_rule, raw_directive):
@@ -47,18 +53,30 @@ def compile_directive(environment, concept, parent_rule, raw_directive):
                 return effects.compile_effects(environment, concept, parent_rule, directive)
             else:
                 raise exceptions.ParseError("Unrecognized effect type: %r" % directive)
+        elif get_text(key) == "end":
+            return [compile_end(environment, concept, parent_rule, directive)]
         else:
             raise exceptions.ParseError("Unknown directive %s in %r" % (get_text(key), raw_directive))
     else:
         return [text.compile_text(environment, concept, parent_rule, raw_directive)]
 
 
+def compile_end(environment, concept, parent_rule, directive):
+    if not is_text(directive):
+        raise exceptions.ParseError("end takes an inline outcome label, not a block: %r" % directive)
+    return types.End(get_text(directive).strip()), {}
+
+
 def compile_choice(environment, concept, parent_rule, directives):
     logger.debug("Compiling choice for %s:%s:\n%r", concept, parent_rule, directives)
     if is_text(directives):
         directives = [directives]
-    intro, directives, subsituations = compile_directives(environment, concept, parent_rule, directives)
+    intro_source, *the_rest = directives
+    intro, first_text = parsers.IntroTextParser().parse(unwrap(get_text(intro_source)))
     subrule = environment.location_separator.join([parent_rule, slugify(get_text(intro), allow_unicode=True)])
+    # Compile this choice's own body namespaced under its own subrule, not the grandparent's rule,
+    # so a choice nested inside this choice's body is addressable as subrule::its-own-slug.
+    directives, subsituations = _compile_directive_bodies(environment, concept, subrule, first_text, the_rest)
     try:
         return (
             types.Choice(subrule),

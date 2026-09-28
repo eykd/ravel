@@ -67,6 +67,23 @@ def fingerprint(rulebook: types.CompiledRulebook) -> str:
     return "sha256:%s" % digest
 
 
+def _situation_locations(rulebook: types.CompiledRulebook) -> Mapping[str, object]:
+    ruleset = rulebook["rulebook"].get("Situation")
+    return {} if ruleset is None else ruleset["locations"]
+
+
+def _collect_end_labels(rulebook: types.CompiledRulebook) -> frozenset[str]:
+    """Collect every compiled ``End.outcome``, across all situations, including choice bodies."""
+    labels: set[str] = set()
+    for situation in _situation_locations(rulebook).values():
+        if not isinstance(situation, types.Situation):
+            continue
+        for directive in situation.directives:
+            if isinstance(directive, types.End):
+                labels.add(directive.outcome)
+    return frozenset(labels)
+
+
 @frozen
 class Story:
     """A compiled rulebook plus its identity; shared read-only between games."""
@@ -78,12 +95,10 @@ class Story:
     @classmethod
     def from_rulebook(cls, rulebook: types.CompiledRulebook) -> Self:
         """Wrap ``rulebook``, computing its identity and end labels."""
-        # No directive can end a story yet, so there are no end labels to collect.
-        return cls(rulebook=rulebook, identity=fingerprint(rulebook), end_labels=frozenset())
+        return cls(rulebook=rulebook, identity=fingerprint(rulebook), end_labels=_collect_end_labels(rulebook))
 
     def _locations(self) -> Mapping[str, object]:
-        ruleset = self.rulebook["rulebook"].get("Situation")
-        return {} if ruleset is None else ruleset["locations"]
+        return _situation_locations(self.rulebook)
 
     def situation(self, location: LocationId) -> types.Situation:
         """Return the situation at ``location``; ``KeyError`` if there is none."""

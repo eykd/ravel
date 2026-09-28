@@ -505,7 +505,26 @@ Standalone effects outside of choices:
 - effect: Score += 10    # Single-line form
 ```
 
----
+### 9.4 End Directive
+
+`- end: <outcome>` halts the story immediately, at any stack depth, with the given outcome label:
+
+```yaml
+look-at-message:
+  - when:
+      - Bar >= 2
+      - Fumbled = 0
+  - There seems to be some sort of message …
+  - **You have won**
+  - end: won
+```
+
+**Outcome**: free inline text, stripped of surrounding whitespace, carried verbatim. A bare
+`- end:` (no value) halts with outcome `""`. `end` takes an inline value only — a block value
+(e.g. a nested list) is a `ParseError`.
+
+`end` is legal anywhere a directive is, including inside a `choice:` body. Directives after `end`
+still compile normally; they are simply never executed (no warning is raised for this).
 
 ## 10. Complete Syntax Reference
 
@@ -548,6 +567,8 @@ glue            = '<>'
 
 ### 10.2 YAML Structure
 
+Directives — `text`, `choice`, `effect`, `end` — appear in order after the optional `when:` block:
+
 ```yaml
 # Preamble (all optional)
 include: [rulebook_name, ...]
@@ -569,6 +590,7 @@ rule-name:
           - operation
   - effect:
       - operation
+  - end: outcome              # Halts the story immediately with the given outcome label
 ```
 
 ---
@@ -590,6 +612,9 @@ Within a situation, directives execute sequentially:
 1. **Text**: Display (if predicate passes)
 2. **Choice Block**: Collect choices, display menu, wait for selection
 3. **Effect**: Modify qualities
+4. **End**: Halt immediately with the given outcome label — clear the stack, discard any offered
+   choices, and stop. This can happen at any stack depth (including inside a `choice:` body); no
+   further directives run and no menu is offered afterward. See `- end:` in §9.4.
 
 When a choice is selected, its sub-situation executes, then control returns to the parent situation (if more directives remain) or to the Query Phase.
 

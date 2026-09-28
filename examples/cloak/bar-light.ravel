@@ -28,6 +28,8 @@ look-at-message:
 
   - **You have won**
 
+  - end: won
+
 
 look-at-scrambled-message:
   - when:
@@ -39,6 +41,8 @@ look-at-scrambled-message:
     fumbling around in the dark. You can still make out a few letters…
 
   - **Y… …ve …n**
+
+  - end: lost
 
 
 leave:

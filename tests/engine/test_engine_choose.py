@@ -152,12 +152,12 @@ def test_gather_runs_only_after_the_chosen_sub_situation_finishes(mini, s0):
 
 
 def test_situation_pops_unconditionally_past_its_last_directive(mini, s0):
-    step = choose(mini, s0, "begin::bridge")
+    step = choose(mini, s0, "begin::crossroads")
 
     assert step.outputs[:3] == (
-        SituationEntered("begin::bridge"),
-        TextShown("You cross the bridge."),
-        SituationExited("begin::bridge"),
+        SituationEntered("begin::crossroads"),
+        TextShown("The signpost points every which way."),
+        SituationExited("begin::crossroads"),
     )
     assert step.state.stack == ()
     assert isinstance(step.outputs[-1], ChoicesOffered)

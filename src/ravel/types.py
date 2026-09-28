@@ -12,6 +12,11 @@ class Choice:
     choice = attr.ib()
 
 
+@attr.s(slots=True)
+class End:
+    outcome: str = attr.ib()
+
+
 @attr.s(slots=True, repr=False)
 class Comparison:
     quality = attr.ib()

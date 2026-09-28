@@ -50,6 +50,37 @@ class TestCompileChoice:
         )
         assert result == expected
 
+    def test_it_should_namespace_a_nested_choice_under_its_parent_choice(self, env):
+        """A ``choice:`` nested inside another ``choice:`` body namespaces under its immediate
+        parent choice, not the grandparent rule -- so sibling nested choices with the same
+        wording at different depths never collide."""
+        result = directives.compile_choice(
+            env,
+            "Situation",
+            "parent",
+            [
+                "Outer choice text.",
+                {
+                    "choice": [
+                        "Inner choice text.",
+                        {"effect": "Foo = 1"},
+                    ]
+                },
+            ],
+        )
+        choice, locations = result
+        assert choice == types.Choice(choice="parent::outer-choice-text")
+        assert "parent::outer-choice-text::inner-choice-text" in locations
+        inner = locations["parent::outer-choice-text::inner-choice-text"]
+        assert inner.directives == [types.Text(text="Inner choice text."), types.Operation("Foo", "=", 1)]
+        outer = locations["parent::outer-choice-text"]
+        assert outer.directives == [
+            types.Text(text="Outer choice text."),
+            types.BeginChoices(),
+            types.Choice(choice="parent::outer-choice-text::inner-choice-text"),
+            types.GetChoice(),
+        ]
+
 
 class TestCompileChoiceFailure:
     def test_it_should_wrap_a_situation_construction_failure(self, env, monkeypatch):

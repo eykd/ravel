@@ -311,15 +311,15 @@ EXPECTED_COMPILED_RULEBOOK = {
                         ),
                         types.BeginChoices(),
                         types.Choice(
-                            choice="intro::i-quietly-cursed-the-light-wishing-for-the-dark",
+                            choice="intro::the-post-office-was-closed::i-quietly-cursed-the-light-wishing-for-the-dark",
                         ),
                         types.Choice(
-                            choice="intro::i-quietly-gave-thanks-for-the-light",
+                            choice="intro::the-post-office-was-closed::i-quietly-gave-thanks-for-the-light",
                         ),
                         types.GetChoice(),
                     ],
                 ),
-                "intro::i-quietly-cursed-the-light-wishing-for-the-dark": types.Situation(
+                "intro::the-post-office-was-closed::i-quietly-cursed-the-light-wishing-for-the-dark": types.Situation(
                     intro=types.Text(
                         text="I quietly cursed the light, wishing for the dark.",
                         sticky=False,
@@ -339,7 +339,7 @@ EXPECTED_COMPILED_RULEBOOK = {
                         ),
                     ],
                 ),
-                "intro::i-quietly-gave-thanks-for-the-light": types.Situation(
+                "intro::the-post-office-was-closed::i-quietly-gave-thanks-for-the-light": types.Situation(
                     intro=types.Text(
                         text="I quietly gave thanks for the light.",
                         sticky=False,
