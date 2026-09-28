@@ -329,3 +329,183 @@ Also:
 4. Session and JSON store.
 5. New CLI adapter.
 6. Delete `vm/machines.py`, `states.py`, `runners.py`, `signals.py`, and their tests.
+
+---
+
+## Planning Decisions (sp:03-plan)
+
+Dated 2026-09-27, taken without the principal (asleep); each is summarised in plan.md's
+"Decided while you slept". Brainstorm alternatives already rejected there (patching the VM,
+`- halt:` / `- finish:` / reserved-quality endings, index-based saves) are not re-opened.
+
+### PD-01. syml 1.0 source
+
+- **Decision**: `syml>=1.0,<2` from PyPI; if `uv lock` cannot resolve 1.0.0 from the index, pin
+  `[tool.uv.sources] syml = { git = "https://github.com/eykd/syml", tag = "v1.0.0" }`.
+- **Rationale**: FR-001 needs a reproducible lock that CI can install; `../syml` is 1.0.0 locally.
+- **Alternatives**: path source `../syml` (not reproducible in CI; rejected); vendoring (no).
+
+### PD-02. Package layout
+
+- **Decision**: new `ravel.engine` (domain), `ravel.app` (application), `ravel.adapters`
+  (story source, save store); `ravel/cli.py` stays in place as the CLI adapter; `ravel/vm/` is
+  deleted whole once the CLI switches.
+- **Rationale**: no old VM code survives; a new name makes stale imports fail loudly and keeps
+  the `ravel.cli:main` entry point stable.
+- **Alternatives**: rewrite inside `ravel.vm` (ambiguous half-migrated state mid-branch);
+  `ravel.domain` naming (collides conceptually with the compiler, which is also domain).
+
+### PD-03. Choice blocks: interpret, don't generate IR
+
+- **Decision**: the engine interprets today's compiled directives (`Text`, `Operation`,
+  `BeginChoices`, `Choice`, `GetChoice`, new `End`). `BeginChoices` gathers the block and parks
+  the frame's ip on `GetChoice` (the YIELD point). VM spec §4 opcodes, §6.2 rulebook JSON, and
+  §8.2 codegen are marked deferred.
+- **Rationale**: satisfies FR-009 with no compiler rewrite; ip positions remain stable per
+  compilation (guarded by the identity hash).
+- **Alternatives**: compile to explicit `DISPLAY_CHOICE`/`YIELD` instructions (more code, no
+  behavior gain now; can be added later behind `IR_VERSION`).
+
+### PD-04. Frame and choose semantics
+
+- **Decision**: `Frame(location, ip)`, no `local_state`. `choose` on an in-situation menu sets
+  the parent's ip to `GetChoice + 1` *before* pushing the child, so the gather runs after the
+  child pops. End-of-directives pops unconditionally.
+- **Rationale**: fixes D2/D3 structurally; saved frames need no "paused" flag.
+- **Alternatives**: advance the parent ip on pop (needs a "returning from choice" marker).
+
+### PD-05. Halt semantics and dead end
+
+- **Decision**: `End` and dead ends clear the stack and `offered`, set `Outcome(label, dead_end)`,
+  emit one `Halted`, and emit no `SituationExited`. Dead end = `Outcome("", dead_end=True)`.
+- **Rationale**: one canonical halted state for saves; FR-018 "no further directives".
+- **Alternatives**: keep frames for inspection (non-canonical saves); a magic `"dead-end"` label
+  (collides with author labels).
+
+### PD-06. Story identity
+
+- **Decision**: `"sha256:" + sha256(canonical_json({"ir": IR_VERSION, "rulebook": …, "givens":
+  …}))`; canonical encoder maps attrs instances to `{"type": ClassName, **fields}`, the
+  `types.VALUE` sentinel to `{"type": "VALUE"}`, `str` subclasses (syml `Source`) to `str`.
+  Excludes source positions and `about:` metadata.
+- **Rationale**: whitespace, comment, and metadata edits keep saves valid; any edit that can
+  move an ip or change semantics refuses the load (FR-022, FR-024).
+- **Alternatives**: hash of source bytes (comment edits break saves); mtimes (non-deterministic);
+  include metadata (title typo fixes would break saves).
+
+### PD-07. Quality values
+
+- **Decision**: `Qualities` is a frozen sorted tuple of pairs. Values must be `int` (not `bool`),
+  finite `float`, or `str`; anything else raises `InvalidQualityValueError` at the operation.
+  Unset qualities read as `None` in `QualityChanged.old` and as `0` in predicates/operations (as
+  today).
+- **Rationale**: immutable, hashable, canonical order for byte-identical saves; JSON can't
+  round-trip NaN/inf and would coerce bools.
+- **Alternatives**: `MappingProxyType` (not hashable, wraps a mutable dict); `frozendict` (not in
+  3.14 stdlib; new dependency).
+
+### PD-08. Save format v1 and decode order
+
+- **Decision**: `{"format": "ravel-save", "format_version": 1, "story_id", "state": {qualities,
+  stack, status, offered, outcome}}`, canonical JSON + `\n`, unknown keys refused. Decode checks:
+  JSON → format tag → version → story id → shape → locations → resumability.
+- **Rationale**: most useful error first; version before anything version-dependent.
+- **Alternatives**: VM spec §6.3 layered schema (layers deferred); MessagePack (not
+  human-readable).
+
+### PD-09. Resting-state validation on load
+
+- **Decision**: refuse `status: "running"`; refuse a waiting state whose `offered` differs from
+  what the engine re-derives (query menu or the top frame's choice block); refuse top ip not on
+  `GetChoice`.
+- **Rationale**: a hand-edited or stale save can never soft-lock or crash the engine later.
+- **Alternatives**: trust the file (a bad ip surfaces as an IndexError mid-game).
+
+### PD-10. `end` compilation
+
+- **Decision**: dispatch `end` in `compile_directive` (no PEG change); outcome = stripped inline
+  text; a block value is a `ParseError`; no warning for directives after `end`.
+- **Rationale**: Principle V; spec edge case "Directives after `end`: never run. No compile error."
+- **Alternatives**: a grammar rule (unneeded); a lint warning (no warning channel exists).
+
+### PD-11. Menu order
+
+- **Decision**: keep `queries.query` order (predicate count desc, then location ID desc), document
+  it in VM spec §7.3, pin it with a test.
+- **Rationale**: spec says pin, don't redesign (D17); saves store IDs so order is presentation only.
+- **Alternatives**: source order (a follow-up if David prefers).
+
+### PD-12. blinker and colorclass
+
+- **Decision**: drop `blinker` from `[project].dependencies`; keep `colorclass`.
+- **Rationale**: nothing uses blinker after the rewrite (the CLI renders returned outputs);
+  replacing colorclass with `click.style` is unrelated churn.
+- **Alternatives**: per-session anonymous `Signal()` fan-out in the CLI (no consumer needs it).
+
+### PD-13. Type checking
+
+- **Decision**: per-module override for `ravel.engine.*`, `ravel.app.*`, `ravel.adapters.*`,
+  `ravel.cli`, `ravel.types`, `ravel.queries`: `check_untyped_defs`, `disallow_untyped_defs`,
+  `disallow_incomplete_defs`, `disallow_any_generics`, `warn_return_any`, `strict_equality`. Not
+  `disallow_untyped_calls` (the compiler stays unannotated). Add `CompiledRulebook`/`Ruleset`
+  TypedDicts; annotate `Environment.load`/`load_rulebook` returns. Remove `syml.*` from the
+  `ignore_missing_imports` override.
+- **Rationale**: FR-035; `check_untyped_defs` alone would have caught D9.
+- **Alternatives**: global `strict = true` (drags the whole compiler into annotation work).
+
+### PD-14. Engine shape: functions, not an executor class
+
+- **Decision**: module functions `start`, `choose`, `present`, `validate_resumable` taking the
+  `Story` explicitly; a private per-call `_Run` accumulates outputs. `GameSession` (app) is the
+  only mutable holder.
+- **Rationale**: FR-005's two operations; nothing to configure on an executor instance.
+- **Alternatives**: VM spec §7.1 `VMExecutor(rulebook)` with `step`/`run_until_yield`/`resume`
+  (public `step` would expose `RUNNING` states nobody needs).
+
+### PD-15. Acceptance tests
+
+- **Decision**: plain pytest end-to-end tests in `tests/acceptance/test_usNN_<slug>.py`, marked
+  `acceptance`, docstrings naming spec scenarios (`US2-AS3`). The pytest-bdd/Gherkin pipeline in
+  the plan template does not exist in ravel and is not added.
+- **Rationale**: no new tooling; same outer-loop role.
+- **Alternatives**: add pytest-bdd (new dependency and pipeline for six files).
+
+### PD-16. Property test
+
+- **Decision**: hypothesis (dev only). Strategy: `lists(integers(0, 10_000), max_size=40)` of
+  choice indices taken modulo menu size, stop at halt; `split = integers(0, len(path))`. Settings
+  `max_examples=200, deadline=None, derandomize=True`. Compare outputs after the split and
+  `encode_save` of the final states.
+- **Rationale**: FR-032/SC-003; derandomized for a flake-free CI.
+- **Alternatives**: random module loop (no shrinking).
+
+### PD-17. CLI mechanics
+
+- **Decision**: `ConsoleUI(session, verbose, read_line=input, echo=click.echo)`; tests use
+  `CliRunner` with `input=` and `monkeypatch.chdir(tmp_path)`; `--load` failure and unexpected
+  errors exit 1; halt, `q`, EOF, Ctrl-C exit 0. `FileSaveStore` writes atomically (temp +
+  `os.replace`).
+- **Rationale**: FR-026–FR-030; injectable I/O keeps the UI unit-testable.
+- **Alternatives**: `click.prompt` (reprompt behavior fights our command parsing).
+
+### PD-18. Constitution amendment
+
+- **Decision**: v1.1.0 → v1.2.0 (MINOR): VI's public surface list and VII's layer/file list are
+  updated to the new packages; II notes the strict per-module set. Lands as its own
+  `docs: amend constitution …` commit at the start of US2. Flagged for David's sign-off.
+- **Rationale**: no principle is removed or redefined; only enumerations change (Versioning Policy).
+- **Alternatives**: MAJOR bump as the spec guessed (overstates the change).
+
+### PD-19. SC-009 baseline
+
+- **Decision**: before bumping syml, dump `as_data()` of every example under 0.6.2 into the
+  scratchpad; after re-indenting under 1.0, compare; record "identical" in the US1 commit body.
+  Not a permanent test.
+- **Rationale**: CI has no 0.6.2 (spec SC-009).
+
+### PD-20. Fixture story
+
+- **Decision**: `tests/fixtures/stories/mini/begin.ravel` with: `given: Count += 1` (once-only
+  check), a `fork` situation (choice block + gather + effect), a choice whose body ends in
+  `- end: escaped`, and a route that sets `Location = "Nowhere"` to reach a dead end.
+- **Rationale**: FR-033; Cloak can't reach these.
