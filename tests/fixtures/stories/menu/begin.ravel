@@ -1,0 +1,30 @@
+given:
+  - Here = 1
+
+alpha:
+  - when:
+      - Here = 1
+  - [Alpha]Alpha is the least specific, first in the file.
+
+zulu:
+  - when:
+      - Here = 1
+  - [Zulu]Zulu ties alpha on specificity.
+
+mike:
+  - when:
+      - Here = 1
+      - Here > 0
+  - [Mike]Mike is more specific than alpha and zulu.
+
+bravo:
+  - when:
+      - Here = 1
+      - Here > 0
+      - Here < 5
+  - [Bravo]Bravo is the most specific.
+
+never:
+  - when:
+      - Here = 2
+  - [Never]This situation's predicate never holds.
