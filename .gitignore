@@ -15,3 +15,7 @@ htmlcov/
 # scratch diffing aids, never committed fixtures
 .specify/scratch/
 .hypothesis/
+
+# sp:08-harden orchestration state (never committed)
+.sp-harden-state.json
+.sp-harden-findings.json
