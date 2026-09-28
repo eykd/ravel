@@ -21,7 +21,6 @@ classifiers = [
 ]
 dependencies = [
     "attrs",
-    "blinker",
     "click",
     "colorclass",
     "parsimonious>=0.10,<0.11",

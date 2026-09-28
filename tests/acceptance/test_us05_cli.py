@@ -2,7 +2,7 @@
 
 RED per ravel-8qa.5.5.1. Written per specs/001-reentrant-vm/spec.md SS US-5 AS1-AS8 and
 specs/001-reentrant-vm/contracts/cli.md. Expected to FAIL against the current ``ravel.cli``: the
-old ``ConsoleRunner``/``StatefulRunner``-based CLI does not build on ``ravel.app.GameSession``,
+old runner-based CLI does not build on ``ravel.app.GameSession``,
 takes no ``--load`` option, and does not match the prompt/error/rendering contract exercised
 below (ravel-8qa.5.5.2 rewrites ``cli.py`` as a thin ``ConsoleUI`` adapter to make this pass).
 

@@ -110,7 +110,7 @@ def engine_modules():
 @pytest.mark.parametrize(
     "source",
     [
-        "import blinker",
+        "import syml",
         "import click",
         "import os",
         "import os.path",
