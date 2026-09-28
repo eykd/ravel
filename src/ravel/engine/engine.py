@@ -10,6 +10,7 @@ from ravel.engine.errors import GameOverError, InvalidStateError, NotOfferedErro
 from ravel.engine.outputs import (
     ChoiceOption,
     ChoicesOffered,
+    Halted,
     Output,
     QualityChanged,
     SituationEntered,
@@ -17,7 +18,7 @@ from ravel.engine.outputs import (
     Step,
     TextShown,
 )
-from ravel.engine.state import Frame, GameState, LocationId, Qualities, Status
+from ravel.engine.state import Frame, GameState, LocationId, Outcome, Qualities, Status
 from ravel.engine.story import Story
 from ravel.utils.strings import get_text
 
@@ -42,17 +43,22 @@ class _Run:
     stack: list[Frame]
     outputs: list[Output] = field(factory=list)
 
+    def _step(
+        self, *, stack: tuple[Frame, ...], status: Status, offered: tuple[LocationId, ...], outcome: Outcome | None
+    ) -> Step:
+        """Snapshot the run's qualities and outputs into a ``Step`` with the given rest-state fields."""
+        state = GameState(qualities=self.qualities, stack=stack, status=status, offered=offered, outcome=outcome)
+        return Step(state=state, outputs=tuple(self.outputs))
+
     def rest(self, offered: tuple[ChoiceOption, ...]) -> Step:
         """Offer ``offered`` and return the waiting step."""
         self.outputs.append(ChoicesOffered(offered))
-        state = GameState(
-            qualities=self.qualities,
+        return self._step(
             stack=tuple(self.stack),
             status=Status.WAITING,
             offered=tuple(option.location for option in offered),
             outcome=None,
         )
-        return Step(state=state, outputs=tuple(self.outputs))
 
     def enter(self, location: LocationId) -> None:
         """Push ``location`` onto the stack at its first directive."""
@@ -90,9 +96,16 @@ class _Run:
                 return step
 
     def query(self) -> Step:
-        """Offer every situation whose predicates hold, most specific first."""
-        matches = queries.query("Situation", self.qualities.items, self.story.rulebook["rulebook"])
+        """Offer every situation whose predicates hold, most specific first; halt on a dead end."""
+        matches = tuple(queries.query("Situation", self.qualities.items, self.story.rulebook["rulebook"]))
+        if not matches:
+            return self.halt(Outcome("", dead_end=True))
         return self.rest(tuple(ChoiceOption(location, get_text(situation.intro)) for location, situation in matches))
+
+    def halt(self, outcome: Outcome) -> Step:
+        """Clear the stack, emit ``Halted``, and return the halted step."""
+        self.outputs.append(Halted(outcome.label, outcome.dead_end))
+        return self._step(stack=(), status=Status.HALTED, offered=(), outcome=outcome)
 
     def advance(self, frame: Frame, ip: int) -> None:
         self.stack[-1] = evolve(frame, ip=ip)
