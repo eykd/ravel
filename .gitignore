@@ -14,3 +14,4 @@ htmlcov/
 .doctor/
 # scratch diffing aids, never committed fixtures
 .specify/scratch/
+.hypothesis/

@@ -38,7 +38,17 @@ Homepage = "https://github.com/eykd/ravel"
 packages = ["src/ravel"]
 
 [dependency-groups]
-dev = ["coverage", "ipython", "mypy", "pdbpp", "pre-commit", "pytest", "pytest-cov", "ruff"]
+dev = [
+    "coverage",
+    "hypothesis>=6.168.3",
+    "ipython",
+    "mypy",
+    "pdbpp",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
