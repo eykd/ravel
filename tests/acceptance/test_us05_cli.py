@@ -215,11 +215,14 @@ def test_s_shows_qualities_sorted_with_repr_values(monkeypatch, tmp_path):
     result = _run(["run", str(MINI_PATH)], "s\nq\n")
 
     assert result.exit_code == 0
-    lines = result.output.splitlines()
-    assert "'Count' = 1" in lines
-    assert "'Location' = 'Fork'" in lines
-    count_index = lines.index("'Count' = 1")
-    location_index = lines.index("'Location' = 'Fork'")
+    # CliRunner's non-tty stdin never locally echoes the typed "s", so it lands glued to the
+    # prompt's own line (a harness artifact, not a rendering bug -- a real terminal's Enter
+    # key puts each response on its own line); assert by substring + ordering instead of
+    # `splitlines()` membership. Amended 2026-09-28 (ravel-8qa.5.5.2).
+    assert "'Count' = 1" in result.output
+    assert "'Location' = 'Fork'" in result.output
+    count_index = result.output.index("'Count' = 1")
+    location_index = result.output.index("'Location' = 'Fork'")
     assert count_index < location_index  # sorted
 
 
@@ -237,7 +240,11 @@ def test_help_and_question_mark_list_the_commands(monkeypatch, tmp_path):
 
 def test_verbose_narrates_quality_changes_and_situation_entry_exit(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    result = _run(["--verbose", "run", str(MINI_PATH)], "q\n")
+    # The intro query merely offers matching top-level situations (no push occurs until a choice
+    # is made -- see engine.py's ``query``/``enter``), so a choice must be taken before quitting
+    # for a SituationEntered/SituationExited pair to actually narrate. Amended 2026-09-28
+    # (ravel-8qa.5.5.2): the original "q\n"-only input never entered a location.
+    result = _run(["--verbose", "run", str(MINI_PATH)], "1\nq\n")
 
     assert result.exit_code == 0
     assert "## " in result.output
