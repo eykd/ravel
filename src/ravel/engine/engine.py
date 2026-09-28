@@ -16,9 +16,10 @@ from ravel.engine.outputs import (
     SituationEntered,
     SituationExited,
     Step,
+    StoryChanged,
     TextShown,
 )
-from ravel.engine.state import ChoiceBlock, Frame, GameState, LocationId, Outcome, Qualities, Status
+from ravel.engine.state import ChoiceBlock, Frame, GameState, LocationId, Outcome, Qualities, SavedGame, Status
 from ravel.engine.story import Story
 from ravel.utils.strings import get_text
 
@@ -196,3 +197,68 @@ def choose(story: Story, state: GameState, location: LocationId) -> Step:
         run.advance(top, top.ip + 1)
     run.enter(location)
     return run.run()
+
+
+def present(story: Story, state: GameState) -> tuple[Output, ...]:
+    """Re-present a resting ``state`` without running anything.
+
+    Used by ``resume`` for the non-empty-stack case; ``resume`` handles the empty-stack query
+    case itself since a saved state no longer carries an ``offered`` to re-derive labels from.
+    """
+    if state.status is Status.HALTED:
+        outcome = state.outcome
+        label = "" if outcome is None else outcome.label
+        dead_end = False if outcome is None else outcome.dead_end
+        return (Halted(label, dead_end),)
+    options = tuple(ChoiceOption(location, get_text(story.situation(location).intro)) for location in state.offered)
+    return (ChoicesOffered(options),)
+
+
+def resume(story: Story, saved: SavedGame) -> Step:
+    """Resolve ``saved`` (a story-free ``SavedGame``) against ``story``, never raising.
+
+    A halted save is restored as-is (2026-09-28: no check that the outcome label is one of the
+    story's ``End`` labels -- a stale label just loads as that halt). A waiting save has its
+    stack resolved bottom to top: a frame whose situation or choice-block anchor no longer
+    matches ``story`` is dropped, along with every frame above it, and the drop is reported via a
+    leading ``StoryChanged``. If the resolved stack ends up empty, the story is re-queried fresh
+    from the saved qualities (which may itself halt on a dead end).
+    """
+    if saved.status is Status.HALTED:
+        state = GameState(qualities=saved.qualities, stack=(), status=Status.HALTED, offered=(), outcome=saved.outcome)
+        return Step(state=state, outputs=present(story, state))
+
+    run = _Run(story=story, qualities=saved.qualities, stack=[])
+    resolved_blocks: list[ChoiceBlock] = []
+    dropped: list[LocationId] = []
+    truncated = False
+    for saved_frame in saved.stack:
+        if truncated:
+            dropped.append(saved_frame.location)
+            continue
+        if not story.has_location(saved_frame.location):
+            truncated = True
+            dropped.append(saved_frame.location)
+            continue
+        blocks = choice_blocks(story.situation(saved_frame.location))
+        matches = [block for block in blocks if block.choices == saved_frame.anchor.choices]
+        if not matches:
+            truncated = True
+            dropped.append(saved_frame.location)
+            continue
+        ordinal = saved_frame.anchor.ordinal
+        block = matches[ordinal] if ordinal < len(matches) else matches[0]
+        run.stack.append(Frame(saved_frame.location, block.get_choice_ip))
+        resolved_blocks.append(block)
+
+    for index in range(len(run.stack) - 1):
+        frame = run.stack[index]
+        run.stack[index] = evolve(frame, ip=frame.ip + 1)
+
+    if dropped:
+        run.outputs.append(StoryChanged(dropped=tuple(dropped)))
+
+    if run.stack:
+        top_block = resolved_blocks[-1]
+        return run.rest(tuple(run.option(location) for location in top_block.choices))
+    return run.query()
