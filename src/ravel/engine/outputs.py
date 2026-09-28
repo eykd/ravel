@@ -28,7 +28,8 @@ class ChoicesOffered:
     choices: tuple[ChoiceOption, ...]
 
     def __attrs_post_init__(self) -> None:
-        raise NotImplementedError
+        if not self.choices:
+            raise ValueError("ChoicesOffered needs at least one choice")
 
 
 @frozen
