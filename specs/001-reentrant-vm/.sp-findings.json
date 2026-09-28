@@ -1,0 +1,18 @@
+[
+  {
+    "category": "code-quality",
+    "file": "src/ravel/app/saves.py",
+    "title": "Remediate: duplicate _is_surrogate_free helper in saves.py and state.py",
+    "severity": "MINOR",
+    "line": 71,
+    "task_id": "ravel-8qa.9"
+  },
+  {
+    "category": "code-quality",
+    "file": "src/ravel/engine/engine.py",
+    "title": "Remediate: stale docstring on engine.present() misdescribes resume() usage",
+    "severity": "MINOR",
+    "line": 202,
+    "task_id": "ravel-8qa.10"
+  }
+]
