@@ -1,4 +1,5 @@
 import operator as op
+from typing import TypedDict
 
 import attr
 from syml.basetypes import Pos, Source  # noqa
@@ -171,3 +172,18 @@ class VALUE:
 class Rule:
     name = attr.ib()
     predicates = attr.ib()
+
+
+class Ruleset(TypedDict):
+    """One concept's compiled rules and the baggage each rule name locates."""
+
+    rules: list[Rule]
+    locations: dict[str, object]
+
+
+class CompiledRulebook(TypedDict):
+    """The merged rulebook ``Environment.load()`` returns."""
+
+    metadata: dict[str, str]
+    rulebook: dict[str, Ruleset]
+    givens: list[Operation]
