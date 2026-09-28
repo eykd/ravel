@@ -716,7 +716,7 @@ requires-dist = [
     { name = "colorclass" },
     { name = "parsimonious", specifier = ">=0.10,<0.11" },
     { name = "python-slugify" },
-    { name = "syml", specifier = ">=0.6" },
+    { name = "syml", specifier = ">=1.0,<2" },
 ]
 
 [package.metadata.requires-dev]
@@ -778,15 +778,14 @@ wheels = [
 
 [[package]]
 name = "syml"
-version = "0.6.2"
+version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "parsimonious" },
-    { name = "regex" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/29/3c/dc5f752628407d0f3dd2747718910aa8e013a7b91bb7a10ae24f86ed0bbd/syml-0.6.2.tar.gz", hash = "sha256:156e7d4e056b42e9034b41e0afffeba50cfdcc95c41c04244380c63103a922fe", size = 9104, upload-time = "2025-01-01T00:16:43.028Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/37/6b982c4b82ee159f935ab6c5c7211d7efae4be03c038c9b18856ee560a1c/syml-1.0.0.tar.gz", hash = "sha256:e8855fd9e1bc4173b888fc2f3d670f92e6ec67b9a69fda84d9e386b26522bfda", size = 71755, upload-time = "2026-09-27T22:45:19.205Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/b4/c849d65dc24e99f6f5a591fc97b52eb60fe35a9f36ed14cef415ba6e1879/syml-0.6.2-py3-none-any.whl", hash = "sha256:0b6da18d78cc6e4d4b80efde9c570c28130f7f518824bacc857eccbcc048b3d3", size = 8273, upload-time = "2025-01-01T00:16:40.877Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/fb/6426a7874e7943c46c8966d8a246a49e6dafd5818a78bb959dac9ac3369e/syml-1.0.0-py3-none-any.whl", hash = "sha256:1846539f74f3db4d0e16b23dbd0f32636e6fa0c7c9f962fe3ea7f5e0d961d37a", size = 36783, upload-time = "2026-09-27T22:45:17.97Z" },
 ]
 
 [[package]]

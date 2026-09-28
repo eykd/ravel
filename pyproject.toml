@@ -26,7 +26,7 @@ dependencies = [
     "colorclass",
     "parsimonious>=0.10,<0.11",
     "python-slugify",
-    "syml>=0.6",
+    "syml>=1.0,<2",
 ]
 
 [project.scripts]
@@ -43,11 +43,12 @@ dev = ["coverage", "ipython", "mypy", "pdbpp", "pre-commit", "pytest", "pytest-c
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["acceptance: end-to-end user-story tests"]
 
 [tool.coverage.run]
 branch = true
 source = ["ravel", "tools"]
-omit = ["*/test*.py", "*/conftest.py"]
+omit = ["*/test*.py", "*/conftest.py", "*/capture_syml062.py"]
 
 [tool.coverage.report]
 show_missing = true

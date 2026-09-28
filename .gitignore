@@ -12,3 +12,5 @@ htmlcov/
 .ruff_cache/
 # br doctor per-run artifacts
 .doctor/
+# scratch diffing aids, never committed fixtures
+.specify/scratch/
