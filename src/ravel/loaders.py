@@ -36,7 +36,10 @@ class FileSystemLoader(BaseLoader):
         return is_up_to_date
 
     def get_source(self, environment, name):
-        filepath = Path(self.base_path) / (name + self.extension)
+        base = Path(self.base_path).resolve()
+        filepath = (base / (name + self.extension)).resolve()
+        if not filepath.is_relative_to(base):
+            raise exceptions.RulebookNotFound("%s: include escapes the story directory" % name)
         if not filepath.exists():
             raise exceptions.RulebookNotFound(name)
 

@@ -63,6 +63,52 @@ class TestGetSource:
             fs_loader.get_source(env, "foo")
 
 
+class TestGetSourcePathTraversal:
+    def test_it_should_reject_a_relative_escape(self, tmp_path):
+        base = tmp_path / "story"
+        base.mkdir()
+        (tmp_path / "secret.ravel").write_text("secret")
+        loader = loaders.FileSystemLoader(base_path=base)
+        env = Mock()
+
+        with pytest.raises(exceptions.RulebookNotFound):
+            loader.get_source(env, "../secret")
+
+    def test_it_should_reject_an_absolute_escape(self, tmp_path):
+        base = tmp_path / "story"
+        base.mkdir()
+        outside = tmp_path / "secret.ravel"
+        outside.write_text("secret")
+        loader = loaders.FileSystemLoader(base_path=base)
+        env = Mock()
+
+        with pytest.raises(exceptions.RulebookNotFound):
+            loader.get_source(env, str(outside.with_suffix("")))
+
+    def test_it_should_reject_a_symlink_escape(self, tmp_path):
+        base = tmp_path / "story"
+        base.mkdir()
+        (tmp_path / "secret.ravel").write_text("secret")
+        (base / "link").symlink_to(tmp_path)
+        loader = loaders.FileSystemLoader(base_path=base)
+        env = Mock()
+
+        with pytest.raises(exceptions.RulebookNotFound):
+            loader.get_source(env, "link/secret")
+
+    def test_it_should_still_resolve_a_legitimate_subdirectory_include(self, tmp_path):
+        base = tmp_path / "story"
+        base.mkdir()
+        sub = base / "sub"
+        sub.mkdir()
+        (sub / "x.ravel").write_text("ok")
+        loader = loaders.FileSystemLoader(base_path=base)
+        env = Mock()
+
+        result, is_up_to_date = loader.get_source(env, "sub/x")
+        assert result == "ok"
+
+
 class TestLoad:
     def test_it_should_load_and_compile_a_rulebook(self, tempdir, fs_loader):
         env = Mock()
