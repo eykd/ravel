@@ -52,7 +52,7 @@ def test_saving_at_a_menu_produces_a_canonical_save_with_the_documented_fields(t
     story = _cloak_source().load()
     session = GameSession(story, FileSaveStore(tmp_path))
     session.new_game()
-    session.choose("begin::intro")  # -> waiting at the Foyer query menu
+    session.choose("begin::intro")  # -> waiting at the intro's press-onward menu (Location still "Intro")
 
     path = session.save("mid.json")
     assert path
@@ -80,7 +80,7 @@ def test_saving_at_a_menu_produces_a_canonical_save_with_the_documented_fields(t
     assert type(qualities["Wearing Cloak"]) is int
     assert qualities["Wearing Cloak"] == 1
     assert type(qualities["Location"]) is str
-    assert qualities["Location"] == "Foyer"
+    assert qualities["Location"] == "Intro"
 
     # A save no longer carries a raw `ip`: each stack frame is named by its `location` plus an
     # `anchor` -- the choice block's own targets (`choices`) and a disambiguating `ordinal` --
