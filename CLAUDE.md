@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Ravel is a Python engine and authoring language for Quality-Based Narratives (QBN) — the
 storylet model from Failbetter Games, with syntax borrowed from Ink and YAML. Author `.ravel`
-files; the compiler turns them into a rulebook; a stack VM performs them.
+files; the compiler turns them into a rulebook; the pure `ravel.engine` interprets it.
 
 ## Environment & commands
 
@@ -29,9 +29,10 @@ uv run pytest
   isort/flake8/black trio. Line length 120. `UP031` (printf-style `%` formatting) is ignored
   deliberately; the codebase uses it throughout for error messages.
 - Type check: `uv run mypy` (config in `pyproject.toml`). Clean, and enforced as a `local`
-  pre-commit hook — not `mirrors-mypy`, which runs in an isolated venv where `attr`, `click`,
-  and `blinker` all become missing-stub errors. Typing is still partial: most function
-  bodies are unannotated, so mypy skips them unless `check_untyped_defs` is turned on.
+  pre-commit hook — not `mirrors-mypy`, which runs in an isolated venv where `attr` and `click`
+  become missing-stub errors. Typing is still partial: most function bodies are unannotated, so
+  mypy skips them unless `check_untyped_defs` is turned on (no per-module override sets it; the
+  `[tool.mypy]` table in `pyproject.toml` is the only config).
 - Run a story: `uv run ravel run examples/cloak` (console script `ravel = ravel.cli:main`;
   `--verbose`/`--debug` are group-level flags, before the subcommand).
 - CI: `.github/workflows/main.yml` runs pytest with branch coverage, `ruff check`,
@@ -49,16 +50,11 @@ their `Source` (filename, line, column) and parse errors can name where the bad 
 Predicate targets must reach `compile_predicate` unflattened for that to survive — use
 `get_list_of_sources`, not `get_list_of_texts`.
 
-`src/ravel/vm/events.py` imports `State` and `Choice` under `if TYPE_CHECKING:` and then uses
-them as annotations in attrs `field()` declarations. That only works because PEP 649 defers
-annotation evaluation on 3.14 — on 3.10 the module raised `NameError` at import and two test
-files failed at collection. Do not "fix" it by dropping the `TYPE_CHECKING` guard without
-understanding this; equally, do not assume the pattern is safe to spread to code that must run
-on older interpreters.
-
 ## Architecture
 
-The pipeline is: `.ravel` source → `Environment` → `Loader` → compiler → rulebook dict → `VirtualMachine` → `Runner`.
+The pipeline is: `.ravel` source → `Environment` → `Loader` → compiler → rulebook dict →
+`ravel.engine` (`start`/`choose`/`present`/`resume`) → `ravel.app.GameSession` → an adapter
+(`ravel.cli.ConsoleUI`, or any other caller of `GameSession`).
 
 **Loading and merging** (`environments.py`, `loaders.py`). `Environment.load()` starts at the
 `begin` rulebook and walks `include:` breadth-first, caching each compiled rulebook and
@@ -80,14 +76,19 @@ every rule's predicates and scores each match by `len(rule.predicates)`, so the 
 matching rule wins. `query_by_name` resolves a rule name back to its compiled baggage via the
 concept's `locations` map.
 
-**The VM** (`vm/`). `VirtualMachine` is a stack of `State` objects plus a FIFO action queue.
-`push`/`pop` *enqueue* work; `do_push`/`do_pop` execute it — mixing the two is how ordering bugs
-appear. States are `Begin` → `DisplayPossibleSituations` → `DisplaySituation`;
-`DisplaySituation.display` walks directives and dispatches on `handle_<lowercased classname>`,
-stopping when it hits a `GetChoice` or the end. Everything the outside world sees is a frozen
-attrs event from `vm/events.py` sent over blinker signals (`vm/signals.py`); a `Runner`
-(`vm/runners.py`, and `ConsoleRunner` in `cli.py`) subscribes to those signals. Input comes back
-in through the `send_input` callable on a `waiting_for_input` event, never by calling the VM.
+**The engine** (`ravel/engine/`). Pure and re-entrant: no mutable module state, no signals, no
+callbacks. `GameState` is immutable (`Frame(location, ip)` tuples on `state.stack`, plus
+`qualities`/`status`/`outcome`); every call takes a `Story` and a `GameState` and returns a `Step`
+(new `GameState` + a tuple of `Output`s) — `start(story)`, `choose(story, state, location)`,
+`present(story, state)`, `resume(story, saved)`. `ip` indexes a situation's compiled directives;
+running a frame dispatches on directive type (`Text`, `Operation`, `BeginChoices`, `End`) until it
+yields at a choice block or the stack empties into query mode. `ravel.engine.outputs` defines the
+seven frozen output types engines can emit (`TextShown`, `ChoicesOffered`, `QualityChanged`,
+`SituationEntered`, `SituationExited`, `Halted`, `StoryChanged`) — plain values, never sent over a
+signal. `ravel.app.GameSession` (`ravel/app/session.py`) is the one mutable holder: it owns a
+`Story` and a `SaveStore` and turns engine calls into `new_game`/`choose`/`save`/`load`. Adapters
+(`ravel.cli.ConsoleUI`) render a session's outputs and drive its prompt loop; nothing calls the
+engine directly except `GameSession`.
 
 **Grammars** (`grammars.py`, `parsers.py`). Parsimonious PEGs, composed by string concatenation
 from a shared `base_expression_grammar`. They cover expressions, comparisons, operations with
@@ -96,6 +97,9 @@ prefixes. Change the grammar and the parser node visitor in `parsers.py` togethe
 
 ## Language reference
 
-`docs/RAVEL_LANGUAGE_SPEC.md` and `docs/RAVEL_VM_SPEC.md` are detailed working specs derived from
-the implementation — read them rather than re-deriving semantics. Both are currently untracked by
-git. `examples/cloak/` is the fullest worked example; `tests/conftest.py` loads it as a fixture.
+`docs/RAVEL_LANGUAGE_SPEC.md` documents the authoring language and is kept in sync with what the
+compiler accepts. `docs/RAVEL_VM_SPEC.md` predates the pure `ravel.engine` rewrite and describes a
+different, instruction-set VM design; it now carries implemented/deferred annotations pointing at
+the real engine and `specs/001-reentrant-vm/contracts/` — read the annotations, not the
+instruction-set body, for current behavior. Both files are tracked by git. `examples/cloak/` is
+the fullest worked example; `tests/conftest.py` loads it as a fixture.

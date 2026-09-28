@@ -620,19 +620,19 @@ When a choice is selected, its sub-situation executes, then control returns to t
 
 ### 11.3 State Stack
 
-The runtime maintains a stack of execution states:
+The engine maintains a stack of `(location, ip)` frames, one per active situation:
 
 ```
-┌─────────────────────────┐
-│ DisplaySituation(bar)   │ ← Current
-├─────────────────────────┤
-│ DisplaySituation(foyer) │ ← Paused
-├─────────────────────────┤
-│ DisplayPossibleSits     │ ← Base
-└─────────────────────────┘
+┌───────────────────────────┐
+│ Frame(bar, ip)             │ ← Current (choosing within Bar)
+├───────────────────────────┤
+│ Frame(foyer, ip)           │ ← Paused (Foyer's own directives resume when Bar pops)
+└───────────────────────────┘
 ```
 
-This allows nested situations (choices within choices) with proper return semantics.
+An empty stack means no situation is active — the engine falls back to **query mode** (§11.1
+Query Phase), finding every top-level situation whose predicates currently pass. This allows
+nested situations (choices within choices) with proper return semantics.
 
 ### 11.4 Rule Matching and Scoring
 

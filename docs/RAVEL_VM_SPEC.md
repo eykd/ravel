@@ -5,6 +5,44 @@
 
 ---
 
+## 0. Implementation Status (2026-09-28)
+
+This document is the original 0.1 design draft for an instruction-set VM (opcodes, a global event
+bus, layered qualities, HATEOAS mode). The `001-reentrant-vm` feature built a **different, much
+smaller** design instead: a pure, re-entrant `ravel.engine` that interprets compiled directives
+directly (no bytecode, no IR) and returns immutable state plus a tuple of output values (no event
+bus, no signals). Section-by-section status, per `specs/001-reentrant-vm/plan.md` "Spec
+Conformance":
+
+| Section | Status | Real behavior lives in |
+|---|---|---|
+| §2.1 Value Objects (QualityValue, LocationId, Expression, Comparator, Constraint) | **Implemented**, different types | `ravel.engine.state`, `ravel.types` |
+| §2.2 Entities (Predicate, Instruction, SituationDef) | **Implemented** (Predicate); `Instruction`/`SituationDef` **deferred** — the engine interprets compiled `types.py` directives (`Text`, `Choice`, `Operation`, `End`), not a separate instruction encoding | `ravel.types`, `ravel.engine.engine` |
+| §2.3 StackFrame | **Implemented**, narrower: `Frame(location, ip)` only — **no `local_state`**; nothing in the shipped design needed frame-local variables | `ravel.engine.state.Frame` |
+| §2.3 QualityLayer / QualityState (layering) | **Deferred** — see §3 | not built |
+| §2.3 VMState | **Implemented** as `GameState`; see §6.3 for the shipped shape | `ravel.engine.state.GameState` |
+| §3 Quality State Layering | **Deferred** — one flat `Qualities` mapping, no `global`/`player`/`session`/`location` layers | `ravel.engine.state.Qualities` |
+| §4 Instruction Set (all opcodes) | **Deferred** (PD-03 in plan.md) — the engine dispatches on directive *type*, not a bytecode instruction stream; no codegen pass exists | `ravel.engine.engine._Run` |
+| §4.5 Control Flow: `YIELD`/`HALT` | **Implemented**, as return-not-emit: a `BeginChoices` directive parks `ip` on the following `GetChoice` and the call *returns* (no `pending_events` queue, no separate `YIELD` opcode); `End` halts immediately, clearing the stack. `BRANCH_IF`/`JUMP`/`NOP` are **deferred** — the compiled directive list has no jumps | `ravel.engine.engine._Run.run` |
+| §5 Event Schema | **Rewritten** — see the note at the top of §5 |
+| §6.2 Rulebook Schema (JSON) | **Deferred** — the compiled rulebook stays an in-memory dict (see this repo's `CLAUDE.md` "Compiling"); no JSON IR is serialized | not built |
+| §6.3 VMState Schema (JSON) | **Replaced** — see the note at the top of §6.3 |
+| §7.2 Step Execution | **Implemented**, same shape (frame → dispatch → advance/pop), no separate `step()`/`run_until_yield()` split — `choose`/`start`/`resume` each run to the next yield or halt in one call | `ravel.engine.engine._Run.run` |
+| §7.3 Query Mode | **Implemented**; see the note at the top of §7.3 for the real sort and its tie-break |
+| §7.4 Resume from Input | **Replaced** by `choose(story, state, location)` — no separate `resume(state, input_data)` taking freeform `input_data`; a location *is* the input | `ravel.engine.engine.choose` |
+| §7.5 Execution Modes (Realtime/HATEOAS/Hybrid) | **Deferred** — the shipped design is a single synchronous call/return API; no built-in checkpoint-interval runner or HATEOAS endpoint exists (an adapter could build either on top of `GameSession`, but none does) | not built |
+| §8.1–8.2 Compilation Target / Situation Compilation (codegen to instructions) | **Deferred** — see §4 | not built |
+| §9 Application Ports | **Replaced** — see the note at the top of §9 |
+| §10 Acceptance Tests (AT-*) | **Historical** — these describe the deferred instruction-set design and are not run; the real acceptance tests are `tests/acceptance/test_us02_engine.py` through `test_us06_*.py` (see `specs/001-reentrant-vm/plan.md` "Acceptance Test Strategy") | `tests/acceptance/` |
+| §11 Glossary | Mixed — `Frame`, `Location`, `Predicate`, `Quality`, `Situation`, `Rulebook` still apply; `Instruction`, `Layer`, `Yield` (as a named event) describe the deferred design |
+
+For the shipped contracts themselves, read `specs/001-reentrant-vm/data-model.md` and
+`specs/001-reentrant-vm/contracts/*.md` (`engine-api.md`, `session-api.md`, `save-format.md`,
+`cli.md`, `end-directive.md`) — they are the authoritative, current source; this document is kept
+for its still-valid domain vocabulary and as a record of the road not taken.
+
+---
+
 ## 1. Introduction
 
 This document specifies a Virtual Machine (VM) for executing compiled Ravel rulebooks. The architecture cleanly separates:
@@ -191,6 +229,10 @@ StackFrame = {
   local_state: dict[str, Any]            # Frame-local variables
 }
 ```
+
+> **Narrower in practice (2026-09-28, per §0).** The shipped `ravel.engine.state.Frame` is just
+> `Frame(location: LocationId, ip: int)` — **no `local_state`**. Nothing in the shipped design
+> needed frame-scoped variables (§3's quality layering, the only planned consumer, is deferred).
 
 Operations:
 - `advance(delta=1) → StackFrame`: New frame with IP += delta
@@ -503,6 +545,27 @@ CHECK_PREDICATE(predicate, jump_if_false):
 
 ## 5. Event Schema
 
+> **Rewritten (2026-09-28, per §0).** No event bus, no `timestamp`/`sequence` envelope, no
+> `StackPushed`/`StackPopped`/`ChoicesBegin`/`ChoicesEnd`/`WaitingForInput`. The shipped engine
+> returns a tuple of plain, frozen `attrs` values from `ravel.engine.outputs` alongside the new
+> state — never sent, always returned. The six sections below (§5.2–§5.6) describe the *deferred*
+> instruction-set event schema; the real seven output kinds are:
+>
+> | Real output (`ravel.engine.outputs`) | Nearest deferred analog below |
+> |---|---|
+> | `TextShown(text, sticky)` | `TextDisplayed` (§5.3) |
+> | `ChoicesOffered(choices: tuple[ChoiceOption, ...])` — one value carrying the whole menu | `ChoicesBegin`/`ChoiceDisplayed`*/`ChoicesEnd` (§5.3) — **not implemented** as three events |
+> | `QualityChanged(name, old, new)` — no `layer` field (§3 deferred) | `QualityChanged` (§5.2) |
+> | `SituationEntered(location)` | `SituationEntered` (§5.4) |
+> | `SituationExited(location)` | `SituationExited` (§5.4) |
+> | `Halted(outcome, dead_end)` | `VMHalted` (§5.5) — `reason` replaced by `outcome`/`dead_end` |
+> | `StoryChanged(dropped)` | none — new in the shipped design; emitted only by `engine.resume` when a loaded save's frames no longer match the current story |
+>
+> `WaitingForInput` is **not implemented**: a caller learns it's waiting by the returned
+> `GameState.status` (`WAITING`/`HALTED`), not a distinct output. `StackPushed`/`StackPopped` are
+> **not implemented**: `SituationEntered`/`SituationExited` already carry the location; no
+> separate depth-counter event exists.
+
 ### 5.1 Event Base
 
 ```
@@ -691,6 +754,16 @@ StackPopped = VMEvent & {
 
 ### 6.3 VMState Schema (JSON)
 
+> **Replaced (2026-09-28, per §0)** by the save format actually shipped: format version 1, no
+> `rulebookId`/story identity, no `localState` (§2.3 has none), no `pendingEvents`, no quality
+> layers (flat `qualities`), and no `offered` — each stack frame instead carries an `anchor`
+> (the choice set it was entered from, plus a tie-break `ordinal`), so a reloaded save can be
+> checked for drift against a changed story without needing to re-derive its old menu. The JSON
+> below is illustrative only; do not use it as a save-format reference. The current field table,
+> canonical encoding rules, decode-error catalog, and worked examples live in
+> `specs/001-reentrant-vm/contracts/save-format.md` and
+> `specs/001-reentrant-vm/data-model.md` § Save file.
+
 ```json
 {
   "$schema": "https://ravel-lang.org/schemas/vmstate/v1",
@@ -803,6 +876,15 @@ step(state):
 
 ### 7.3 Query Mode
 
+> **Pinned tie-break (2026-09-28, per §0).** "Sort by `predicate_score` descending" is
+> implemented, but ties need a second key: two situations that match with equal predicate counts
+> sort **by location ID descending** (`ravel.queries.query` sorts `(score, name, result)` tuples
+> with `reverse=True`, so equal scores fall back to descending name comparison). This is a real,
+> user-visible ordering rule, not an implementation accident — pinned by
+> `tests/engine/test_engine_query.py::test_query_mode_orders_by_predicate_count_then_location_descending`.
+> The pseudocode below still applies with that tie-break folded into "sort by predicate_score
+> descending"; there is no separate `pending_events`/`WaitingForInput` step (§5).
+
 When the stack is empty, the VM enters query mode:
 
 ```
@@ -847,6 +929,15 @@ resume(state, input_data):
 ```
 
 ### 7.5 Execution Modes
+
+> **Deferred (2026-09-28, per §0).** None of Realtime/HATEOAS/Hybrid mode as described below is
+> built. The shipped design has one calling convention: a synchronous function call
+> (`start`/`choose`/`present`/`resume`) that returns a `Step` (new `GameState` + outputs) in one
+> shot — no `run_until_yield`/`resume(state, input_data)` split, no server loop, no checkpoint
+> interval. `ravel.app.GameSession` composes those calls into `new_game`/`choose`/`save`/`load`
+> for an adapter to drive (`ravel.cli.ConsoleUI` does, in a synchronous prompt loop); nothing
+> stops a caller from building an async HATEOAS endpoint or a checkpointing runner on top of
+> `GameSession`, but neither exists today.
 
 #### Realtime Mode (In-Memory)
 
@@ -964,6 +1055,27 @@ SituationDef("begin::intro::press-onward"):
 ## 9. Application Ports
 
 ### 9.1 Port Interfaces
+
+> **Replaced (2026-09-28, per §0).** None of the four async ports below were built. The shipped
+> application layer (`ravel.app.ports`) defines exactly two synchronous `Protocol`s, both in
+> `specs/001-reentrant-vm/contracts/session-api.md`:
+>
+> ```python
+> class StorySource(Protocol):
+>     def load(self) -> Story: ...  # raises ravel.exceptions.* on a bad source
+>
+> class SaveStore(Protocol):
+>     def write(self, name: str, data: bytes) -> str: ...  # returns a display path
+>     def read(self, name: str) -> bytes: ...               # at most MAX_SAVE_BYTES + 1 bytes
+> ```
+>
+> `ravel.adapters.story_source.FileSystemStorySource` and `ravel.adapters.save_store.FileSaveStore`
+> are the only implementations. There is no `EventPublisherPort` (no events, §5) and no separate
+> `StateRepositoryPort`/`RulebookRepositoryPort` split — a `Story` is immutable and loaded once per
+> `GameSession`, and state is persisted only as an encoded save via `SaveStore`, never as a
+> standalone repository entity.
+
+The historical design (not built):
 
 ```python
 class VMExecutorPort(Protocol):
