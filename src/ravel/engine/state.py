@@ -109,3 +109,42 @@ class GameState:
     status: Status
     offered: tuple[LocationId, ...]
     outcome: Outcome | None
+
+
+@frozen
+class ChoiceBlock:
+    """One choice block in a situation's directives: its choice targets and its ``GetChoice`` ip.
+
+    Built by ``ravel.engine.engine.choice_blocks``, shared by the run loop, ``encode_save``'s
+    anchor computation, and ``engine.resume``'s anchor resolution.
+    """
+
+    choices: tuple[LocationId, ...]
+    get_choice_ip: int
+
+
+@frozen
+class Anchor:
+    """Names a choice block by its content, not its raw ip, so a save survives a rulebook edit."""
+
+    choices: tuple[LocationId, ...]
+    ordinal: int
+
+
+@frozen
+class SavedFrame:
+    """One stack frame as saved: a location plus the anchor for the block it was waiting at."""
+
+    location: LocationId
+    anchor: Anchor
+
+
+@frozen
+class SavedGame:
+    """What ``decode_save`` produces: parsed and shape-checked, but not yet resolved against a
+    story. ``engine.resume(story, saved)`` does the resolution and is the only consumer."""
+
+    qualities: Qualities
+    stack: tuple[SavedFrame, ...]
+    status: Status
+    outcome: Outcome | None

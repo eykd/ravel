@@ -63,7 +63,16 @@ class Halted:
     dead_end: bool
 
 
-type Output = TextShown | ChoicesOffered | QualityChanged | SituationEntered | SituationExited | Halted
+@frozen
+class StoryChanged:
+    """Emitted by ``engine.resume`` when the loaded story no longer matches one or more saved
+    frames and they were truncated. Never emitted on a fresh ``start``/``choose``, and never
+    emitted by a load against an unchanged story."""
+
+    dropped: tuple[LocationId, ...]  # the dropped frames' locations, bottom (deepest kept) to top
+
+
+type Output = TextShown | ChoicesOffered | QualityChanged | SituationEntered | SituationExited | Halted | StoryChanged
 
 
 @frozen

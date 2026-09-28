@@ -39,7 +39,7 @@ def hand_built_story(directives):
         },
         "givens": [],
     }
-    return Story(rulebook=rulebook, identity="sha256:hand-built", end_labels=frozenset())
+    return Story(rulebook=rulebook)
 
 
 def waiting(offered, stack=(), qualities=None):
@@ -146,6 +146,20 @@ def test_gather_runs_only_after_the_chosen_sub_situation_finishes(mini, s0):
     )
     assert s2.state.stack == ()
     assert s2.state.qualities.get("Place") == "Middle"
+
+
+def test_a_second_choice_block_in_one_situation_is_found_after_the_first_doesnt_match():
+    """A situation with two separate choice blocks (data-model.md SS Choice blocks): resuming at
+    the second exercises ``begin_choices``'s scan past a first, non-matching block."""
+    duplicate = load_story(FIXTURES / "duplicate-blocks")
+    s0 = start(duplicate).state
+    s1 = choose(duplicate, s0, "begin::loop")
+
+    s2 = choose(duplicate, s1.state, "begin::loop::go-on")
+
+    assert s2.state.stack == (Frame("begin::loop", 7),)
+    assert s2.state.offered == ("begin::loop::go-on",)
+    assert s2.state.qualities.get("Visited") == 1
 
 
 # --- Unconditional pop ---------------------------------------------------------------------

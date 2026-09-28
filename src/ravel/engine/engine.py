@@ -18,9 +18,33 @@ from ravel.engine.outputs import (
     Step,
     TextShown,
 )
-from ravel.engine.state import Frame, GameState, LocationId, Outcome, Qualities, Status
+from ravel.engine.state import ChoiceBlock, Frame, GameState, LocationId, Outcome, Qualities, Status
 from ravel.engine.story import Story
 from ravel.utils.strings import get_text
+
+
+def choice_blocks(situation: types.Situation) -> tuple[ChoiceBlock, ...]:
+    """Every choice block in ``situation``, source order.
+
+    Shared by the run loop (``begin_choices``), ``encode_save`` (to compute an anchor), and
+    ``engine.resume`` (to resolve one).
+    """
+    directives = situation.directives
+    blocks: list[ChoiceBlock] = []
+    ip = 0
+    while ip < len(directives):
+        if not isinstance(directives[ip], types.BeginChoices):
+            ip += 1
+            continue
+        choices: list[LocationId] = []
+        get_choice_ip = ip + 1
+        while get_choice_ip < len(directives) and isinstance(directives[get_choice_ip], types.Choice):
+            choices.append(directives[get_choice_ip].choice)
+            get_choice_ip += 1
+        if get_choice_ip < len(directives) and isinstance(directives[get_choice_ip], types.GetChoice):
+            blocks.append(ChoiceBlock(choices=tuple(choices), get_choice_ip=get_choice_ip))
+        ip = get_choice_ip + 1
+    return tuple(blocks)
 
 
 def _apply_operation(qualities: Qualities, operation: types.Operation) -> tuple[Qualities, QualityChanged]:
@@ -121,17 +145,13 @@ class _Run:
         self.advance(frame, frame.ip + 1)
 
     def begin_choices(self, frame: Frame, _directive: types.BeginChoices) -> Step:
-        """Gather the block's choices, rest on its ``GetChoice``, and wait."""
-        directives = self.situation(frame.location).directives
-        ip = frame.ip + 1
-        choices: list[ChoiceOption] = []
-        while ip < len(directives) and isinstance(directives[ip], types.Choice):
-            choices.append(self.option(directives[ip].choice))
-            ip += 1
-        if ip >= len(directives) or not isinstance(directives[ip], types.GetChoice):
-            raise InvalidStateError("%r has a choice block without a GetChoice" % frame.location)
-        self.advance(frame, ip)
-        return self.rest(tuple(choices))
+        """Find this block via ``choice_blocks``, rest on its ``GetChoice``, and wait."""
+        situation = self.situation(frame.location)
+        for block in choice_blocks(situation):
+            if block.get_choice_ip - len(block.choices) == frame.ip + 1:
+                self.advance(frame, block.get_choice_ip)
+                return self.rest(tuple(self.option(location) for location in block.choices))
+        raise InvalidStateError("%r has a choice block without a GetChoice" % frame.location)
 
     def unreachable(self, frame: Frame, directive: object) -> None:
         raise InvalidStateError("%r reached %r outside a choice block" % (frame.location, directive))
