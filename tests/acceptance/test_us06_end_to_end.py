@@ -7,8 +7,8 @@ hypothesis-driven determinism property, is ravel-8qa.5.6.2's job -- not written 
 menu position -- to pin the exact win and loss routes through Cloak. (3) drives the real
 ``ravel.cli`` front door (a ``click.testing.CliRunner`` over ``ConsoleUI``) through a save mid-route,
 a quit, and a ``--load`` restart, and asserts the transcript ends on the win outcome line. Per US5
-(ravel-8qa.5.5.x), ``ravel.cli`` is a thin ``ConsoleUI`` over ``GameSession``; ``ravel.vm`` and
-blinker are gone.
+(ravel-8qa.5.5.x), ``ravel.cli`` is a thin ``ConsoleUI`` over ``GameSession``; the old stack VM
+and its signal bus are gone.
 
 Given US2/US3/US4/US5 are already closed, both routes below are expected to already reach their
 documented halts -- if so this file is unexpectedly GREEN already; see the task's commit
