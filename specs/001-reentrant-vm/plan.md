@@ -451,8 +451,12 @@ the permanent "every example loads" test passes locally and fails in CI.
   reads; each `validate_resumable` rule; each decode step.
 - **Surrogate tests**: `decode_save` refuses a lone high (`"\ud800"`) and a lone low
   (`"\udc80"`) surrogate, both as a quality value and as a quality name (`SaveCorruptError`), and
-  **accepts** a valid pair escape (`"\ud83d\ude00"` → one astral character), which must
-  round-trip byte-identically; `Qualities.set("q", "\udc80")` raises `InvalidQualityValueError`.
+  **accepts** a valid pair escape (`"\ud83d\ude00"` → one astral character). Because
+  `ensure_ascii=False`, re-encoding writes that character as raw UTF-8 (`\xf0\x9f\x98\x80`), **not**
+  the input's escape, so the test asserts decode → encode yields the canonical raw form and that
+  the canonical bytes then round-trip byte-identically — never that the escaped input bytes come
+  back unchanged (that assertion fails, and "fixing" it with `ensure_ascii=True` would change the
+  canonical format). `Qualities.set("q", "\udc80")` raises `InvalidQualityValueError`.
 - **Layering test**: resolves relative imports (`from ..app import x`) against the module's
   package, scans `import a.b` and `from a import b` forms, and uses the allowlist
   `{__future__, abc, collections, dataclasses, enum, functools, hashlib, itertools, json, math,
