@@ -46,7 +46,8 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["ravel"]
+source = ["ravel", "tools"]
+omit = ["*/test*.py", "*/conftest.py"]
 
 [tool.coverage.report]
 show_missing = true
@@ -64,11 +65,11 @@ select = ["E", "F", "W", "B", "C4", "SIM", "I", "UP"]
 ignore = ["UP031"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ravel"]
+known-first-party = ["ravel", "tools"]
 
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
-files = ["src"]
+files = ["src", "tools"]
 
 [[tool.mypy.overrides]]
 module = ["parsimonious.*", "syml.*", "colorclass.*", "slugify.*"]

@@ -5,6 +5,7 @@ exec uv run pytest \
     --failed-first \
     --exitfirst \
     --cov=ravel \
+    --cov=tools \
     --cov-branch \
     --disable-warnings \
     --no-cov-on-fail "$@"
