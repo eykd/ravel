@@ -1,0 +1,20 @@
+given:
+  - Location = "Loop"
+
+# Two `choice:` blocks below share the exact same label ("Go on"), so they compile to the same
+# child situation (`begin::loop::go-on`) -- the compiler namespaces a choice's own body by its
+# parent rule plus a slug of its own label, and a later definition for the same slug silently
+# wins (`ravel.utils.data.merge_dicts`). That's deliberate here: this fixture exists to give
+# `encode_save`/`engine.resume` two choice blocks with an identical `anchor.choices` tuple in one
+# situation, disambiguated only by `ordinal` (data-model.md SS Choice blocks, anchors, and saved
+# frames). Only "Second time through." ever actually runs; "First time through." is dead body
+# text kept for readability, not a bug.
+loop:
+  - when:
+      - Location = "Loop"
+  - You are looping.
+  - choice:
+      - [Go on]First time through.
+  - effect: Visited = 1
+  - choice:
+      - [Go on]Second time through.

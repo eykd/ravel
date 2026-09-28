@@ -1,10 +1,12 @@
 """Acceptance test for US4: save and load a game.
 
-RED per ravel-8qa.5.4.1 -- expected to FAIL with a collection-time
-``ModuleNotFoundError`` on ``ravel.app`` (``ravel.app``, ``ravel.adapters.save_store``, and
-``ravel.adapters.story_source`` don't exist yet) until the US4 Green leaves land
-(ravel-8qa.5.4.2 onward, per specs/001-reentrant-vm/contracts/session-api.md and
-save-format.md).
+RED per ravel-8qa.5.4.1, rewritten per ravel-8qa.5.4.6 for the 2026-09-28 design revision
+(anchored, rulebook-independent saves -- see specs/001-reentrant-vm/spec.md SS Clarifications SS
+Session 2026-09-28, contracts/save-format.md, contracts/session-api.md, contracts/engine-api.md).
+Still expected to FAIL with a collection-time ``ModuleNotFoundError`` on ``ravel.app``
+(``ravel.app``, ``ravel.adapters.save_store``, ``ravel.adapters.story_source``, and
+``ravel.engine.outputs.StoryChanged`` don't exist yet) until the US4 Green leaves land
+(ravel-8qa.5.4.2 onward).
 """
 
 import json
@@ -19,12 +21,10 @@ from ravel.app import (
     GameSession,
     LoadRefusedError,
     SaveCorruptError,
-    StoryChangedError,
-    UnknownLocationError,
     UnsupportedSaveVersionError,
 )
 from ravel.engine.errors import GameOverError
-from ravel.engine.outputs import ChoiceOption, ChoicesOffered, QualityChanged
+from ravel.engine.outputs import ChoiceOption, ChoicesOffered, QualityChanged, StoryChanged
 from ravel.engine.state import Outcome, Status
 
 pytestmark = pytest.mark.acceptance
@@ -32,6 +32,7 @@ pytestmark = pytest.mark.acceptance
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CLOAK_PATH = REPO_ROOT / "examples" / "cloak"
 MINI_PATH = REPO_ROOT / "tests" / "fixtures" / "stories" / "mini"
+DUPLICATE_BLOCKS_PATH = REPO_ROOT / "tests" / "fixtures" / "stories" / "duplicate-blocks"
 
 
 def _cloak_source() -> FileSystemStorySource:
@@ -42,8 +43,12 @@ def _mini_source() -> FileSystemStorySource:
     return FileSystemStorySource(MINI_PATH)
 
 
+def _duplicate_blocks_source() -> FileSystemStorySource:
+    return FileSystemStorySource(DUPLICATE_BLOCKS_PATH)
+
+
 def test_saving_at_a_menu_produces_a_canonical_save_with_the_documented_fields(tmp_path):
-    """US4-AS1/FR-022: a save at a menu is canonical JSON with format, identity, and state fields."""
+    """US4-AS1/FR-022: a save at a menu is canonical JSON with format and state fields."""
     story = _cloak_source().load()
     session = GameSession(story, FileSaveStore(tmp_path))
     session.new_game()
@@ -62,17 +67,14 @@ def test_saving_at_a_menu_produces_a_canonical_save_with_the_documented_fields(t
     recanonicalized = json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     assert recanonicalized.encode("utf-8") + b"\n" == data
 
-    assert set(doc) == {"format", "format_version", "story_id", "state"}
+    assert set(doc) == {"format", "format_version", "state"}
     assert doc["format"] == "ravel-save"
     assert doc["format_version"] == 1
-    assert doc["story_id"] == story.identity
 
     state = doc["state"]
-    assert set(state) == {"qualities", "stack", "status", "offered", "outcome"}
+    assert set(state) == {"qualities", "stack", "status", "outcome"}
     assert state["status"] == "waiting_input"
     assert state["outcome"] is None
-    assert state["offered"] == list(session.state.offered)
-    assert state["offered"]  # Foyer's menu is non-empty
 
     qualities = state["qualities"]
     assert type(qualities["Wearing Cloak"]) is int
@@ -80,8 +82,19 @@ def test_saving_at_a_menu_produces_a_canonical_save_with_the_documented_fields(t
     assert type(qualities["Location"]) is str
     assert qualities["Location"] == "Foyer"
 
-    assert state["stack"] == [{"location": frame.location, "ip": frame.ip} for frame in session.state.stack]
-    assert all(set(entry) == {"location", "ip"} for entry in state["stack"])
+    # A save no longer carries a raw `ip`: each stack frame is named by its `location` plus an
+    # `anchor` -- the choice block's own targets (`choices`) and a disambiguating `ordinal` --
+    # never the ip (data-model.md SS Choice blocks, anchors, and saved frames).
+    assert len(state["stack"]) == 1
+    assert all(set(entry) == {"location", "anchor"} for entry in state["stack"])
+    assert all(set(entry["anchor"]) == {"choices", "ordinal"} for entry in state["stack"])
+
+    top = state["stack"][-1]
+    assert top["location"] == session.state.stack[-1].location == "begin::intro"
+    # The anchor's choices match the offered menu; Cloak has no duplicated choice blocks here,
+    # so the ordinal is 0.
+    assert top["anchor"]["choices"] == list(session.state.offered)
+    assert top["anchor"]["ordinal"] == 0
 
 
 def test_loading_restores_state_without_reapplying_givens_and_represents_the_menu(tmp_path):
@@ -161,45 +174,121 @@ def test_save_mid_game_then_load_and_continue_matches_an_uninterrupted_run(tmp_p
     assert (tmp_path / "final-uninterrupted.json").read_bytes() == (tmp_path / "final-resumed.json").read_bytes()
 
 
-def test_loading_against_a_changed_story_is_refused_and_leaves_state_untouched(tmp_path):
-    """US4-AS4/FR-024: an edited (differently-compiled) story refuses the load and leaves state."""
-    live_story = _cloak_source().load()
-    live = GameSession(live_story, FileSaveStore(tmp_path))
+def test_loading_against_a_changed_story_is_degraded_not_refused(tmp_path):
+    """US4-AS4 (2026-09-28 revision)/FR-024: a changed story never refuses a load. ``resume``
+    degrades it instead -- truncating the stale part of the stack and reporting it via a leading
+    ``StoryChanged`` -- per save-format.md's round-trip laws (a)-(c). (d), the
+    ordinal-disambiguation case, is its own test below."""
+    mini = _mini_source().load()
+    live = GameSession(mini, FileSaveStore(tmp_path))
     live.new_game()
-    live.choose("begin::intro")
+    live.choose("begin::bridge")
+    live.choose("begin::bridge::follow-the-tunnel")
+    expected_menu = live.menu()
+    assert expected_menu == (
+        ChoiceOption("begin::bridge::follow-the-tunnel::press-onward-into-the-dark", "Press onward into the dark"),
+        ChoiceOption("begin::bridge::follow-the-tunnel::turn-back-to-the-bridge", "Turn back to the bridge"),
+    )
     live.save("mid.json")
     state_before = live.state
 
-    edited_dir = tmp_path / "edited-cloak"
-    shutil.copytree(CLOAK_PATH, edited_dir)
-    begin_ravel = edited_dir / "begin.ravel"
-    assert begin_ravel.exists()
-    begin_ravel.write_text(
-        begin_ravel.read_text(encoding="utf-8").replace("Press onward!", "Press onward now!"),
+    # (a) a benign edit elsewhere in the story (an unrelated situation, "crossroads") -> load
+    # succeeds, resumes at the very same menu, and emits no `StoryChanged` at all -- the anchor
+    # still matches.
+    benign_dir = tmp_path / "benign-edit"
+    shutil.copytree(MINI_PATH, benign_dir)
+    benign_ravel = benign_dir / "begin.ravel"
+    benign_ravel.write_text(
+        benign_ravel.read_text(encoding="utf-8").replace(
+            "The signpost points every which way.",
+            "The signpost points every which way, uselessly.",
+        ),
         encoding="utf-8",
     )
-    edited_story = FileSystemStorySource(edited_dir).load()
-    assert edited_story.identity != live_story.identity
+    benign_story = FileSystemStorySource(benign_dir).load()
+    benign_session = GameSession(benign_story, FileSaveStore(tmp_path))
+    benign_outs = benign_session.load("mid.json")
 
-    edited_session = GameSession(edited_story, FileSaveStore(tmp_path))
-    with pytest.raises(StoryChangedError, match="story has changed"):
-        edited_session.load("mid.json")
+    assert benign_outs == (ChoicesOffered(expected_menu),)
+    assert not any(isinstance(output, StoryChanged) for output in benign_outs)
+    assert benign_session.state == state_before
+    assert live.state == state_before  # the live session's own state is never touched by a load
 
-    # Nothing was assigned: the edited session still has no game, and the live session, whose
-    # save this was, is completely untouched.
-    with pytest.raises(Exception):  # noqa: B017, PT011 - NoGameError; asserting "no game" not its type
-        _ = edited_session.state
-    assert live.state == state_before
+    # (a), sharper variant: a line added *inside* the saved choice block's own situation, above
+    # the block itself, shifts every directive index after it -- proving the anchor (the choice
+    # block's own content), not the old raw `ip`, is what's actually being matched. The anchor
+    # tuple itself is untouched, so this still resumes clean, with no `StoryChanged`; only the
+    # frame's underlying ip differs, so this asserts the menu/qualities/stack shape rather than
+    # `state == state_before`.
+    shifted_dir = tmp_path / "shifted-ip"
+    shutil.copytree(MINI_PATH, shifted_dir)
+    shifted_ravel = shifted_dir / "begin.ravel"
+    shifted_ravel.write_text(
+        shifted_ravel.read_text(encoding="utf-8").replace(
+            "      - [Follow the tunnel]You follow a tunnel deeper underground.\n",
+            "      - [Follow the tunnel]You follow a tunnel deeper underground.\n"
+            "      - It is dark and close in here.\n",
+        ),
+        encoding="utf-8",
+    )
+    shifted_story = FileSystemStorySource(shifted_dir).load()
+    shifted_session = GameSession(shifted_story, FileSaveStore(tmp_path))
+    shifted_outs = shifted_session.load("mid.json")
 
-    # A positive control: identity derives from compiled content, not from the directory path, so
-    # an unedited copy of the same story loads the same save without complaint.
-    unedited_dir = tmp_path / "unedited-cloak"
-    shutil.copytree(CLOAK_PATH, unedited_dir)
-    unedited_story = FileSystemStorySource(unedited_dir).load()
-    assert unedited_story.identity == live_story.identity
-    unedited_session = GameSession(unedited_story, FileSaveStore(tmp_path))
-    unedited_session.load("mid.json")
-    assert unedited_session.state == live.state
+    assert shifted_outs == (ChoicesOffered(expected_menu),)
+    assert not any(isinstance(output, StoryChanged) for output in shifted_outs)
+    assert shifted_session.menu() == expected_menu
+    assert shifted_session.state.qualities == state_before.qualities
+    assert [frame.location for frame in shifted_session.state.stack] == [frame.location for frame in state_before.stack]
+
+    # (b) deleting the saved (bottom) situation entirely -> every frame above it is dropped too,
+    # `StoryChanged` names them all bottom-to-top, and the state re-derives a fresh top-level
+    # query menu from the saved qualities.
+    deleted_dir = tmp_path / "deleted-bridge"
+    shutil.copytree(MINI_PATH, deleted_dir)
+    deleted_ravel = deleted_dir / "begin.ravel"
+    original = deleted_ravel.read_text(encoding="utf-8")
+    bridge_start = original.index("bridge:")
+    bridge_end = original.index("dead-end:")
+    deleted_ravel.write_text(original[:bridge_start] + original[bridge_end:], encoding="utf-8")
+    deleted_story = FileSystemStorySource(deleted_dir).load()
+
+    deleted_session = GameSession(deleted_story, FileSaveStore(tmp_path))
+    deleted_outs = deleted_session.load("mid.json")
+
+    assert deleted_outs[0] == StoryChanged(dropped=("begin::bridge", "begin::bridge::follow-the-tunnel"))
+    assert isinstance(deleted_outs[1], ChoicesOffered)
+    assert len(deleted_outs) == 2
+    assert deleted_session.state.stack == ()
+    assert deleted_session.state.qualities == state_before.qualities
+
+    # (c) changing the top frame's own choice block's targets -> only that frame (and anything
+    # above it) is dropped; the parent frame survives and becomes the new top, re-offering its
+    # own (unchanged) menu.
+    retargeted_dir = tmp_path / "retargeted-tunnel"
+    shutil.copytree(MINI_PATH, retargeted_dir)
+    retargeted_ravel = retargeted_dir / "begin.ravel"
+    retargeted_ravel.write_text(
+        retargeted_ravel.read_text(encoding="utf-8").replace(
+            "[Press onward into the dark]Something glints ahead in the dark.",
+            "[Press onward into the darkness]Something glints ahead in the dark.",
+        ),
+        encoding="utf-8",
+    )
+    retargeted_story = FileSystemStorySource(retargeted_dir).load()
+
+    retargeted_session = GameSession(retargeted_story, FileSaveStore(tmp_path))
+    retargeted_outs = retargeted_session.load("mid.json")
+
+    assert retargeted_outs[0] == StoryChanged(dropped=("begin::bridge::follow-the-tunnel",))
+    assert len(retargeted_session.state.stack) == 1
+    assert retargeted_session.state.stack[-1].location == "begin::bridge"
+    assert retargeted_outs[1] == ChoicesOffered(
+        (
+            ChoiceOption("begin::bridge::follow-the-tunnel", "Follow the tunnel"),
+            ChoiceOption("begin::bridge::shout-into-the-void", "Shout into the void"),
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -217,12 +306,6 @@ def test_loading_against_a_changed_story_is_refused_and_leaves_state_untouched(t
             UnsupportedSaveVersionError,
             "2",
             id="unsupported-version",
-        ),
-        pytest.param(
-            lambda doc: doc["state"].__setitem__("offered", ["nowhere::not-a-place"]),
-            UnknownLocationError,
-            "nowhere::not-a-place",
-            id="unknown-location",
         ),
     ],
 )
@@ -276,3 +359,45 @@ def test_loading_a_halted_save_restores_the_halt_and_rejects_further_choices(tmp
 
     with pytest.raises(GameOverError):
         loaded.choose("begin::bridge")
+
+
+def test_saving_at_duplicate_choice_blocks_is_disambiguated_by_ordinal(tmp_path):
+    """US4-AS4(d)/data-model.md SS Anchor: two choice blocks in one situation offering the exact
+    same choice-target tuple are disambiguated by `ordinal`, not conflated -- a save taken at the
+    first occurrence resumes at the first occurrence, and a save at the second resumes at the
+    second, even though `anchor.choices` alone can't tell them apart."""
+    duplicate = _duplicate_blocks_source().load()
+
+    first = GameSession(duplicate, FileSaveStore(tmp_path))
+    first.new_game()
+    first.choose("begin::loop")
+    assert first.menu() == (ChoiceOption("begin::loop::go-on", "Go on"),)
+    first.save("ordinal-0.json")
+    state_at_ordinal_0 = first.state
+    outputs_after_ordinal_0 = first.choose("begin::loop::go-on")
+
+    second = GameSession(duplicate, FileSaveStore(tmp_path))
+    second.new_game()
+    second.choose("begin::loop")
+    second.choose("begin::loop::go-on")  # consumes the first (ordinal 0) block
+    assert second.menu() == (ChoiceOption("begin::loop::go-on", "Go on"),)  # now at ordinal 1
+    second.save("ordinal-1.json")
+    state_at_ordinal_1 = second.state
+
+    # The two saves are genuinely different states (the second has run the intervening effect),
+    # so a resume that ignored `ordinal` and always resolved to the first match would conflate
+    # them.
+    assert state_at_ordinal_1 != state_at_ordinal_0
+    assert state_at_ordinal_1.qualities.get("Visited") == 1
+    assert state_at_ordinal_0.qualities.get("Visited") is None
+
+    reloaded_0 = GameSession(duplicate, FileSaveStore(tmp_path))
+    reloaded_0_outs = reloaded_0.load("ordinal-0.json")
+    assert reloaded_0.state == state_at_ordinal_0
+    assert not any(isinstance(output, StoryChanged) for output in reloaded_0_outs)
+    assert reloaded_0.choose("begin::loop::go-on") == outputs_after_ordinal_0
+
+    reloaded_1 = GameSession(duplicate, FileSaveStore(tmp_path))
+    reloaded_1_outs = reloaded_1.load("ordinal-1.json")
+    assert reloaded_1.state == state_at_ordinal_1
+    assert not any(isinstance(output, StoryChanged) for output in reloaded_1_outs)
