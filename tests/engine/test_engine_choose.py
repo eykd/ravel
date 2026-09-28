@@ -221,3 +221,17 @@ def test_out_of_range_ip_raises_invalid_state(mini):
 
     with pytest.raises(InvalidStateError):
         choose(mini, state, "begin::fork::go-left")
+
+
+def test_choice_block_running_off_the_end_raises_invalid_state():
+    story = hand_built_story([types.BeginChoices(), types.Choice("s")])
+
+    with pytest.raises(InvalidStateError):
+        choose(story, waiting(("s",)), "s")
+
+
+def test_choice_block_without_get_choice_raises_invalid_state():
+    story = hand_built_story([types.BeginChoices(), types.Choice("s"), types.Text("stray")])
+
+    with pytest.raises(InvalidStateError):
+        choose(story, waiting(("s",)), "s")
