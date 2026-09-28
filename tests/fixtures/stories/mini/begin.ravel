@@ -24,6 +24,19 @@ bridge:
   - when:
       - Location = "Fork"
   - [Cross the bridge]You cross the bridge.
+  - choice:
+      - [Follow the tunnel]You follow a tunnel deeper underground.
+      - choice:
+          - [Press onward into the dark]Something glints ahead in the dark.
+          - end: won
+          - effect: Trap = 1
+      - choice:
+          - [Turn back to the bridge]You retreat, saying nothing.
+          - end:
+  - choice:
+      - [Shout into the void]Your voice fades to nothing.
+      - end: lost
+  - effect: Place = "AfterBridge"
 
 dead-end:
   - when:
