@@ -285,6 +285,8 @@ look-around:
 - Missing qualities are treated as `0`
 - More predicates = higher specificity score (used for ordering)
 
+A condition that cannot be evaluated (for example `X > 10 / Y` with `Y` unset, or `X > Name` with `Name` a string) is false. So `X > E` and `X <= E` can both be false, and a story whose conditions all fail reaches a dead end.
+
 ---
 
 ## 7. Operations and Effects

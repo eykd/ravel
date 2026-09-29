@@ -51,20 +51,25 @@ class Comparison:
     def get_comparators(self) -> Callable[[Any, Any], Any]:
         return self._comparators[self.comparator]
 
-    def get_expression(self, **kwargs: Any) -> Any:
-        return evaluate_term(self.expression, **kwargs)
+    def evaluate(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool:
+        current = 0 if qvalue is None else qvalue
+        rhs = evaluate_term(self.expression, qualities=qualities, qvalue=current)
+        try:
+            return bool(self.get_comparators()(current, rhs))
+        except (TypeError, ArithmeticError) as error:
+            raise EvaluationError("%r: %s" % (self, error)) from error
 
-    def evaluate(self, qvalue: Any, **kwargs: Any) -> Any:
-        if qvalue is None:
-            qvalue = 0
-        return self.get_comparators()(qvalue, self.get_expression(qvalue=qvalue, **kwargs))
+    def check(self, qualities: QualityLookup) -> bool:
+        try:
+            return self.evaluate(qualities.get(self.quality), qualities=qualities)
+        except EvaluationError:
+            return False
 
-    def check(self, qualities: Any, **kwargs: Any) -> Any:
-        value = qualities.get(self.quality)
-        return self.evaluate(value, **kwargs)
-
-    def __call__(self, qvalue: Any, **kwargs: Any) -> Any:
-        return self.evaluate(qvalue, **kwargs)
+    def __call__(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool:
+        try:
+            return self.evaluate(qvalue, qualities=qualities)
+        except EvaluationError:
+            return False
 
     def __repr__(self) -> str:
         return "(%r %s %r)" % (self.quality, self.comparator, self.expression)
@@ -155,11 +160,11 @@ class Predicate:
     name: Any = attr.ib()
     predicate: Any = attr.ib()
 
-    def check(self, qualities: Any, **kwargs: Any) -> Any:
+    def check(self, qualities: QualityLookup) -> bool:
         if self.predicate is None:
             return True
 
-        return self.predicate.check(qualities, **kwargs)
+        return bool(self.predicate.check(qualities))
 
 
 @attr.s(slots=True)
@@ -174,11 +179,11 @@ class Text:
     sticky: Any = attr.ib(default=False, repr=False)
     predicate: Any = attr.ib(default=None, repr=False)
 
-    def check(self, qualities: Any, **kwargs: Any) -> Any:
+    def check(self, qualities: QualityLookup) -> bool:
         if self.predicate is None:
             return True
 
-        return self.predicate.check(qualities, **kwargs)
+        return bool(self.predicate.check(qualities))
 
     def __str__(self) -> str:
         return str(self.text)
