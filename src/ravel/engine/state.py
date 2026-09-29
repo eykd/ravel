@@ -9,6 +9,7 @@ from typing import Final
 from attrs import frozen
 
 from ravel.engine.errors import InvalidQualityValueError
+from ravel.types import MAX_STRING_LENGTH
 
 type QualityValue = int | float | str
 type LocationId = str
@@ -34,7 +35,7 @@ def _is_storable(value: object) -> bool:
         return value in INT_QUALITY_RANGE
     if isinstance(value, float):
         return math.isfinite(value)
-    return is_surrogate_free(value)
+    return len(value) <= MAX_STRING_LENGTH and is_surrogate_free(value)
 
 
 def _validate_quality(name: str, value: object) -> None:

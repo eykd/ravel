@@ -344,3 +344,40 @@ class TestConstraintApply:
 
     def test_constraint_error_is_an_evaluation_error(self):
         assert issubclass(exceptions.ConstraintError, exceptions.EvaluationError)
+
+
+class TestStringConcatenationCap:
+    def test_it_concatenates_short_strings(self):
+        assert types.Expression("a", "+", "b").evaluate() == "ab"
+        assert types.Operation("s", "+=", "b").evaluate("a") == "ab"
+
+    def test_it_leaves_numeric_addition_unchanged(self):
+        assert types.Expression(2, "+", 3).evaluate() == 5
+
+    def test_it_concatenates_up_to_the_cap(self):
+        half = "x" * (types.MAX_STRING_LENGTH // 2)
+        assert len(types.Expression(half, "+", half).evaluate()) == types.MAX_STRING_LENGTH
+        assert len(types.Operation("s", "+=", half).evaluate(half)) == types.MAX_STRING_LENGTH
+
+    def test_it_rejects_an_expression_over_the_cap(self):
+        with pytest.raises(exceptions.EvaluationError, match="maximum string length"):
+            types.Expression("x" * types.MAX_STRING_LENGTH, "+", "y").evaluate()
+
+    def test_it_rejects_an_operation_over_the_cap(self):
+        with pytest.raises(exceptions.EvaluationError, match="maximum string length"):
+            types.Operation("s", "+=", "y").evaluate("x" * types.MAX_STRING_LENGTH)
+
+    def test_an_over_cap_concatenation_makes_a_comparison_false(self):
+        overflow = types.Expression("x" * types.MAX_STRING_LENGTH, "+", "y")
+        assert types.Comparison("S", "==", overflow)("z") is False
+
+    def test_it_does_not_build_the_oversize_string(self):
+        big = "x" * types.MAX_STRING_LENGTH
+
+        # A str subclass whose __add__ would flag any concatenation actually being attempted.
+        class Trap(str):
+            def __add__(self, other):
+                raise AssertionError("concatenated before checking the cap")
+
+        with pytest.raises(exceptions.EvaluationError):
+            types.Expression(Trap(big), "+", "y").evaluate()

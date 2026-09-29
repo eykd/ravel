@@ -23,12 +23,23 @@ EMPTY_QUALITIES: Final[Mapping[str, QualityValue]] = MappingProxyType({})
 
 
 _STRING_SAFE_OPERATORS: Final = frozenset({"+", "+=", "="})
+_CONCATENATING_OPERATORS: Final = frozenset({"+", "+="})
+
+# Longest string a quality may hold, in characters (generous for prose). ``+`` checks the combined length
+# before concatenating, so a doubling ``s += s`` or a long ``s + s + ...`` chain fails with a typed
+# EvaluationError instead of building an enormous intermediate string.
+MAX_STRING_LENGTH: Final = 65_536
 
 
 def _reject_string_arithmetic(operator: str, left: Any, right: Any, *, subject: object) -> None:
-    """Raise unless a string operand only meets ``+``/``+=``/``=`` (blocks ``"a" * N`` and ``"%99999d" % 1``)."""
+    """Raise unless string operands only meet ``+``/``+=``/``=`` and any concatenation stays within the cap."""
     if operator not in _STRING_SAFE_OPERATORS and (isinstance(left, str) or isinstance(right, str)):
         raise EvaluationError("%r: operator %r does not accept string operands" % (subject, operator))
+    concatenating = operator in _CONCATENATING_OPERATORS and isinstance(left, str) and isinstance(right, str)
+    if concatenating and len(left) + len(right) > MAX_STRING_LENGTH:
+        raise EvaluationError(
+            "%r: concatenation would exceed the maximum string length (%d)" % (subject, MAX_STRING_LENGTH)
+        )
 
 
 @attr.s(slots=True)

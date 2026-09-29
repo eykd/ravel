@@ -5,8 +5,9 @@ import pytest
 from ravel.adapters.story_source import FileSystemStorySource, MemoryStorySource
 from ravel.app.ports import StorySource
 from ravel.engine.engine import start
+from ravel.engine.errors import InvalidOperationError
 from ravel.engine.story import Story
-from ravel.exceptions import ParseError, RulebookNotFound
+from ravel.exceptions import EvaluationError, ParseError, RulebookNotFound
 from ravel.parsers import MAX_EXPRESSION_OPERANDS
 
 
@@ -149,3 +150,28 @@ def test_memory_source_rejects_an_oversized_integer_literal_at_load(line):
 
     with pytest.raises(ParseError):
         MemoryStorySource({"begin": src}).load()
+
+
+def _play(src):
+    return start(MemoryStorySource({"begin": src}).load())
+
+
+def test_memory_source_repeated_doubling_given_fails_typed():
+    src = "given:\n  - S = 'ab'\n" + "  - S += S\n" * 30 + "\nstart:\n  - when:\n      - S != 0\n  - Ready.\n"
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        _play(src)
+
+    assert isinstance(excinfo.value.__cause__, EvaluationError)
+
+
+def test_memory_source_long_concatenation_chain_given_fails_typed():
+    chain = " + ".join(["S"] * MAX_EXPRESSION_OPERANDS)
+    src = (
+        "given:\n  - S = 'abcdefgh'\n"
+        + "  - S = %s\n" % chain * 4
+        + "\nstart:\n  - when:\n      - S != 0\n  - Ready.\n"
+    )
+
+    with pytest.raises(InvalidOperationError):
+        _play(src)

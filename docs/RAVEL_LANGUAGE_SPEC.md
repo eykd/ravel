@@ -1032,6 +1032,27 @@ story/
 | State model | Sequential with jumps | Quality-based matching |
 | Use case | Linear branching | Quality-based narratives |
 
+### E. Limits
+
+The engine refuses hostile or runaway input at fixed caps. Each cap fails with a typed error rather than
+exhausting memory or the interpreter stack.
+
+| Limit | Value | Error |
+|-------|-------|-------|
+| Operands in one expression chain (`a + b + c ...`) | 100 | `ParseError` at compile time |
+| Parenthesis nesting in one expression | 20 | `ParseError` at compile time |
+| Total expression tree depth | 200 | `ParseError` at compile time |
+| Digits in an integer literal | 4300 (Python's `sys.get_int_max_str_digits()` default) | `ParseError` at compile time |
+| Choice block nesting | 200 | `ParseError` at compile time |
+| String length (a quality's value, and the result of any `+` or `+=`) | 65,536 characters | `EvaluationError` |
+| Integer quality range | -2^63 to 2^63 - 1 | `InvalidQualityValueError` on store |
+| Save file size | 1 MiB | `SaveCorruptError` on load |
+
+The string cap is checked on the combined length before two strings are concatenated, so the oversize
+result is never built. An `EvaluationError` in a `when:` predicate makes that predicate false; in an
+`effect:` or `given:` it surfaces as the engine's `InvalidOperationError`. A string longer than the cap is
+also unstorable, so `InvalidQualityValueError` guards storage as a second check.
+
 ---
 
 ## 14. Version History
