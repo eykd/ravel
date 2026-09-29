@@ -30,11 +30,12 @@ from ravel.engine.state import (
     is_surrogate_free,
 )
 from ravel.engine.story import Story
-from ravel.utils.excerpts import bounded_repr
+from ravel.utils.excerpts import bounded_repr, printable
 
 SAVE_FORMAT: Final = "ravel-save"
 SAVE_FORMAT_VERSION: Final = 1
 MAX_SAVE_BYTES: Final = 1_048_576  # 1 MiB
+MAX_LISTED_KEYS: Final = 5  # keys named in a key-mismatch error before "and N more"
 SAVE_MAGIC: Final = b'{"format":"ravel-save"'  # every canonical v1 save starts with this
 
 
@@ -185,7 +186,17 @@ def _parse_json(data: bytes) -> object:
     except SaveCorruptError:
         raise
     except (UnicodeDecodeError, ValueError, RecursionError) as error:
-        raise SaveCorruptError("not valid JSON: %s" % error) from error
+        raise SaveCorruptError("not valid JSON: %s" % printable(error)) from error
+
+
+def _list_keys(keys: set[str]) -> str:
+    """Name at most ``MAX_LISTED_KEYS`` of ``keys`` (sorted), each bounded, then ``and N more``."""
+    shown = sorted(keys)[:MAX_LISTED_KEYS]
+    text = ", ".join(bounded_repr(key) for key in shown)
+    hidden = len(keys) - len(shown)
+    if hidden:
+        text += " and %d more" % hidden
+    return text
 
 
 def _check_keys(obj: Mapping[str, object], required: set[str], label: str) -> None:
@@ -196,9 +207,9 @@ def _check_keys(obj: Mapping[str, object], required: set[str], label: str) -> No
     extra = keys - required
     problems = []
     if missing:
-        problems.append("missing %s" % ", ".join(sorted(repr(key) for key in missing)))
+        problems.append("missing %s" % _list_keys(missing))
     if extra:
-        problems.append("unexpected %s" % ", ".join(sorted(repr(key) for key in extra)))
+        problems.append("unexpected %s" % _list_keys(extra))
     raise SaveCorruptError("%s: %s" % (label, "; ".join(problems)))
 
 
@@ -335,4 +346,4 @@ def decode_save(data: bytes) -> SavedGame:
     except LoadRefusedError:
         raise
     except Exception as error:
-        raise SaveCorruptError("unexpected error decoding save: %s" % error) from error
+        raise SaveCorruptError("unexpected error decoding save: %s" % printable(error)) from error

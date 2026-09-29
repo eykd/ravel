@@ -313,6 +313,44 @@ class TestDecodeSaveErrors:
         with pytest.raises(SaveCorruptError, match="extra"):
             decode_save(_canonical(doc))
 
+    def test_step4_bounds_a_huge_unexpected_key(self):
+        doc = self._good_doc()
+        doc["x" * 500_000] = 1
+        with pytest.raises(SaveCorruptError, match="top level") as info:
+            decode_save(_canonical(doc))
+        assert len(str(info.value)) < 300
+
+    def test_step4_lists_few_unexpected_keys_and_counts_the_rest(self):
+        doc = self._good_doc()
+        for i in range(60_000):
+            doc["k%05d" % i] = 1
+        with pytest.raises(SaveCorruptError, match="top level") as info:
+            decode_save(_canonical(doc))
+        message = str(info.value)
+        assert len(message) < 300
+        assert "'k00000'" in message
+        assert "and 59995 more" in message
+
+    def test_step4_bounds_many_unexpected_keys_in_a_nested_anchor(self):
+        doc = self._good_doc()
+        for i in range(1_000):
+            doc["state"]["stack"][0]["anchor"]["k%d" % i] = 1
+        with pytest.raises(SaveCorruptError, match=r"state\.stack\[0\]\.anchor") as info:
+            decode_save(_canonical(doc))
+        assert len(str(info.value)) < 300
+        assert "and 995 more" in str(info.value)
+
+    def test_step4_bounds_missing_keys_too(self):
+        # Exactly MAX_LISTED_KEYS + 1 required keys can't be missing in the real format, so
+        # exercise the helper's missing-branch through _check_keys directly.
+        from ravel.app.saves import _check_keys
+
+        required = {"m%d" % i for i in range(20)} | {"m" * 500_000}
+        with pytest.raises(SaveCorruptError, match="lbl") as info:
+            _check_keys({}, required, "lbl")
+        assert len(str(info.value)) < 300
+        assert "and 16 more" in str(info.value)
+
     def test_step4_rejects_a_missing_state_field(self):
         doc = self._good_doc()
         del doc["state"]["stack"]
