@@ -366,6 +366,15 @@ Quality operator Expression min N
 Quality operator Expression max N
 ```
 
+Each operation takes at most one constraint. The bound `N` is a number literal and may be negative. The
+constraint applies to the result of `=` as well as the compound operators, and in `given` as well as in
+`effect`. A string result is an error, and the clamped value takes the bound's kind (integer or float).
+
+```
+X = 5 ; X -= 10 min 0   → 0
+X = 5 ; X += 10 max 8   → 8
+```
+
 ---
 
 ## 8. Rules and Situations

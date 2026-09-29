@@ -158,7 +158,7 @@ class Operation:
             result: QualityValue = self.get_operator()(current, rhs)
         except (TypeError, ArithmeticError) as error:
             raise EvaluationError("%r: %s" % (self, error)) from error
-        return result
+        return self.constraint.apply(result) if self.constraint else result
 
 
 @attr.s(slots=True)
