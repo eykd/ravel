@@ -1,0 +1,6 @@
+[
+  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: long operator chains raise untyped RecursionError at evaluation time", "severity": "CRITICAL", "line": 50, "task_id": "ravel-h6v.8"},
+  {"category": "security", "file": "src/ravel/grammars.py", "title": "Remediate: nested parentheses in expressions raise untyped RecursionError at compile", "severity": "MAJOR", "line": 15, "task_id": "ravel-h6v.9"},
+  {"category": "security", "file": "src/ravel/types.py", "title": "Remediate: string repetition and % formatting allow unbounded memory allocation", "severity": "MAJOR", "line": 101, "task_id": "ravel-h6v.10"},
+  {"category": "security", "file": "src/ravel/grammars.py", "title": "Remediate: oversized integer literals escape as untyped VisitationError", "severity": "MINOR", "line": 60, "task_id": "ravel-h6v.11"}
+]
