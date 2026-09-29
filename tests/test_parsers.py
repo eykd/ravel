@@ -121,7 +121,7 @@ class TestOperationsParser:
         expected = types.Operation(
             "Man of Honor",
             "+=",
-            types.Expression(3, "+", types.Expression(2, "+", 3)),
+            types.Expression(types.Expression(3, "+", 2), "+", 3),
             None,
         )
         result = parser.parse(statement)
@@ -139,7 +139,11 @@ class TestOperationsParser:
             types.Expression(
                 3,
                 "+",
-                types.Expression(5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))),
+                types.Expression(
+                    types.Expression(5, "*", 2),
+                    "/",
+                    types.Expression(3, "-", 2),
+                ),
             ),
             None,
         )
@@ -148,6 +152,28 @@ class TestOperationsParser:
         print("Exp", expected)
         assert isinstance(result, types.Operation)
         assert result == expected
+
+    @pytest.mark.parametrize(
+        ("text", "rhs"),
+        [
+            ("X = 10 - 4 - 2", types.Expression(types.Expression(10, "-", 4), "-", 2)),
+            ("X = 8 / 4 / 2", types.Expression(types.Expression(8, "/", 4), "/", 2)),
+            ("X = 2 + 3 * 4", types.Expression(2, "+", types.Expression(3, "*", 4))),
+            (
+                "X = 8 // 2 * 3 % 5",
+                types.Expression(types.Expression(types.Expression(8, "//", 2), "*", 3), "%", 5),
+            ),
+            ("X = (1 + 2) * 3", types.Expression(types.Expression(1, "+", 2), "*", 3)),
+            ("X = 10-4", types.Expression(10, "-", 4)),
+        ],
+    )
+    def test_arithmetic_parses_left_associative_with_two_precedence_tiers(self, parser, text, rhs):
+        assert parser.parse(text) == types.Operation("X", "=", rhs, None)
+
+    @pytest.mark.parametrize("text", ["X=5", "X>1"])
+    def test_setters_and_comparators_require_surrounding_whitespace(self, parser, text):
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            parser.parse(text)
 
     @pytest.mark.parametrize("qs", ['"', "'", "`", '"""', "'''", "```"])
     def test_it_should_set_a_string(self, parser, qs):
