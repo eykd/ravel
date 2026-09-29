@@ -1,12 +1,12 @@
 import operator as op
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
-from typing import Any, Final, Protocol, TypedDict
+from typing import Any, Final, Literal, Protocol, TypedDict
 
 import attr
 from syml.basetypes import Pos, Source  # noqa
 
-from ravel.exceptions import EvaluationError
+from ravel.exceptions import ConstraintError, EvaluationError
 from ravel.utils.data import evaluate_term
 
 # Mirrors ravel.engine.state.QualityValue (importing it here would be circular).
@@ -75,12 +75,16 @@ class Comparison:
 
 @attr.s(slots=True)
 class Constraint:
-    kind: Any = attr.ib()
-    value: Any = attr.ib()
+    kind: Literal["min", "max"] = attr.ib()
+    value: int | float = attr.ib()
 
-    def apply(self, result: Any) -> Any:
-        """Clamp ``result`` to this constraint's bound."""
-        raise NotImplementedError
+    def apply(self, result: QualityValue) -> QualityValue:
+        """Clamp ``result`` to this constraint's bound; a string result is rejected."""
+        if isinstance(result, str):
+            raise ConstraintError("%s constraint %r cannot be applied to string %r" % (self.kind, self.value, result))
+        if self.kind == "min":
+            return self.value if result < self.value else result
+        return self.value if result > self.value else result
 
 
 @attr.s(slots=True)
