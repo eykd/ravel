@@ -132,9 +132,8 @@ class ConsoleUI:
             if output.dead_end:
                 self._out("*** The story has nowhere left to go. ***")
             else:
-                outcome = _escape_control_characters(output.outcome)
-                if outcome:
-                    self._out("*** The End (outcome: %s) ***" % outcome)
+                if output.outcome:
+                    self._out("*** The End (outcome: %s) ***" % output.outcome)
                 else:
                     self._out("*** The End ***")
         else:
