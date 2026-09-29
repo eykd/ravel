@@ -384,3 +384,54 @@ class TestMissingBaggage:
             rulebooks.compile_preamble(env, rulebook)
 
         assert "No baggage found after rule" in excinfo.value.args[0]
+
+
+class TestBareConceptLine:
+    def test_it_should_compile_a_bare_registered_concept_line_as_that_concept(self, env):
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                declared:
+                  - Situation
+                  - You are here[.], somewhere.
+                """
+            )
+        )
+
+        result = rulebooks.compile_rulebook(env, rulebook)
+
+        assert result["rulebook"]["Situation"]["rules"] == [types.Rule("declared", [])]
+        assert result["rulebook"]["Situation"]["locations"]["declared"].intro == types.Text(
+            text="You are here.", sticky=False, predicate=None
+        )
+
+    def test_it_should_treat_an_unregistered_first_line_as_situation_intro_text(self, env):
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                lonely:
+                  - Hello
+                  - There you are.
+                """
+            )
+        )
+
+        result = rulebooks.compile_rulebook(env, rulebook)
+
+        assert list(result["rulebook"]) == ["Situation"]
+        assert result["rulebook"]["Situation"]["locations"]["lonely"].intro == types.Text(
+            text="Hello", sticky=False, predicate=None
+        )
+
+    def test_it_should_complain_when_a_bare_registered_concept_has_no_baggage(self, env):
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                lonely:
+                  - Situation
+                """
+            )
+        )
+
+        with pytest.raises(exceptions.MissingBaggageError):
+            rulebooks.compile_rulebook(env, rulebook)
