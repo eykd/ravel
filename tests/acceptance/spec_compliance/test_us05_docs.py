@@ -61,6 +61,68 @@ def test_us05_as1_language_spec_is_v02() -> None:
     assert "additive          = multiplicative (ws? additive_op ws? multiplicative)*" in grammar
 
 
+def test_us05_section12_cloak_listing_is_current() -> None:
+    """US5-§12: §12 Cloak listing contains all five example files verbatim in the right order."""
+    CLOAK = ROOT / "examples" / "cloak"
+    spec = read("docs/RAVEL_LANGUAGE_SPEC.md")
+
+    # Extract §12 section: from "## 12." to the next "## 13." or end of file
+    section12_start = spec.find("## 12. Example: Cloak of Darkness")
+    assert section12_start >= 0, "§12 heading not found"
+
+    section13_start = spec.find("\n## 13.", section12_start)
+    if section13_start < 0:
+        section13_start = len(spec)
+    else:
+        section13_start += 1  # Include the newline
+
+    section12_text = spec[section12_start:section13_start]
+
+    # Split by lines and track state
+    lines = section12_text.split("\n")
+    in_fence = False
+    headings_found: list[str] = []
+    fence_contents: dict[str, str] = {}
+    current_heading = None
+    current_fence_lines: list[str] = []
+
+    for _i, line in enumerate(lines):
+        # Toggle fence state on lines that are exactly ```
+        if line.startswith("```"):
+            if not in_fence:
+                # Opening fence
+                in_fence = True
+                current_fence_lines = []
+            else:
+                # Closing fence
+                in_fence = False
+                if current_heading is not None:
+                    fence_contents[current_heading] = "\n".join(current_fence_lines) + "\n"
+                current_heading = None
+        elif in_fence and current_heading is not None:
+            # Collect fence content
+            current_fence_lines.append(line)
+        elif not in_fence and line.startswith("### "):
+            # Collect heading outside fence
+            heading_text = line[4:].strip()
+            headings_found.append(heading_text)
+            current_heading = heading_text
+
+    # Verify the order and names
+    expected = ["begin.ravel", "foyer.ravel", "cloakroom.ravel", "bar-dark.ravel", "bar-light.ravel"]
+    assert headings_found == expected, f"Expected {expected}, got {headings_found}"
+
+    # Verify the set matches glob
+    expected_set = {p.name for p in CLOAK.glob("*.ravel")}
+    assert set(headings_found) == expected_set, f"Heading set {set(headings_found)} != glob set {expected_set}"
+
+    # Verify each file content matches exactly
+    for heading in headings_found:
+        actual = fence_contents[heading]
+        expected_content = (CLOAK / heading).read_text(encoding="utf-8")
+        assert actual == expected_content, f"Content mismatch for {heading}"
+
+
 @pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as2_vm_spec_is_v02() -> None:
     """US5-AS2: the VM spec is v0.2 and describes the shipped engine, with the design in Appendix A."""

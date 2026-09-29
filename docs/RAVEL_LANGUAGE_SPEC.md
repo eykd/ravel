@@ -1,6 +1,6 @@
 # Ravel Language Specification
 
-**Version**: 0.1 (Draft)
+**Version**: 0.2
 **Status**: Working specification derived from implementation analysis
 
 ---
@@ -731,74 +731,254 @@ The classic IF demonstration game, implemented in Ravel:
 ```yaml
 include:
   - foyer
-  - cloakroom
-  - bar-dark
-  - bar-light
 
 given:
   - Location = "Intro"
   - "Wearing Cloak" = 1
-  - Fumbled = 0
 
 when:
   - Location = "Intro"
 
 intro:
-  - Hurrying through the rainswept November night[…], you're glad to see
-    the bright lights of the Opera House.
 
-  - {"Wearing Cloak" == 0}The rain drenches you. Boy, you sure do wish
-    you'd worn your opera cloak.
+  - Hurrying through the rainswept November night[…], you're glad to see the bright
+    lights of the Opera House. It's surprising that there aren't more people about
+    but, hey, what do you expect in a cheap demo game…?
+
+  - {"Wearing Cloak" == 0}The rain drenches you. Boy, you sure do wish you'd
+    worn your opera cloak.
 
   - choice:
-      - [Press onward!]You press onward to the entrance.
+
+      - [Press onward!]You press onward, until you reach the double doors and let
+        yourself in.
+
       - effect:
           - Location = "Foyer"
 ```
 
 ### foyer.ravel
 ```yaml
+include:
+  - cloakroom
+  - bar-dark
+  - bar-light
+
 when:
   - Location = "Foyer"
 
+
 foyer:
-  - You are standing in a spacious hall[.], splendidly decorated in red
-    and gold, with glittering chandeliers overhead.
 
-  - choice:
-      - [Go to the cloakroom]You head toward the small room off the hall.
-      - effect:
-          - Location = "Cloakroom"
+  - You stand in a spacious hall[.], with glittering chandeliers overhead,
+    splendidly decorated in red and gold. The hall, that is. The hall is
+    splendidly decorated.
 
-  - choice:
-      - [Go to the bar]The neon sign beckons.
-      - effect:
-          - Location = "Bar"
+  - {"Wearing Cloak" >= 1}Your cloak drips readily on the thick red carpet.
+
+
+outside:
+
+  - [Outside, the rain pours down, and lightning flashes.]You look out at the
+    drenching rain. Lightning flashes, thunder rolls. Better stay inside.
+
+
+cloakroom:
+
+  - [A cloak room lies just off the main hall.]
+  - {"Wearing Cloak" >= 1}Dripping from the rain, you enter the cloak room.
+  - {"Wearing Cloak" == 0}You enter the cloak room.
+
+  - effect:
+      - Location = "Cloakroom"
+
+
+bar:
+
+  - [A little further down the hall, a neon sign advertises the bar.]
+  - {"Wearing Cloak" >= 1}Dripping from the rain, you wander over to the bar.
+  - {"Wearing Cloak" == 0}You wander over to the bar.
+
+  - effect:
+      - Location = "Bar"
 ```
 
 ### cloakroom.ravel
 ```yaml
+include:
+  - foyer
+
+given:
+  - Cloakroom = 0
+
 when:
   - Location = "Cloakroom"
 
 look:
-  - [The cloakroom is small.]The walls are lined with hooks.
-  - {"Wearing Cloak" == 0}Your velvet cloak hangs on a brass hook.
+
+  - [The cloak room is small.]The walls of this small room were clearly once
+    lined with hooks, though now only one remains.
+
+  - {"Wearing Cloak" == 0}Your velvet cloak hangs from that single hook,
+    dripping on the carpet.
+
+  - effect: Cloakroom += 1
+
+
+the-hook:
+
+  - when:
+      - Cloakroom >= 2
+      - "Wearing Cloak" = 1
+
+  - There's a brass hook on the wall.[] Useful for hanging things on it.
+
+  - {"Wearing Cloak" == 0}Your velvet cloak hangs from that single hook,
+    dripping on the carpet.
+
+  - effect: Cloakroom += 1
+
 
 hang-up-cloak:
-  - when:
-      - "Wearing Cloak" >= 1
-  - [Hang up your cloak.]You hang your cloak on the hook.
-  - effect:
-      - "Wearing Cloak" = 0
 
-return-to-foyer:
-  - [Return to the foyer]You step back into the main hall.
+  - when:
+      - Cloakroom >= 3
+      - "Wearing Cloak" >= 1
+
+  - [Hang up your cloak.]You hang the dripping velvet cloak on the small brass
+    hook.
+
+  - effect: "Wearing Cloak" = 0
+
+
+put-on-cloak:
+
+  - when:
+      - Cloakroom >= 2
+      - "Wearing Cloak" == 0
+
+  - [Put on your cloak.]You take the dripping velvet cloak from the small brass
+    hook and put it on.
+
+  - effect: "Wearing Cloak" = 1
+
+
+look-at-cloak:
+
+  - when:
+      - "Wearing Cloak" == 0
+
+  - Your cloak hangs from a brass hook.[] A handsome cloak, of velvet trimmed
+    with satin, and slightly spattered with raindrops. Its blackness is so deep
+    that it almost seems to suck light from the room.
+
+
+
+leave:
+
+  - [The warm glow of the Foyer beckons you out.]You leave the cloakroom.
+
   - effect:
       - Location = "Foyer"
 ```
 
----
+### bar-dark.ravel
+```yaml
+include:
+  - foyer
+
+given:
+  - Fumbled = 0
+  - Bar = 0
+
+when:
+  - Location = "Bar"
+  - "Wearing Cloak" >= 1
+
+
+look-in-dark:
+
+  - It is pitch dark[…], and you can't see a thing. It would be easy to trip
+    over something.
+
+  - effect: Bar += 1
+
+
+fumble-around:
+
+  - when:
+      - Bar >= 2
+
+  - [Fumble around for a light switch.]You fumble around in the dark, but to no avail.
+
+  - effect: Fumbled = 1
+
+
+leave:
+
+  - [The bright opulence of the Foyer beckons you.]You leave the darkened Bar.
+
+  - effect:
+      - Location = "Foyer"
+```
+
+### bar-light.ravel
+```yaml
+include:
+  - foyer
+
+given:
+  - Fumbled = 0
+  - Bar = 0
+
+when:
+  - Location = "Bar"
+  - "Wearing Cloak" = 0
+
+
+look:
+
+  - The bar, much rougher than you'd have guessed after the opulence of
+    the foyer, is completely empty. Sawdust covers the floor.
+
+  - effect: Bar += 1
+
+
+look-at-message:
+  - when:
+      - Bar >= 2
+      - Fumbled = 0
+
+  - There seems to be some sort of message scrawled in the sawdust on the
+    floor.[] The message, neatly marked in the sawdust, reads…
+
+  - **You have won**
+
+  - end: won
+
+
+look-at-scrambled-message:
+  - when:
+      - Bar >= 2
+      - Fumbled >= 1
+
+  - There seems to have been some sort of message scrawled in the sawdust on
+    the floor.[] Unfortunately, some fool has scrambled it up, probably by
+    fumbling around in the dark. You can still make out a few letters…
+
+  - **Y… …ve …n**
+
+  - end: lost
+
+
+leave:
+
+  - [The opulence of the Foyer beckons you.]You leave the Bar.
+
+  - effect:
+      - Location = "Foyer"
+```
+
 
 ## 13. Appendices
 
@@ -854,6 +1034,7 @@ story/
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.2 | 2026-09-28 | Applied rulings R1–R8; added precedence and whitespace rules; fixed rule-ordering documentation; resynchronized §12 Cloak listing with examples/cloak files. |
 | 0.1 | 2025 | Initial specification draft |
 
 ---
