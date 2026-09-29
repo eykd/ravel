@@ -164,7 +164,13 @@ Three naming formats are supported:
 - Quoted names use double quotes
 - Bracketed names use square brackets
 - Names are case-sensitive
-- No reserved words
+- In an expression, an identifier or a `[Bracketed Name]` is a quality reference, and a quoted token is always a string. Quoted names remain valid as subjects (the left-hand quality of a comparison or operation).
+- In an expression, a name with punctuation must be bracketed: `[Has-Key]`. `Has-Key` is `Has` minus `Key`.
+- `value`, `min` and `max` are reserved inside expressions only. There are no reserved words in subject position.
+
+```
+Has-Key = 5 ; X = [Has-Key] → 5
+```
 
 ### 4.2 Quality Values
 
@@ -244,8 +250,8 @@ around arithmetic operators.
 
 Expressions can include:
 
-- **Literals**: `42`, `3.14`, `"string"`
-- **Quality references**: `Score`, `"Wearing Cloak"`, `[Health]`
+- **Literals**: `42`, `3.14`, `"string"` (a quoted token is always a string)
+- **Quality references**: `Score`, `[Wearing Cloak]`, `[Health]` (identifiers and bracketed names)
 - **The value keyword**: `value`
 - **Nested expressions**: `(Score + 5) * 2`
 
@@ -558,7 +564,10 @@ quoted_quality  = ~'"[^"]+"'
 bracketed_quality = ~'\[[^\]]+\]'
 
 # Values
-value           = number / string / quality_ref / "value"
+term            = number / string / qvalue / quality_ref
+quality_ref     = bracketed_quality / identifier
+identifier      = ~'(?!(?:value|min|max)\b)[^\W\d]\w*'
+qvalue          = ~'value\b'
 number          = float / integer
 integer         = ~'-?[0-9]+'
 float           = ~'-?[0-9]+\.[0-9]*'
@@ -570,7 +579,7 @@ additive          = multiplicative (ws? additive_op ws? multiplicative)*
 multiplicative    = primary (ws? multiplicative_op ws? primary)*
 additive_op       = '+' / '-'
 multiplicative_op = '*' / '//' / '/' / '%'
-primary           = value / ('(' ws? expression ws? ')')
+primary           = term / ('(' ws? expression ws? ')')
 
 # Comparisons
 comparison      = quality comparator expression
@@ -766,7 +775,7 @@ return-to-foyer:
 
 ### A. Reserved Words
 
-The following are reserved in expression contexts:
+The following are reserved inside expressions only (no reserved words in subject position):
 - `value` - Current quality value
 - `min` - Constraint keyword
 - `max` - Constraint keyword

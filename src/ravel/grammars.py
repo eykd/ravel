@@ -12,7 +12,7 @@ base_expression_grammar = textwrap.dedent(
     multiplicative        = primary (ws? multiplicative_op ws? primary)*
     additive_op           = add / subtract
     multiplicative_op     = multiply / floor_div / divide / modulus
-    primary               = value / (open_paren ws? expression ws? close_paren)
+    primary               = term / (open_paren ws? expression ws? close_paren)
 
 
     open_paren            = "("
@@ -49,9 +49,11 @@ base_expression_grammar = textwrap.dedent(
     ws                    = ~"\\s+"
     end                   = ~"\\s*$"
 
-    value                 = number / string / qvalue / bracketed_quality
+    term                  = number / string / qvalue / quality_ref
+    quality_ref           = bracketed_quality / identifier
+    identifier            = ~"(?!(?:value|min|max)\\b)[^\\W\\d]\\w*"
 
-    qvalue                = "value"
+    qvalue                = ~"value\\b"
 
     number                = float / integer
     float                 = ~"-?\\d+\\.\\d*"

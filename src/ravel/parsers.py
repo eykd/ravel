@@ -28,6 +28,13 @@ class BaseExpressionParser(BaseParser):
     def visit_bracketed_quality(self, node, children):
         return node.text[1:-1]
 
+    def visit_identifier(self, node, children):
+        return types.QualityRef(node.text)
+
+    def visit_quality_ref(self, node, children):
+        name = children[0]
+        return name if isinstance(name, types.QualityRef) else types.QualityRef(name)
+
     def visit_float(self, node, children):
         return float(node.text)
 
@@ -64,7 +71,7 @@ class BaseExpressionParser(BaseParser):
 
 
 class ComparisonParser(BaseExpressionParser):
-    grammar = Grammar("comparison = ws? quality ws comparator ws expression ws?" + grammars.base_expression_grammar)
+    grammar = Grammar(grammars.comparison_grammar)
 
     def visit_comparator(self, node, children):
         return node.text
