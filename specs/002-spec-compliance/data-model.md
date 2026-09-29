@@ -84,11 +84,16 @@ fallback in `queries.py`) keeps working.
 |---|---|---|---|
 | `EvaluationError` | `ravel.exceptions` | `ValueError` | base for run-time expression failures this feature defines |
 | `ConstraintError` | `ravel.exceptions` | `EvaluationError` | a constraint meets a non-numeric result |
-| `InvalidOperationError` | `ravel.engine.errors` | `EngineError` | `_apply_operation` caught an `EvaluationError` (chained as `__cause__`) |
+| `InvalidOperationError` | `ravel.engine.errors` | `EngineError` | `_apply_operation` caught an `EvaluationError`, `ArithmeticError` or `TypeError` from an operation (chained as `__cause__`; RT-1) |
 | `OperationParseError` | `ravel.exceptions` | `ParseError` | *existing*; now also for a constraint on a string literal (`X = "a" max 3`) |
 
 `ravel.exceptions` imports `Source` from `syml.basetypes` instead of `ravel.types` so `types.py`
 can import `ConstraintError` without a cycle.
+
+**Predicate failures are non-matches (RT-2).** A `Comparison` whose evaluation raises `TypeError`,
+`ArithmeticError` or `EvaluationError` inside `queries.query_predicates` doesn't match, in both the
+set-subject and unset-subject branches; nothing is raised to the engine. Operations, by contrast,
+raise `InvalidOperationError`.
 
 ## Concept registry (`ravel.compiler.concepts`)
 

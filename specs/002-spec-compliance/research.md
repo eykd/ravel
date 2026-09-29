@@ -181,6 +181,10 @@ repo). Their results are quoted where they settle a question.
   `Location > "Bar"` against 0 raises). That stays as-is for comparator type mismatches. It must
   not start swallowing new failures, so quality-reference evaluation raises nothing new: an unset
   reference reads 0 and a set one returns its value.
+  **Amended by red-team pass 1 (2026-09-28)**: that premise fails for arithmetic on a reference
+  (`X > 10 / Y`, Y unset). Both branches now treat `TypeError`, `ArithmeticError` and
+  `EvaluationError` as a non-match, logged at `WARNING`, so no save can be stranded by a raising
+  predicate (plan.md RT-2).
 
 ### PD-07. `value` outside an operation or comparison (deferred item 5)
 
@@ -221,6 +225,11 @@ repo). Their results are quoted where they settle a question.
   `TypeError`/`ZeroDivisionError` from inside the engine. No spec text covers them; changing them
   would also change what the unset-quality `TypeError` fallback in PD-06 catches. Filed as a
   follow-up, not fixed here.
+- **Amended by red-team pass 1 (2026-09-28)**: quality references make `1 / 0` and `"a" + 1`
+  reachable from ordinary story text (`X = 100 / Bonus` with Bonus unset). No new error type, but
+  `_apply_operation` now also wraps `ArithmeticError` and `TypeError` in `InvalidOperationError`,
+  and predicates treat those failures as non-matches. See plan.md, Edge Cases & Error Handling
+  (RT-1, RT-2). Unbounded string growth (`X *= 2` on a string) stays a follow-up.
 
 ### PD-09. Concept detection (FR-009, R6)
 

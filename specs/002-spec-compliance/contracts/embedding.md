@@ -63,6 +63,13 @@ def handle(story: Story, save: bytes, location: LocationId) -> tuple[bytes, tupl
 Guarantee: for any waiting state `s` reached this way, `engine.resume(story,
 decode_save(encode_save(story, s))).state == s`, and re-encoding gives the same bytes.
 
+**Trust boundary (RT-4).** `decode_save` checks shape and `MAX_SAVE_BYTES` only; save bytes are not
+tamper-evident, and a client holding them can forge any quality or stack. `choose` still refuses a
+location outside `state.offered` (`NotOfferedError`). A host that sends save bytes to the client
+must keep saves server-side behind an opaque id, or authenticate the bytes (e.g. HMAC with a
+server-held key) before `decode_save`. The engine ships neither; VM spec §10 states this in the
+HATEOAS recipe.
+
 ## Determinism (FR-015, PD-13)
 
 Guarantee: for a `Story` compiled from the same sources and the same sequence of `choose`

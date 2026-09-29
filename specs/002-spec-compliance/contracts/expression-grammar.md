@@ -90,6 +90,9 @@ def _fold_left(first: Term, rest: list[tuple[str, Term]]) -> Term:
 | `X = values` | `Operation("X", "=", QualityRef("values"))` |
 | `X = maxHealth` | `Operation("X", "=", QualityRef("maxHealth"))` |
 | `X = Été + 1` | `Operation("X", "=", Expression(QualityRef("Été"), "+", 1))` |
+| `X = Has-Key` | `Operation("X", "=", Expression(QualityRef("Has"), "-", QualityRef("Key")))` (a bare punctuated name is arithmetic, R8; RT-3) |
+| `X = [Has-Key]` | `Operation("X", "=", QualityRef("Has-Key"))` |
+| `Has-Key = 5` | `Operation("Has-Key", "=", 5)` (subjects are `[^\s]+`, unchanged) |
 | `X -= 10 min 0` | `Operation("X", "-=", 10, Constraint("min", 0))` |
 | `X += 1 max -5` | `Operation("X", "+=", 1, Constraint("max", -5))` |
 | `X = Health max 3` | `Operation("X", "=", QualityRef("Health"), Constraint("max", 3))` |

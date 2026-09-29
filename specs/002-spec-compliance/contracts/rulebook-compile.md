@@ -73,3 +73,18 @@ intro:
 `TextShown("Hello there.")`, `ChoicesOffered(("begin::intro::go", "Go"))`. `choose(begin::intro::go)`
 → `SituationEntered("begin::intro::go")`, `TextShown("You go.")`, `TextShown("Extra words.")`,
 `QualityChanged("X", None, 1)`, `SituationExited` ×2, then the next menu. The menu label stays `Go`.
+(Verified by probe against the shipped engine, 2026-09-28.)
+
+**Rejected order (RT-5).** The bracketed `[Label]…` line must be the choice's first item:
+
+```yaml
+intro:
+  - Hello[.] there.
+  - choice:
+      - text: Extra words.
+      - [Go]You go.
+```
+
+→ compiling raises `ravel.exceptions.ParseError` ("No text found, instead: …") whose message
+carries the `Source` position of the `text:` key. Existing behavior, pinned by a test; §9.2 v0.2
+states the ordering rule.

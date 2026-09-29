@@ -67,7 +67,11 @@ class ConstraintError(EvaluationError): ...
 
 # ravel/engine/errors.py
 class InvalidOperationError(EngineError):
-    """An operation's expression or constraint failed at run time."""
+    """An operation's expression or constraint failed at run time.
+
+    Wraps ``EvaluationError`` (``ConstraintError``), ``ArithmeticError`` (``ZeroDivisionError``,
+    ``OverflowError``) and ``TypeError`` raised while evaluating an operation (RT-1).
+    """
 ```
 
 Every `qualities` defaults to `EMPTY_QUALITIES` and `qvalue` to `0`, so today's context-free
@@ -75,7 +79,10 @@ calls in `tests/test_types.py` (`exp.evaluate()`, `operation.evaluate(None)`) ke
 `Comparison.evaluate` treats a `None` subject as `0` (unchanged), then passes that as `qvalue`.
 `queries.query_predicates(query, predicates)` builds `lookup = dict(query)` once and calls
 `predicate(qvalue, qualities=lookup)` in both branches (set subject and the unset-subject
-`predicate(0)` fallback). The fallback's `except TypeError` is unchanged.
+`predicate(0)` fallback). **Both** branches catch `(TypeError, ArithmeticError, EvaluationError)`
+and treat it as a non-match, logging the rule name, the predicate and the error at `WARNING` on the
+`ravel.query` logger (RT-2; widens PD-06's unset-only `except TypeError`, because a raising
+predicate would fail every query from that state and strand any save in it).
 
 `_apply_operation(qualities, operation)`:
 
@@ -83,8 +90,8 @@ calls in `tests/test_types.py` (`exp.evaluate()`, `operation.evaluate(None)`) ke
 old = qualities.get(operation.quality)
 try:
     new = operation.evaluate(old, qualities=qualities)
-except EvaluationError as error:
-    raise InvalidOperationError("%s: %s" % (operation_text, error)) from error
+except (EvaluationError, ArithmeticError, TypeError) as error:
+    raise InvalidOperationError("%r failed: %s" % (operation, error)) from error
 return qualities.set(operation.quality, new), QualityChanged(operation.quality, old, new)
 ```
 
@@ -116,6 +123,10 @@ Each row runs `OperationParser().parse(src).evaluate(qualities.get(subject), qua
 | X = 5 | `X = 20 max 8` | X = 8 (`=` clamps too) |
 | — | `X -= 3 min -2` | X = -2 |
 | Name = "Hi" | `X = Name max 3` | `ConstraintError` from `Operation.evaluate`; `InvalidOperationError` from the engine |
+| — | `X = 100 / Bonus` | `ZeroDivisionError` from `Operation.evaluate` (unset reads 0); `InvalidOperationError` from the engine, `__cause__` the `ZeroDivisionError` (RT-1) |
+| Name = "a" | `X = Name + 1` | `TypeError` from `Operation.evaluate`; `InvalidOperationError` from the engine (RT-1) |
+| Has-Key = 5 | `X = Has-Key` | X = 0 (`Has` minus `Key`, both unset; RT-3) |
+| Has-Key = 5 | `X = [Has-Key]` | X = 5 |
 | Name = "Wearing Cloak" | comparison `Name == "Wearing Cloak"` | True |
 | Name = "Wearing Cloak" | comparison `Name == [Wearing Cloak]` | False (reads the unset quality `Wearing Cloak`, i.e. 0) |
 | Health = 7, Max = 10 | comparison `Health < [Max]` | True |
@@ -128,3 +139,8 @@ Through the engine:
   (US2-AS4).
 - `when: X > Y` with X = 2 and Y = 1 → the rule matches in `query`; with Y = 3 it doesn't.
 - `{Health < [Max]}Low.` shows `Low.` when Health = 7 and Max = 10.
+- `when: X > 10 / Y` with X = 2 and Y unset → the rule doesn't match (the `ZeroDivisionError` is a
+  non-match, logged at `WARNING`), and other matching rules are still offered (RT-2).
+- `when: X > Name` with X = 2 and Name = "a" → no match (was: `TypeError` out of `query`; RT-2).
+- `X = 100 / Bonus` in a choice's `effect:` → `choose` raises `InvalidOperationError`; a
+  `GameSession` holding that game keeps its previous state (RT-1).
