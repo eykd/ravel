@@ -96,7 +96,8 @@ def compile_preamble(environment, rulebook):
     }
 
 
-def _rule_sort_key(rule):
+def rule_sort_key(rule):
+    """The one total order for compiled rules: name, then predicates (safe for mixed-type operands)."""
     return (rule.name, [predicate_sort_key(p) for p in rule.predicates])
 
 
@@ -148,7 +149,7 @@ def compile_rulebook(environment, rulebook, prefix=""):
         rules[concept]["locations"].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
 
     for ruleset in rules.values():
-        ruleset["rules"].sort(key=_rule_sort_key)
+        ruleset["rules"].sort(key=rule_sort_key)
 
     return {
         "rulebook": dict(rules),

@@ -120,7 +120,7 @@ class Environment:
                 master_concept["locations"].update(ruleset["locations"])
 
         for ruleset in master_rulebook.values():
-            ruleset["rules"].sort()
+            ruleset["rules"].sort(key=rulebooks.rule_sort_key)
 
         return {
             "metadata": metadata,

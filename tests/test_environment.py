@@ -5,8 +5,9 @@ import syml
 from hypothesis import given
 from hypothesis import strategies as st
 
-from ravel import environments, exceptions, loaders
+from ravel import environments, exceptions, loaders, types
 from ravel.adapters.story_source import MemoryStorySource
+from ravel.compiler import rulebooks
 from ravel.engine.engine import start
 from ravel.engine.story import Story
 
@@ -381,3 +382,44 @@ class TestSourceNestingDepth:
 
         with pytest.raises(exceptions.ParseError, match="<rulebook>"):
             env.compile_rulebook("a: b\n")
+
+
+class TestMergedRuleOrder:
+    """The merge in ``load_rulebook`` orders rules with the same key ``compile_rulebook`` uses."""
+
+    @staticmethod
+    def _rule(name, operand):
+        comparison = types.Comparison("x", ">", operand)
+        return types.Rule(name, [types.Predicate("x", comparison)])
+
+    def test_it_should_order_mixed_type_operands_on_a_name_tie_without_raising(self):
+        number = self._rule("R", 1)
+        reference = self._rule("R", types.QualityRef("y"))
+        rulebooks_by_name = {
+            "A": {
+                "includes": ["B"],
+                "metadata": {},
+                "givens": [],
+                "rulebook": {"c": {"rules": [reference], "locations": {}}},
+            },
+            "B": {
+                "includes": [],
+                "metadata": {},
+                "givens": [],
+                "rulebook": {"c": {"rules": [number], "locations": {}}},
+            },
+        }
+        env = environments.Environment(loader=loaders.MemoryLoader({}), initializing_name="A")
+        with patch.object(env, "get_rulebook", side_effect=rulebooks_by_name.__getitem__):
+            merged = env.load()["rulebook"]["c"]["rules"]
+        assert merged == sorted([reference, number], key=rulebooks.rule_sort_key)
+        assert merged == [number, reference]
+
+    def test_it_should_sort_with_the_shared_key_at_both_sites(self):
+        with patch.object(rulebooks, "rule_sort_key", wraps=rulebooks.rule_sort_key) as key:
+            env = environments.Environment(
+                loader=loaders.MemoryLoader({"A": include_rulebook("B"), "B": "intro:\n  - Hi[.] there.\n"}),
+                initializing_name="A",
+            )
+            env.load()
+        assert key.call_count > 0
