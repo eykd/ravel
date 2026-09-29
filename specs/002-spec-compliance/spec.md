@@ -88,8 +88,9 @@ rules; load a two-rulebook include cycle and count loads.
    `when:` after it, **When** it compiles, **Then** that line is intro text.
 3. **Given** rulebook A includes B and B includes A, **When** the story loads, **Then** each
    rulebook is compiled exactly once, in breadth-first order, and loading ends.
-4. **Given** a `choice:` with a `text:` override, **When** the choice is offered and taken,
-   **Then** the output shows the override text as the spec describes.
+4. **Given** a `choice:` with a `text:` entry, **When** the choice is offered and taken,
+   **Then** the menu label is unchanged, and the `text:` is shown after the choice's own text, as
+   §9.2 describes.
 
 ---
 
