@@ -97,3 +97,16 @@ def test_given_dividing_by_an_unset_quality_raises_invalid_operation():
 
     assert isinstance(excinfo.value.__cause__, EvaluationError)
     assert isinstance(excinfo.value.__cause__.__cause__, ZeroDivisionError)
+
+
+def test_given_with_a_max_constraint_is_clamped_in_the_emitted_change():
+    rulebook: types.CompiledRulebook = {
+        "metadata": {},
+        "rulebook": {"Situation": {"rules": [], "locations": {}}},
+        "givens": [types.Operation("Gold", "=", 50, types.Constraint("max", 20))],
+    }
+
+    step = start(Story(rulebook=rulebook))
+
+    changes = [output for output in step.outputs if isinstance(output, QualityChanged)]
+    assert changes == [QualityChanged("Gold", None, 20)]

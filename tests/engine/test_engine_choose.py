@@ -25,7 +25,7 @@ from ravel.engine.outputs import (
 from ravel.engine.state import Frame, GameState, Outcome, Qualities, Status
 from ravel.engine.story import Story
 from ravel.environments import Environment
-from ravel.exceptions import EvaluationError
+from ravel.exceptions import ConstraintError, EvaluationError
 from ravel.loaders import FileSystemLoader
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stories"
@@ -312,3 +312,15 @@ def test_text_prefix_that_cannot_evaluate_hides_its_line_and_play_continues():
 
     assert TextShown("hidden", False) not in step.outputs
     assert TextShown("shown", False) in step.outputs
+
+
+def test_effect_constraint_on_a_string_result_raises_invalid_operation_from_constraint_error():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.QualityRef("Name"), types.Constraint("max", 3))],
+    )
+    state = waiting(("s",), qualities=Qualities().set("Name", "Hi"))
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        choose(story, state, "s")
+
+    assert isinstance(excinfo.value.__cause__, ConstraintError)

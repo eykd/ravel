@@ -261,6 +261,29 @@ class TestExpressionEvaluationFailures:
         assert not isinstance(excinfo.value, exceptions.EvaluationError)
 
 
+class TestOperationConstraint:
+    def test_min_constraint_clamps_a_subtraction(self):
+        operation = types.Operation("X", "-=", 10, types.Constraint("min", 0))
+        assert operation.evaluate(5) == 0
+
+    def test_max_constraint_clamps_an_addition(self):
+        operation = types.Operation("X", "+=", 10, types.Constraint("max", 8))
+        assert operation.evaluate(5) == 8
+
+    def test_max_constraint_leaves_a_result_under_the_bound_alone(self):
+        operation = types.Operation("X", "+=", 1, types.Constraint("max", 8))
+        assert operation.evaluate(5) == 6
+
+    def test_max_constraint_clamps_an_assignment(self):
+        operation = types.Operation("X", "=", 20, types.Constraint("max", 8))
+        assert operation.evaluate(5) == 8
+
+    def test_constraint_on_a_string_result_raises_constraint_error(self):
+        operation = types.Operation("X", "=", types.QualityRef("Name"), types.Constraint("max", 3))
+        with pytest.raises(exceptions.ConstraintError):
+            operation.evaluate(None, qualities={"Name": "Hi"})
+
+
 class TestConstraintApply:
     def test_min_raises_low_values_to_the_bound(self):
         assert types.Constraint("min", 0).apply(-5) == 0
