@@ -1,34 +1,26 @@
 [
   {
-    "category": "save-format",
-    "file": "src/ravel/app/saves.py",
-    "title": "Remediate: encode_save writes saves larger than the 1 MiB cap that decode_save then refuses",
+    "category": "resource-limits",
+    "file": "src/ravel/environments.py",
+    "title": "Remediate: indentation nesting cap bypassed via Unicode line separators",
     "severity": "MAJOR",
-    "line": 112,
-    "task_id": "ravel-h6v.26"
+    "line": 23,
+    "task_id": "ravel-h6v.30"
   },
   {
-    "category": "information-leak",
-    "file": "src/ravel/app/saves.py",
-    "title": "Remediate: save decode errors list unexpected keys unbounded in _check_keys",
+    "category": "data-integrity",
+    "file": "src/ravel/compiler/directives.py",
+    "title": "Remediate: sibling choices whose labels slugify alike silently overwrite each other's bodies",
     "severity": "MINOR",
-    "line": 163,
-    "task_id": "ravel-h6v.27"
+    "line": 104,
+    "task_id": "ravel-h6v.31"
   },
   {
-    "category": "untyped-exception",
+    "category": "input-validation",
     "file": "src/ravel/parsers.py",
-    "title": "Remediate: mid-line <> glue in a text line raises raw parsimonious IncompleteParseError",
+    "title": "Remediate: parenthesis depth pre-check counts parens inside string literals and prose",
     "severity": "MINOR",
-    "line": 216,
-    "task_id": "ravel-h6v.28"
-  },
-  {
-    "category": "untyped-exception",
-    "file": "src/ravel/compiler/rulesets.py",
-    "title": "Remediate: predicate sorting raises raw TypeError when one quality has mixed-type comparison values",
-    "severity": "MINOR",
-    "line": 6,
-    "task_id": "ravel-h6v.29"
+    "line": 61,
+    "task_id": "ravel-h6v.32"
   }
 ]
