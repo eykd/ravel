@@ -174,7 +174,10 @@ Qualities can hold:
 |------|----------|
 | Integer | `0`, `1`, `42`, `-5` |
 | Float | `3.14`, `0.5`, `-2.7` |
-| String | `"Intro"`, `"Foyer"`, `'hello'` |
+| String | `"Intro"`, `"Foyer"`, `'hello'`, `""` |
+
+A leading `-` is part of a number literal, never a separate operator: `-5` is the integer negative
+five. The empty string `""` is a valid string literal.
 
 **String Quoting Styles:**
 
@@ -231,6 +234,8 @@ around arithmetic operators.
 8 / 4 / 2         → 1.0
 2 + 3 * 4         → 14
 (10 - 4) * 2    → 12 (parentheses override)
+10 -4           → 6  (subtraction, not a negative literal)
+10 - -4         → 14
 7 // 2          → 3  (floor division)
 7 % 3           → 1  (modulo)
 ```
@@ -339,6 +344,7 @@ effect:
   - Health -= 10 min 0       # Cannot go below 0
   - Score += 100 max 1000    # Cannot exceed 1000
   - Reputation += 5 min 0    # Clamp at 0
+  - Debt += 1 max -5         # Bounds may be negative
 ```
 
 **Syntax:**
@@ -555,7 +561,7 @@ bracketed_quality = ~'\[[^\]]+\]'
 value           = number / string / quality_ref / "value"
 number          = float / integer
 integer         = ~'-?[0-9]+'
-float           = ~'-?[0-9]+\.[0-9]+'
+float           = ~'-?[0-9]+\.[0-9]*'
 string          = '"' ~'[^"]*' '"' / "'" ~"[^']*" "'"
 
 # Expressions
@@ -573,7 +579,7 @@ comparator      = '>=' / '>' / '<=' / '<' / '!=' / '==' / '='
 # Operations
 operation       = quality setter expression constraint?
 setter          = '+=' / '-=' / '*=' / '//=' / '/=' / '%=' / '='
-constraint      = ('min' / 'max') number
+constraint      = ('min' / 'max') ws number
 
 # Text
 intro_text      = head ('[' suffix ']' tail)?
