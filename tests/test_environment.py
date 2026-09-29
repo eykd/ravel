@@ -415,11 +415,28 @@ class TestMergedRuleOrder:
         assert merged == sorted([reference, number], key=rulebooks.rule_sort_key)
         assert merged == [number, reference]
 
-    def test_it_should_sort_with_the_shared_key_at_both_sites(self):
+    def test_it_should_sort_with_the_shared_key_when_compiling_a_rulebook(self):
+        env = environments.Environment(
+            loader=loaders.MemoryLoader({"A": "intro:\n  - Hi[.] there.\n"}),
+            initializing_name="A",
+        )
         with patch.object(rulebooks, "rule_sort_key", wraps=rulebooks.rule_sort_key) as key:
-            env = environments.Environment(
-                loader=loaders.MemoryLoader({"A": include_rulebook("B"), "B": "intro:\n  - Hi[.] there.\n"}),
-                initializing_name="A",
-            )
+            env.get_rulebook("A")
+        assert key.call_count > 0
+
+    def test_it_should_sort_with_the_shared_key_when_merging_rulebooks(self):
+        precompiled = {
+            "A": {
+                "includes": [],
+                "metadata": {},
+                "givens": [],
+                "rulebook": {"c": {"rules": [self._rule("R", 1)], "locations": {}}},
+            },
+        }
+        env = environments.Environment(loader=loaders.MemoryLoader({}), initializing_name="A")
+        with (
+            patch.object(env, "get_rulebook", side_effect=precompiled.__getitem__),
+            patch.object(rulebooks, "rule_sort_key", wraps=rulebooks.rule_sort_key) as key,
+        ):
             env.load()
         assert key.call_count > 0
