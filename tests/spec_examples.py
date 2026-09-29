@@ -34,6 +34,12 @@ def _is_scoped(section: str | None) -> bool:
     return section.split(".")[0] in _SCOPED_TOP or section == "11.4"
 
 
+def _pop_keys_from(keys: list[tuple[int, str]], indent: int) -> None:
+    """Drop every tracked YAML key indented at ``indent`` or deeper."""
+    while keys and keys[-1][0] >= indent:
+        keys.pop()
+
+
 def _result_text(line: str) -> str:
     """Return a result line with any trailing comment stripped from its expected literal."""
     left, _, right = line.partition(" → ")
@@ -59,15 +65,13 @@ def _item_example(
     if inline is not None:
         key, value = inline.group(1), _TRAILING_COMMENT.sub("", inline.group(2)).strip()
         key_indent = indent + 2
-        while keys and keys[-1][0] >= key_indent:
-            keys.pop()
+        _pop_keys_from(keys, key_indent)
         if not value:
             keys.append((key_indent, key))
         elif key in _KEY_KINDS:
             return value, _KEY_KINDS[key]
         return None
-    while keys and keys[-1][0] > indent:
-        keys.pop()
+    _pop_keys_from(keys, indent + 1)
     if keys and keys[-1][1] in _KEY_KINDS:
         return _TRAILING_COMMENT.sub("", rest).strip(), _KEY_KINDS[keys[-1][1]]
     return None
@@ -102,8 +106,7 @@ def extract_examples(markdown: str) -> list[SpecExample]:
         key = _KEY.match(line.strip())
         if key is not None and not _ITEM.match(line):
             indent = len(line) - len(line.lstrip())
-            while keys and keys[-1][0] >= indent:
-                keys.pop()
+            _pop_keys_from(keys, indent)
             keys.append((indent, key.group(1)))
     return examples
 
