@@ -36,6 +36,7 @@ def section(text: str, heading: str) -> str:
     return match.group(0)
 
 
+@pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as1_language_spec_is_v02() -> None:
     """US5-AS1: the language spec is v0.2, reflects R1-R8, has a precedence table, PEG matches code."""
     spec = read("docs/RAVEL_LANGUAGE_SPEC.md")
@@ -60,6 +61,7 @@ def test_us05_as1_language_spec_is_v02() -> None:
     assert "additive          = multiplicative (ws? additive_op ws? multiplicative)*" in grammar
 
 
+@pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as2_vm_spec_is_v02() -> None:
     """US5-AS2: the VM spec is v0.2 and describes the shipped engine, with the design in Appendix A."""
     spec = read("docs/RAVEL_VM_SPEC.md")
@@ -76,6 +78,7 @@ def test_us05_as2_vm_spec_is_v02() -> None:
     assert not re.search(r"^\| .*Expression.*\*\*Implemented\*\*", spec, re.MULTILINE)
 
 
+@pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as3_claude_md_matches_docs() -> None:
     """US5-AS3: CLAUDE.md's Language reference paragraph names both docs as v0.2."""
     claude = read("CLAUDE.md")
