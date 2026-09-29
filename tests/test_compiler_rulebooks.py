@@ -5,6 +5,7 @@ import syml
 
 from ravel import exceptions, types
 from ravel.compiler import rulebooks
+from ravel.compiler.rulesets import predicate_sort_key
 from ravel.utils.strings import get_text_source
 
 
@@ -159,6 +160,31 @@ class TestCompileRulebook:
         assert len(compiled["second"]) == 3
         # Rules that add no predicates share the one pre-sorted sequence.
         assert compiled["first"] is compiled["third"]
+
+    def test_it_should_merge_mixed_type_common_and_own_predicates_in_key_order(self, env):
+        rulebook_syml = textwrap.dedent(
+            """
+            when:
+              - x > 1
+              - x > threshold
+
+            first:
+              - when:
+                  - x > "a"
+                  - x > 0.5
+              - Some text.
+        """
+        )
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml))
+        (rule,) = result["rulebook"]["Situation"]["rules"]
+
+        assert rule.predicates == sorted(rule.predicates, key=predicate_sort_key)
+        assert [p.predicate.expression for p in rule.predicates] == [
+            0.5,
+            1,
+            "a",
+            types.QualityRef("threshold"),
+        ]
 
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
         bad_rulebook_syml = textwrap.dedent(

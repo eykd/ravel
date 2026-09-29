@@ -11,7 +11,7 @@ from . import (
     effects,
     situations,  # noqa
 )
-from .rulesets import compile_ruleset
+from .rulesets import compile_ruleset, predicate_sort_key
 
 
 def get_next(seq):
@@ -96,6 +96,10 @@ def compile_preamble(environment, rulebook):
     }
 
 
+def _rule_sort_key(rule):
+    return (rule.name, [predicate_sort_key(p) for p in rule.predicates])
+
+
 def compile_rulebook(environment, rulebook, prefix=""):
     """Compile a rulebook declaration"""
     rules = defaultdict(lambda: {"rules": [], "locations": {}})
@@ -134,13 +138,17 @@ def compile_rulebook(environment, rulebook, prefix=""):
 
         own_predicates = compile_ruleset(environment, concept, rule_name, ruleset_predicates)
         # Merging two sorted runs equals sorting their concatenation, common predicates first on ties.
-        predicates = list(heapq.merge(common_predicates, own_predicates)) if own_predicates else common_predicates
+        predicates = (
+            list(heapq.merge(common_predicates, own_predicates, key=predicate_sort_key))
+            if own_predicates
+            else common_predicates
+        )
 
         rules[concept]["rules"].append(types.Rule(rule_name, predicates))
         rules[concept]["locations"].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
 
     for ruleset in rules.values():
-        ruleset["rules"].sort()
+        ruleset["rules"].sort(key=_rule_sort_key)
 
     return {
         "rulebook": dict(rules),
