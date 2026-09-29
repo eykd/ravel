@@ -2,7 +2,7 @@ import itertools as it
 
 import pytest
 
-from ravel import parsers, types
+from ravel import exceptions, parsers, types
 
 
 class TestComparison:
@@ -130,3 +130,55 @@ class TestComparisonParser:
         print("Exp", expected)
         assert isinstance(result, types.Comparison)
         assert result == expected
+
+
+class TestComparisonThreadsQualities:
+    def test_check_reads_a_quality_ref_from_the_qualities(self):
+        comparison = types.Comparison("Health", "<", types.QualityRef("Max"))
+        assert comparison.check({"Health": 7, "Max": 10}) is True
+
+    def test_call_binds_value_placeholder_to_the_subject(self):
+        comparison = types.Comparison("Health", ">=", types.VALUE)
+        assert comparison(7) is True
+
+    def test_check_is_false_when_division_by_zero(self):
+        comparison = types.Comparison("X", ">", types.Expression(10, "/", types.QualityRef("Y")))
+        assert comparison.check({"X": 2}) is False
+
+    def test_call_is_false_when_division_by_zero(self):
+        comparison = types.Comparison("X", ">", types.Expression(10, "/", types.QualityRef("Y")))
+        assert comparison(2, qualities={"X": 2}) is False
+
+    def test_check_is_false_when_operands_are_incompatible(self):
+        comparison = types.Comparison("X", ">", types.QualityRef("Name"))
+        assert comparison.check({"X": 2, "Name": "a"}) is False
+
+    def test_evaluate_raises_evaluation_error_chaining_zero_division(self):
+        comparison = types.Comparison("X", ">", types.Expression(10, "/", types.QualityRef("Y")))
+        with pytest.raises(exceptions.EvaluationError) as excinfo:
+            comparison.evaluate(2, qualities={"X": 2})
+        assert isinstance(excinfo.value.__cause__, ZeroDivisionError)
+
+    def test_evaluate_raises_evaluation_error_chaining_type_error(self):
+        comparison = types.Comparison("X", ">", types.QualityRef("Name"))
+        with pytest.raises(exceptions.EvaluationError) as excinfo:
+            comparison.evaluate(2, qualities={"X": 2, "Name": "a"})
+        assert isinstance(excinfo.value.__cause__, TypeError)
+
+    def test_check_lets_a_lookup_type_error_propagate_bare(self):
+        class ExplodingLookup:
+            def get(self, name):
+                raise TypeError("broken lookup")
+
+        comparison = types.Comparison("X", ">", 1)
+        with pytest.raises(TypeError) as excinfo:
+            comparison.check(ExplodingLookup())
+        assert not isinstance(excinfo.value, exceptions.EvaluationError)
+
+    def test_predicate_check_forwards_qualities(self):
+        predicate = types.Predicate("p", types.Comparison("Health", "<", types.QualityRef("Max")))
+        assert predicate.check({"Health": 7, "Max": 10}) is True
+
+    def test_text_check_forwards_qualities(self):
+        text = types.Text("hi", predicate=types.Comparison("Health", "<", types.QualityRef("Max")))
+        assert text.check({"Health": 7, "Max": 10}) is True
