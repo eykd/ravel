@@ -11,8 +11,8 @@ class TestQueryPredicates:
     def test_it_should_query_a_set_of_fully_matching_predicates_against_a_query(self):
         query = [("foo", 2), ("bar", 3), ("baz", 4)]
         predicates = [
-            types.Predicate("foo", lambda x: x >= 2),
-            types.Predicate("bar", lambda x: x >= 3),
+            types.Predicate("foo", lambda x, qualities=None: x >= 2),
+            types.Predicate("bar", lambda x, qualities=None: x >= 3),
         ]
         matched = queries.query_predicates(query, predicates)
         assert matched is True
@@ -22,8 +22,8 @@ class TestQueryPredicates:
     ):
         query = [("foo", 2), ("bar", 3), ("baz", 4)]
         predicates = [
-            types.Predicate("foo", lambda x: x >= 2),
-            types.Predicate("bar", lambda x: x < 2),
+            types.Predicate("foo", lambda x, qualities=None: x >= 2),
+            types.Predicate("bar", lambda x, qualities=None: x < 2),
         ]
         matched = queries.query_predicates(query, predicates)
         assert matched is False
@@ -33,8 +33,8 @@ class TestQueryPredicates:
     ):
         query = [("foo", 2), ("baz", 4)]  # 'bar' is effectively 0
         predicates = [
-            types.Predicate("foo", lambda x: x >= 2),
-            types.Predicate("bar", lambda x: x < 2),
+            types.Predicate("foo", lambda x, qualities=None: x >= 2),
+            types.Predicate("bar", lambda x, qualities=None: x < 2),
         ]
         matched = queries.query_predicates(query, predicates)
         assert matched is True
@@ -44,8 +44,8 @@ class TestQueryPredicates:
     ):
         query = [("foo", 2), ("baz", 4)]  # 'bar' is effectively 0
         predicates = [
-            types.Predicate("foo", lambda x: x >= 2),
-            types.Predicate("bar", lambda x: x > 2),
+            types.Predicate("foo", lambda x, qualities=None: x >= 2),
+            types.Predicate("bar", lambda x, qualities=None: x > 2),
         ]
         matched = queries.query_predicates(query, predicates)
         assert matched is False
@@ -53,8 +53,8 @@ class TestQueryPredicates:
     def test_it_should_query_with_a_missing_query_and_type_mismatch_on_predicate(self):
         query = [("foo", 2), ("baz", 4)]  # 'bar' is effectively 0
         predicates = [
-            types.Predicate("foo", lambda x: x >= 2),
-            types.Predicate("bar", lambda x: x < "blah"),
+            types.Predicate("foo", lambda x, qualities=None: x >= 2),
+            types.Predicate("bar", types.Comparison("bar", "<", "blah")),
         ]
         matched = queries.query_predicates(query, predicates)
         assert matched is False

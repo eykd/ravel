@@ -9,6 +9,7 @@ def query_predicates(query: Iterable[tuple[str, Any]], predicates: Iterable[Any]
     matches = []
     qkeys = set()
     qvalue = None
+    lookup = dict(query)
     for predicate in predicates:
         rkey = predicate.name
         predicate = predicate.predicate
@@ -22,17 +23,14 @@ def query_predicates(query: Iterable[tuple[str, Any]], predicates: Iterable[Any]
                     rkey,
                     predicate,
                 )
-                matched = predicate(qvalue)
+                matched = predicate(qvalue, qualities=lookup)
                 matches.append(bool(matched))
                 if matched:
                     logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
                 break
         else:
             assert rkey not in qkeys
-            try:
-                matched = predicate(0)
-            except TypeError:
-                matched = False
+            matched = predicate(0, qualities=lookup)
             if matched:
                 logger.debug("Matched rule for `%s %r`: %s", rkey, predicate, qvalue)
                 matches.append(True)
