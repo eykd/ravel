@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ravel.engine.story import Story
 from ravel.environments import Environment
-from ravel.loaders import FileSystemLoader
+from ravel.loaders import FileSystemLoader, MemoryLoader
 
 
 class FileSystemStorySource:
@@ -30,4 +30,5 @@ class MemoryStorySource:
 
     def load(self) -> Story:
         """Compile the story rooted at ``entry``; raises ``ravel.exceptions.*`` on bad source."""
-        raise NotImplementedError
+        environment = Environment(loader=MemoryLoader(self._sources), initializing_name=self._entry)
+        return Story.from_rulebook(environment.load())
