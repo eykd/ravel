@@ -1,6 +1,7 @@
 [
-  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: plain-text {...} predicate prefix bypasses the expression length gate", "severity": "MAJOR", "line": 171, "task_id": "ravel-h6v.17"},
-  {"category": "security", "file": "src/ravel/compiler/rulebooks.py", "title": "Remediate: common when predicates are recompiled per rule giving quadratic load cost", "severity": "MAJOR", "line": 121, "task_id": "ravel-h6v.18"},
-  {"category": "security", "file": "src/ravel/environments.py", "title": "Remediate: syml syntax errors escape the ravel ParseError hierarchy", "severity": "MINOR", "line": 103, "task_id": "ravel-h6v.19"},
-  {"category": "security", "file": "src/ravel/exceptions.py", "title": "Remediate: parse error messages echo unbounded rulebook source text", "severity": "MINOR", "line": 35, "task_id": "ravel-h6v.20"}
+  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: brackets or unquoted names end the predicate prefix scan early, bypassing the length cap", "severity": "MAJOR", "line": 180, "task_id": "ravel-h6v.21"},
+  {"category": "security", "file": "src/ravel/compiler/rulebooks.py", "title": "Remediate: malformed rulebook shapes raise raw AttributeError TypeError KeyError from Environment.load", "severity": "MINOR", "line": 56, "task_id": "ravel-h6v.22"},
+  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: unclosed bracket in intro text raises raw parsimonious IncompleteParseError", "severity": "MINOR", "line": 145, "task_id": "ravel-h6v.23"},
+  {"category": "security", "file": "src/ravel/app/saves.py", "title": "Remediate: save decode errors echo unbounded save-supplied keys names and locations", "severity": "MINOR", "line": 144, "task_id": "ravel-h6v.24"},
+  {"category": "security", "file": "src/ravel/cli.py", "title": "Remediate: console adapter echoes story control characters and terminal escapes unfiltered", "severity": "MINOR", "line": 107, "task_id": "ravel-h6v.25"}
 ]
