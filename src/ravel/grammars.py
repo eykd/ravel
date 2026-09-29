@@ -104,10 +104,12 @@ intro_text_grammar = textwrap.dedent(
 )
 
 
+# A text line is `cmp_prefix? prose`. PlainTextParser does that split itself, matching cmp_prefix against a
+# bounded window so an over-long predicate never reaches the grammar, then parsing the rest with `prose`.
 plain_text_grammar = (
     textwrap.dedent(
         r"""
-    line        = cmp_prefix? text glue?
+    prose       = text glue?
 
     text        = ~"(?:(?!<>).)*"
     glue        = "<>"

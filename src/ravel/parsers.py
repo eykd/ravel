@@ -1,4 +1,3 @@
-import re
 import sys
 from typing import Final
 
@@ -55,6 +54,12 @@ class BaseExpressionParser(BaseParser):
             raise self.operand_limit_error(
                 "Expression is %d characters long; the maximum supported is %d" % (len(text), self.max_length)
             )
+        self._check_paren_depth(text)
+        self._depths: dict[int, int] = {}
+        return super().parse(text, pos=pos)
+
+    def _check_paren_depth(self, text):
+        """Refuse text whose parentheses nest deeper than Parsimonious can safely recurse."""
         depth = deepest = 0
         for char in text:
             if char == "(":
@@ -66,8 +71,6 @@ class BaseExpressionParser(BaseParser):
             raise self.operand_limit_error(
                 "Expression nests parentheses %d deep; the maximum supported is %d" % (deepest, MAX_PAREN_DEPTH)
             )
-        self._depths: dict[int, int] = {}
-        return super().parse(text, pos=pos)
 
     def visit_quoted_quality(self, node, children):
         return node.text[1:-1]
@@ -169,25 +172,40 @@ class IntroTextParser(BaseParser):
 
 
 class PlainTextParser(ComparisonParser):
-    # Prose is not an expression, so the whole line is exempt from the length cap; only the leading
-    # {...} predicate prefix is an expression, and parse() gates its length before the grammar runs.
+    """Parse a text line: an optional {...} predicate prefix, then prose.
+
+    Prose is not an expression, so it is exempt from the length cap; only the prefix is an expression. The
+    grammar never sees the whole line: the prefix is matched against a bounded window (the cap plus its two
+    braces), so a prefix longer than the cap cannot be parsed however its text is shaped, and the prose after
+    it goes to a separate linear rule. There is no hand-written approximation of the grammar to disagree with.
+    """
+
     max_length = None
     grammar = Grammar(grammars.plain_text_grammar)
 
-    # The prefix text after the opening brace: runs to the first "}" outside a quoted string (strings may
-    # hold a "}"), or to the end of the line when the brace is never closed. Each branch starts on a
-    # different character and the star cannot fail, so the scan is linear with no backtracking.
-    _prefix_span = re.compile(r"""\{((?:"[^"]*"|'[^']*'|`[^`]*`|[^}])*)""")
-
     def parse(self, text, pos=0):
-        """Parse a text line, refusing an over-long {...} prefix (or unclosed brace) before the grammar runs."""
-        match = self._prefix_span.match(text, pos)
-        if match is not None and len(match.group(1)) > MAX_EXPRESSION_LENGTH:
-            raise exceptions.ComparisonParseError(
-                "Predicate is %d characters long; the maximum supported is %d"
-                % (len(match.group(1)), MAX_EXPRESSION_LENGTH)
-            )
-        return super().parse(text, pos=pos)
+        """Parse a text line, refusing a {...} prefix that does not close within MAX_EXPRESSION_LENGTH."""
+        line = text[pos:]
+        predicate = None
+        prose = line
+        if line.startswith("{"):
+            window = line[: MAX_EXPRESSION_LENGTH + 2]
+            self._check_paren_depth(window)
+            self._depths = {}
+            try:
+                prefix = self.grammar["cmp_prefix"].match(window)
+            except exceptions.ParsimoniousParseError:
+                if len(line) > len(window):
+                    raise exceptions.ComparisonParseError(
+                        "Text line starts with '{' but no predicate closes within %d characters; "
+                        "the maximum supported predicate is %d characters" % (len(window), MAX_EXPRESSION_LENGTH)
+                    ) from None
+                # A short line whose "{" opens no valid predicate is plain prose, braces and all.
+            else:
+                predicate = self.visit(prefix)
+                prose = line[prefix.end :]
+        result = self.visit(self.grammar["prose"].parse(prose))
+        return types.Text(result.text, sticky=result.sticky, predicate=predicate)
 
     def visit_text(self, node, children):
         return node.text
@@ -195,11 +213,9 @@ class PlainTextParser(ComparisonParser):
     def visit_glue(self, node, children):
         return True
 
-    def visit_line(self, node, children):
-        predicate, text, *sticky = children
-        sticky = self.reduce_children(sticky)
-        result = types.Text(text, sticky=bool(sticky), predicate=predicate)
-        return result
+    def visit_prose(self, node, children):
+        text, sticky = children
+        return types.Text(text, sticky=bool(sticky))
 
     def visit_comparison(self, node, children):
         comparison = super().visit_comparison(node, children)

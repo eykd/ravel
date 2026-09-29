@@ -1,6 +1,9 @@
 import itertools as it
 
+import parsimonious.expressions
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from ravel import exceptions, parsers, types
 
@@ -442,6 +445,62 @@ class TestExpressionLengthLimit:
 
     def test_a_long_unprefixed_prose_line_still_parses(self):
         assert parsers.PlainTextParser().parse("x" * 500_000).text == "x" * 500_000
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            '{x == [a}] + "%s"} hi',
+            '{[q}] == "%s"} hi',
+            '{q}} == "%s"} hi',
+        ],
+        ids=["brace-in-bracketed-operand", "brace-in-bracketed-quality", "brace-in-unquoted-quality"],
+    )
+    def test_a_brace_the_grammar_consumes_does_not_shorten_the_measured_prefix(self, monkeypatch, template):
+        """ravel-h6v.21: a "}" inside [brackets] or an unquoted name once ended a hand regex's scan early."""
+        seen = []
+        real_match = parsimonious.expressions.Expression.match
+
+        def spy(self, text, pos=0):
+            seen.append(len(text))
+            return real_match(self, text, pos)
+
+        monkeypatch.setattr(parsimonious.expressions.Expression, "match", spy)
+        text = template % ("a" * 200_000)
+
+        with pytest.raises(exceptions.ComparisonParseError, match=str(parsers.MAX_EXPRESSION_LENGTH)):
+            parsers.PlainTextParser().parse(text)
+        assert seen
+        assert max(seen) <= parsers.MAX_EXPRESSION_LENGTH + 2
+
+    @pytest.mark.parametrize(
+        ("text", "prose"),
+        [('{x == "a}b"} prose', " prose"), ("{x == 1} prose with a } brace", " prose with a } brace")],
+    )
+    def test_a_brace_in_a_string_or_in_the_prose_keeps_its_meaning(self, text, prose):
+        result = parsers.PlainTextParser().parse(text)
+
+        assert result.text == prose
+        assert result.predicate is not None
+
+    def test_a_short_line_whose_brace_opens_no_predicate_is_prose(self):
+        assert parsers.PlainTextParser().parse("{foo bar} hi") == types.Text("{foo bar} hi")
+
+    @given(st.text(alphabet='{}[]"q =1+a<>', max_size=60))
+    def test_an_accepted_line_never_has_a_prefix_longer_than_the_cap(self, line):
+        """Property: whatever the line, the predicate prefix the parser accepts is at most the cap."""
+        cap = 8
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(parsers, "MAX_EXPRESSION_LENGTH", cap)
+            try:
+                result = parsers.PlainTextParser().parse(line)
+            except exceptions.ComparisonParseError:
+                assert len(line) > cap + 2
+                return
+            except exceptions.ParsimoniousParseError:
+                return  # prose holding "<>" before its end is malformed, as it always was
+        prefix_length = len(line) - len(result.text) - (2 if result.sticky else 0)
+        assert prefix_length <= cap + 2
+        assert (prefix_length > 0) == (result.predicate is not None)
 
 
 class TestExpressionDepthLimit:
