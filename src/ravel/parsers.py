@@ -47,9 +47,6 @@ class BaseExpressionParser(BaseParser):
     def visit_qvalue(self, node, children):
         return types.VALUE
 
-    def visit_expression(self, node, children):
-        return children[0]
-
     def _fold_left(self, node, children):
         first, rest = children
         if rest is None:
