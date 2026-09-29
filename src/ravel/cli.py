@@ -139,7 +139,7 @@ class ConsoleUI:
         if not stack:
             return "the top level"
         location = stack[-1].location
-        return get_text(self.session.story.situation(location).intro)
+        return str(get_text(self.session.story.situation(location).intro))
 
     def _is_halted(self) -> bool:
         return self.session.state.status is Status.HALTED

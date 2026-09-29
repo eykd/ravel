@@ -1,5 +1,6 @@
 import operator as op
-from typing import TypedDict
+from collections.abc import Callable
+from typing import Any, TypedDict
 
 import attr
 from syml.basetypes import Pos, Source  # noqa
@@ -9,7 +10,7 @@ from ravel.utils.data import evaluate_term
 
 @attr.s(slots=True)
 class Choice:
-    choice = attr.ib()
+    choice: Any = attr.ib()
 
 
 @attr.s(slots=True)
@@ -19,9 +20,9 @@ class End:
 
 @attr.s(slots=True, repr=False)
 class Comparison:
-    quality = attr.ib()
-    comparator = attr.ib()
-    expression = attr.ib()
+    quality: Any = attr.ib()
+    comparator: Any = attr.ib()
+    expression: Any = attr.ib()
 
     _comparators = {
         ">": op.gt,
@@ -33,44 +34,44 @@ class Comparison:
         "!=": op.ne,
     }
 
-    def get_comparators(self):
+    def get_comparators(self) -> Callable[[Any, Any], Any]:
         return self._comparators[self.comparator]
 
-    def get_expression(self, **kwargs):
+    def get_expression(self, **kwargs: Any) -> Any:
         return evaluate_term(self.expression, **kwargs)
 
-    def evaluate(self, qvalue, **kwargs):
+    def evaluate(self, qvalue: Any, **kwargs: Any) -> Any:
         if qvalue is None:
             qvalue = 0
         return self.get_comparators()(qvalue, self.get_expression(qvalue=qvalue, **kwargs))
 
-    def check(self, qualities, **kwargs):
+    def check(self, qualities: Any, **kwargs: Any) -> Any:
         value = qualities.get(self.quality)
         return self.evaluate(value, **kwargs)
 
-    def __call__(self, qvalue, **kwargs):
+    def __call__(self, qvalue: Any, **kwargs: Any) -> Any:
         return self.evaluate(qvalue, **kwargs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "(%r %s %r)" % (self.quality, self.comparator, self.expression)
 
 
 @attr.s(slots=True)
 class Constraint:
-    kind = attr.ib()
-    value = attr.ib()
+    kind: Any = attr.ib()
+    value: Any = attr.ib()
 
 
 @attr.s(slots=True)
 class Effect:
-    operation = attr.ib()
+    operation: Any = attr.ib()
 
 
 @attr.s(slots=True)
 class Expression:
-    term1 = attr.ib()
-    operator = attr.ib()
-    term2 = attr.ib()
+    term1: Any = attr.ib()
+    operator: Any = attr.ib()
+    term2: Any = attr.ib()
 
     _operators = {
         "+": op.add,
@@ -81,10 +82,10 @@ class Expression:
         "%": op.mod,
     }
 
-    def get_operator(self):
+    def get_operator(self) -> Callable[[Any, Any], Any]:
         return self._operators[self.operator]
 
-    def evaluate(self, **kwargs):
+    def evaluate(self, **kwargs: Any) -> Any:
         return self.get_operator()(
             evaluate_term(self.term1, **kwargs),
             evaluate_term(self.term2, **kwargs),
@@ -103,10 +104,10 @@ class GetChoice:
 
 @attr.s(slots=True)
 class Operation:
-    quality = attr.ib()
-    operator = attr.ib()
-    expression = attr.ib()
-    constraint = attr.ib(default=None)
+    quality: Any = attr.ib()
+    operator: Any = attr.ib()
+    expression: Any = attr.ib()
+    constraint: Any = attr.ib(default=None)
 
     _operators = {
         "=": lambda a, b: b,
@@ -118,13 +119,13 @@ class Operation:
         "%=": op.mod,
     }
 
-    def get_operator(self):
+    def get_operator(self) -> Callable[[Any, Any], Any]:
         return self._operators[self.operator]
 
-    def get_expression(self, **kwargs):
+    def get_expression(self, **kwargs: Any) -> None:
         return
 
-    def evaluate(self, initial_value, **kwargs):
+    def evaluate(self, initial_value: Any, **kwargs: Any) -> Any:
         if initial_value is None:
             initial_value = 0
         result = self.get_operator()(
@@ -136,10 +137,10 @@ class Operation:
 
 @attr.s(slots=True)
 class Predicate:
-    name = attr.ib()
-    predicate = attr.ib()
+    name: Any = attr.ib()
+    predicate: Any = attr.ib()
 
-    def check(self, qualities, **kwargs):
+    def check(self, qualities: Any, **kwargs: Any) -> Any:
         if self.predicate is None:
             return True
 
@@ -148,24 +149,24 @@ class Predicate:
 
 @attr.s(slots=True)
 class Situation:
-    intro = attr.ib()
-    directives = attr.ib()
+    intro: Any = attr.ib()
+    directives: Any = attr.ib()
 
 
 @attr.s(slots=True)
 class Text:
-    text = attr.ib()
-    sticky = attr.ib(default=False, repr=False)
-    predicate = attr.ib(default=None, repr=False)
+    text: Any = attr.ib()
+    sticky: Any = attr.ib(default=False, repr=False)
+    predicate: Any = attr.ib(default=None, repr=False)
 
-    def check(self, qualities, **kwargs):
+    def check(self, qualities: Any, **kwargs: Any) -> Any:
         if self.predicate is None:
             return True
 
         return self.predicate.check(qualities, **kwargs)
 
-    def __str__(self):
-        return self.text
+    def __str__(self) -> str:
+        return str(self.text)
 
 
 @attr.s(slots=True)
@@ -175,8 +176,8 @@ class VALUE:
 
 @attr.s(slots=True)
 class Rule:
-    name = attr.ib()
-    predicates = attr.ib()
+    name: Any = attr.ib()
+    predicates: Any = attr.ib()
 
 
 class Ruleset(TypedDict):

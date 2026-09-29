@@ -1,9 +1,11 @@
 import logging
+from collections.abc import Iterable, Iterator
+from typing import Any
 
 logger = logging.getLogger("ravel.query")
 
 
-def query_predicates(query, predicates):
+def query_predicates(query: Iterable[tuple[str, Any]], predicates: Iterable[Any]) -> bool:
     matches = []
     qkeys = set()
     qvalue = None
@@ -42,7 +44,7 @@ def query_predicates(query, predicates):
     return all(matches)
 
 
-def query_ruleset(q, rules):
+def query_ruleset(q: Iterable[tuple[str, Any]], rules: Any) -> Iterator[tuple[int, str, Any]]:
     q = sorted(q)
     for rule in rules["rules"]:
         logger.debug("Against rule %r", rule)
@@ -53,7 +55,9 @@ def query_ruleset(q, rules):
             logger.debug("Rule %s rejected", rule.name)
 
 
-def query(concept, q, rules, how_many=None):
+def query(
+    concept: str, q: Iterable[tuple[str, Any]], rules: Any, how_many: int | None = None
+) -> Iterator[tuple[str, Any]]:
     accepted_rules = sorted(
         query_ruleset(q, rules.get(concept, [])),
         reverse=True,
@@ -63,10 +67,9 @@ def query(concept, q, rules, how_many=None):
         yield rname, result
 
 
-def query_top(concept, q, rules):
-    for rname, result in query(concept, q, rules=rules, how_many=1):
-        return rname, result
+def query_top(concept: str, q: Iterable[tuple[str, Any]], rules: Any) -> tuple[str, Any] | None:
+    return next(query(concept, q, rules=rules, how_many=1), None)
 
 
-def query_by_name(rname, rules):
+def query_by_name(rname: str, rules: Any) -> Any:
     return rules["locations"][rname]
