@@ -22,6 +22,15 @@ class QualityLookup(Protocol):
 EMPTY_QUALITIES: Final[Mapping[str, QualityValue]] = MappingProxyType({})
 
 
+_STRING_SAFE_OPERATORS: Final = frozenset({"+", "+=", "="})
+
+
+def _reject_string_arithmetic(operator: str, left: Any, right: Any, *, subject: object) -> None:
+    """Raise unless a string operand only meets ``+``/``+=``/``=`` (blocks ``"a" * N`` and ``"%99999d" % 1``)."""
+    if operator not in _STRING_SAFE_OPERATORS and (isinstance(left, str) or isinstance(right, str)):
+        raise EvaluationError("%r: operator %r does not accept string operands" % (subject, operator))
+
+
 @attr.s(slots=True)
 class Choice:
     choice: Any = attr.ib()
@@ -113,6 +122,7 @@ class Expression:
     def evaluate(self, **kwargs: Any) -> Any:
         left = evaluate_term(self.term1, **kwargs)
         right = evaluate_term(self.term2, **kwargs)
+        _reject_string_arithmetic(self.operator, left, right, subject=self)
         try:
             return self.get_operator()(left, right)
         except (TypeError, ArithmeticError) as error:
@@ -154,6 +164,7 @@ class Operation:
     ) -> QualityValue:
         current = 0 if initial_value is None else initial_value
         rhs = evaluate_term(self.expression, qualities=qualities, qvalue=current)
+        _reject_string_arithmetic(self.operator, current, rhs, subject=self)
         try:
             result: QualityValue = self.get_operator()(current, rhs)
         except (TypeError, ArithmeticError) as error:

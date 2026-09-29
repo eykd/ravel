@@ -241,6 +241,10 @@ left-associative: they evaluate left to right.
 `* / // %` share one tier and bind tighter than `+ -`, which share the other. Whitespace is optional
 around arithmetic operators.
 
+Strings take part only in `+` (concatenation) and `=`. Any other operator with a string operand
+(`"ab" * 3`, `"%5d" % 7`, `Name *= 2`) is an evaluation error: false in a condition, an error in an
+effect. There is no string repetition or `%`-formatting.
+
 **Examples:**
 ```
 5 + 3           → 8

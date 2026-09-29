@@ -172,3 +172,7 @@ Through the engine:
   `start` returns `Halted("", True)` with status `HALTED`, not an exception (RT-14).
 - A `QualityLookup` stub whose `get` raises `TypeError` → `Comparison.check` raises `TypeError`
   and `Operation.evaluate` raises `TypeError` (not `False`, not `InvalidOperationError`; RT-13).
+
+## String operands
+
+Strings take part only in `+` (concatenation) and `=`. Every other arithmetic operator (including `*=` and `%=`) raises `EvaluationError` when either operand is a string, before the operator runs, so a rulebook cannot allocate unbounded memory. In a predicate this evaluates false; in an effect it surfaces as `InvalidOperationError`.

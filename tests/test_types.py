@@ -192,6 +192,40 @@ class TestOperationEvaluationContext:
         assert not isinstance(excinfo.value, exceptions.EvaluationError)
 
 
+class TestStringArithmeticIsRejected:
+    @pytest.mark.parametrize("operator", ["*", "%", "-", "/", "//"])
+    def test_expression_should_reject_string_operands(self, operator):
+        for left, right in [("ab", 3), (3, "ab"), ("ab", "cd")]:
+            with pytest.raises(exceptions.EvaluationError):
+                types.Expression(left, operator, right).evaluate()
+
+    def test_expression_should_still_concatenate_strings(self):
+        assert types.Expression("ab", "+", "cd").evaluate() == "abcd"
+
+    @pytest.mark.parametrize("operator", ["*=", "%=", "-=", "/=", "//="])
+    def test_operation_should_reject_a_string_quality(self, operator):
+        with pytest.raises(exceptions.EvaluationError):
+            types.Operation("X", operator, 2).evaluate("ab")
+
+    def test_operation_should_reject_a_string_operand(self):
+        with pytest.raises(exceptions.EvaluationError):
+            types.Operation("X", "*=", "ab").evaluate(3)
+
+    def test_operation_should_still_concatenate_and_assign_strings(self):
+        assert types.Operation("X", "+=", "cd").evaluate("ab") == "abcd"
+        assert types.Operation("X", "=", "cd").evaluate("ab") == "cd"
+
+    def test_a_predicate_with_string_repetition_should_be_false(self):
+        comparison = types.Comparison("X", "==", types.Expression("ab", "*", 3))
+        assert comparison("abababab") is False
+        assert comparison.check(_Lookup()) is False
+
+
+class _Lookup:
+    def get(self, name, /):
+        return "ababab"
+
+
 class TestPredicate:
     def test_it_should_pass_when_there_is_no_predicate(self):
         assert types.Predicate("Foo", None).check({}) is True
