@@ -1,11 +1,15 @@
 import operator as op
-from collections.abc import Callable
-from typing import Any, TypedDict
+from collections.abc import Callable, Mapping
+from types import MappingProxyType
+from typing import Any, Final, Protocol, TypedDict
 
 import attr
 from syml.basetypes import Pos, Source  # noqa
 
 from ravel.utils.data import evaluate_term
+
+# Mirrors ravel.engine.state.QualityValue (importing it here would be circular).
+type QualityValue = int | float | str
 
 
 @attr.s(slots=True)
@@ -169,27 +173,35 @@ class Text:
         return str(self.text)
 
 
-@attr.s(slots=True)
-class VALUE:
-    pass
+class QualityLookup(Protocol):
+    """Read-only access to current quality values by name."""
+
+    def get(self, name: str, /) -> QualityValue | None: ...
 
 
-@attr.s(slots=True)
+EMPTY_QUALITIES: Final[Mapping[str, QualityValue]] = MappingProxyType({})
+
+
+@attr.s(frozen=True, slots=True)
 class Value:
     """The ``VALUE`` placeholder: evaluates to the current quality value."""
 
-    def evaluate(self, **kwargs: Any) -> Any:
-        raise NotImplementedError
+    def evaluate(self, *, qualities: QualityLookup = EMPTY_QUALITIES, qvalue: QualityValue = 0) -> QualityValue:
+        return qvalue
 
 
-@attr.s(slots=True)
+VALUE: Final = Value()
+
+
+@attr.s(frozen=True, slots=True)
 class QualityRef:
     """A reference to a quality by name, evaluated against the current qualities."""
 
     name: str = attr.ib()
 
-    def evaluate(self, **kwargs: Any) -> Any:
-        raise NotImplementedError
+    def evaluate(self, *, qualities: QualityLookup = EMPTY_QUALITIES, qvalue: QualityValue = 0) -> QualityValue:
+        value = qualities.get(self.name)
+        return 0 if value is None else value
 
 
 @attr.s(slots=True)
