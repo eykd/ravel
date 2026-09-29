@@ -1,7 +1,7 @@
 """Bounded, printable-escaped excerpts of untrusted text for error messages.
 
-Dependency-free so that every layer (the core, ``ravel.app``, adapters) can use it without
-importing ``ravel.exceptions`` (which pulls in parsimonious and syml).
+Dependency-free utility usable from any layer of ravel without pulling in
+heavy dependencies like parsimonious or syml.
 """
 
 MAX_EXCERPT_LENGTH = 80
