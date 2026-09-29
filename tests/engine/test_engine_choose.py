@@ -6,7 +6,14 @@ import pytest
 
 from ravel import types
 from ravel.engine.engine import choose, start
-from ravel.engine.errors import GameOverError, InvalidStateError, NotOfferedError, NotWaitingError
+from ravel.engine.errors import (
+    EngineError,
+    GameOverError,
+    InvalidOperationError,
+    InvalidStateError,
+    NotOfferedError,
+    NotWaitingError,
+)
 from ravel.engine.outputs import (
     ChoiceOption,
     ChoicesOffered,
@@ -18,6 +25,7 @@ from ravel.engine.outputs import (
 from ravel.engine.state import Frame, GameState, Outcome, Qualities, Status
 from ravel.engine.story import Story
 from ravel.environments import Environment
+from ravel.exceptions import EvaluationError
 from ravel.loaders import FileSystemLoader
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stories"
@@ -249,3 +257,58 @@ def test_choice_block_without_get_choice_raises_invalid_state():
 
     with pytest.raises(InvalidStateError):
         choose(story, waiting(("s",)), "s")
+
+
+# --- Unevaluable operations (RT-1, RT-2) ---------------------------------------------------
+
+
+def test_effect_dividing_by_an_unset_quality_raises_invalid_operation():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.Expression(10, "/", types.QualityRef("Zero")))],
+    )
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        choose(story, waiting(("s",)), "s")
+
+    assert isinstance(excinfo.value, EngineError)
+    assert isinstance(excinfo.value.__cause__, EvaluationError)
+    assert isinstance(excinfo.value.__cause__.__cause__, ZeroDivisionError)
+
+
+def test_effect_adding_a_number_to_a_string_quality_raises_invalid_operation():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.Expression(types.QualityRef("Name"), "+", 1))],
+    )
+    state = waiting(("s",), qualities=Qualities().set("Name", "a"))
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        choose(story, state, "s")
+
+    assert isinstance(excinfo.value.__cause__, EvaluationError)
+    assert isinstance(excinfo.value.__cause__.__cause__, TypeError)
+
+
+def test_effect_reading_a_set_quality_stores_the_computed_value():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.Expression(types.QualityRef("Base"), "+", 1))],
+    )
+    state = waiting(("s",), qualities=Qualities().set("Base", 4))
+
+    step = choose(story, state, "s")
+
+    assert step.state.qualities.get("X") == 5
+
+
+def test_text_prefix_that_cannot_evaluate_hides_its_line_and_play_continues():
+    unevaluable = types.Comparison("Name", "==", types.Expression(1, "/", types.QualityRef("Zero")))
+    story = hand_built_story(
+        [
+            types.Text("hidden", predicate=types.Predicate("p", unevaluable)),
+            types.Text("shown"),
+        ],
+    )
+
+    step = choose(story, waiting(("s",)), "s")
+
+    assert TextShown("hidden", False) not in step.outputs
+    assert TextShown("shown", False) in step.outputs

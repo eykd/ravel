@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from ravel import types
 from ravel.adapters.story_source import FileSystemStorySource
 from ravel.app.saves import (
     NoGameError,
@@ -19,9 +20,10 @@ from ravel.app.saves import (
     encode_save,
 )
 from ravel.app.session import DEFAULT_SAVE_NAME, GameSession
-from ravel.engine.errors import NotOfferedError
+from ravel.engine.errors import InvalidOperationError, NotOfferedError
 from ravel.engine.outputs import ChoiceOption, ChoicesOffered, Halted, StoryChanged
 from ravel.engine.state import Status
+from ravel.engine.story import Story
 
 
 class FakeSaveStore:
@@ -275,3 +277,30 @@ class TestLoad:
         assert loaded.state.stack == ()
         # A successful (degraded) load still assigns state -- this is not a refusal.
         assert loaded.state.qualities.get("Location") == "Intro"
+
+
+class TestChooseInvalidOperation:
+    def test_an_invalid_operation_leaves_the_session_state_unchanged(self):
+        rulebook: types.CompiledRulebook = {
+            "metadata": {},
+            "rulebook": {
+                "Situation": {
+                    "rules": [types.Rule("s", [])],
+                    "locations": {
+                        "s": types.Situation(
+                            intro=types.Text("S"),
+                            directives=[types.Operation("X", "=", types.Expression(10, "/", types.QualityRef("Zero")))],
+                        )
+                    },
+                }
+            },
+            "givens": [],
+        }
+        session = GameSession(Story(rulebook=rulebook), FakeSaveStore())
+        session.new_game()
+        state_before = session.state
+
+        with pytest.raises(InvalidOperationError):
+            session.choose("s")
+
+        assert session.state == state_before

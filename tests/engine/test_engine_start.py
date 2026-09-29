@@ -4,11 +4,14 @@ from pathlib import Path
 
 import pytest
 
+from ravel import types
 from ravel.engine.engine import start
+from ravel.engine.errors import InvalidOperationError
 from ravel.engine.outputs import ChoiceOption, ChoicesOffered, QualityChanged
 from ravel.engine.state import Status
 from ravel.engine.story import Story
 from ravel.environments import Environment
+from ravel.exceptions import EvaluationError
 from ravel.loaders import FileSystemLoader
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stories"
@@ -80,3 +83,17 @@ def test_start_mini_offers_the_matching_situations(mini):
     assert isinstance(step.outputs[-1], ChoicesOffered)
     assert set(step.state.offered) == {"begin::crossroads", "begin::fork", "begin::bridge"}
     assert step.state.status is Status.WAITING
+
+
+def test_given_dividing_by_an_unset_quality_raises_invalid_operation():
+    rulebook: types.CompiledRulebook = {
+        "metadata": {},
+        "rulebook": {"Situation": {"rules": [], "locations": {}}},
+        "givens": [types.Operation("X", "=", types.Expression(10, "/", types.QualityRef("Zero")))],
+    }
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        start(Story(rulebook=rulebook))
+
+    assert isinstance(excinfo.value.__cause__, EvaluationError)
+    assert isinstance(excinfo.value.__cause__.__cause__, ZeroDivisionError)

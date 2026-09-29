@@ -27,3 +27,10 @@ class InvalidQualityValueError(EngineError):
 
 class InvalidStateError(EngineError):
     """A game state is not resumable against its story."""
+
+
+class InvalidOperationError(EngineError):
+    """A quality operation could not be evaluated (division by zero, type mismatch, ...).
+
+    ``__cause__`` is the underlying ``EvaluationError``.
+    """
