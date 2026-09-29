@@ -15,6 +15,12 @@ from ravel.compiler import rulebooks
 # The compiler's own MAX_CHOICE_NESTING_DEPTH (200) is deliberately higher: it guards rulebook data that
 # did not come through this text path.
 MAX_SOURCE_NESTING_DEPTH: Final = 128
+# An inline list marker (``- - - x``) costs syml roughly twice the stack frames of an indentation level, so a
+# one-line chain that the depth cap above admits (122-128 markers) overflows the default recursion limit
+# (ravel-h6v.34). Markers per line are therefore capped separately. Measured: syml survives ~110 markers at
+# indent 0 from a shallow stack and ~80 from a stack 300 frames deep; 64 leaves headroom in both, and 64
+# markers plus up to 64 indentation levels (the 128-level total) still load from that deep stack.
+MAX_INLINE_LIST_MARKERS: Final = 64
 
 # The authoritative per-rulebook source cap. ``compile_rulebook`` enforces it for every loader, shipped or
 # custom; ``FileSystemLoader`` also uses it to bound its read to cap + 1 bytes (an early, memory-safe check).
@@ -58,6 +64,11 @@ def _source_nesting_depth(source: str, filename: str = "") -> int:
         while marker := _SYML_LIST_MARKER.match(line, column):
             columns.append(column)
             column = marker.end()
+        if len(columns) > MAX_INLINE_LIST_MARKERS:
+            raise exceptions.ParseError(
+                "Rulebook %s has %d inline list markers on one line; the maximum supported is %d"
+                % (exceptions.bounded_repr(filename or "<rulebook>"), len(columns), MAX_INLINE_LIST_MARKERS)
+            )
         if not columns or _SYML_KEY.match(line, column):
             columns.append(column)  # a plain line (key or text) is a level at its indent; an inline key too
         for level in columns:

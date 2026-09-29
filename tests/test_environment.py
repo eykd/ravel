@@ -333,14 +333,35 @@ class TestSourceNestingDepth:
         source = "a:\n" + " " * (indent + 1) + ("-" + spacing) * markers + tail + "\n"
         assert environments._source_nesting_depth(source) >= _syml_data_depth(source)
 
-    def test_it_should_refuse_a_one_line_chain_of_more_than_128_list_markers(self):
-        source = "- " * (environments.MAX_SOURCE_NESTING_DEPTH + 1) + "x\n"
-        with pytest.raises(exceptions.ParseError, match="'begin'.*maximum supported is 128"):
+    def test_it_should_refuse_a_one_line_chain_of_more_than_the_marker_cap(self):
+        source = "- " * (environments.MAX_INLINE_LIST_MARKERS + 1) + "x\n"
+        with pytest.raises(exceptions.ParseError, match="'begin'.*maximum supported is 64") as info:
             MemoryStorySource({"begin": source}).load()
+        assert not isinstance(info.value.__cause__, RecursionError)
 
-    def test_it_should_accept_a_one_line_chain_of_128_list_markers_at_the_limit(self):
-        source = "- " * environments.MAX_SOURCE_NESTING_DEPTH + "x\n"
-        assert environments._source_nesting_depth(source) == environments.MAX_SOURCE_NESTING_DEPTH
+    @pytest.mark.parametrize("stack_depth", [0, 300])
+    @pytest.mark.parametrize("indent_levels", [0, 32, environments.MAX_SOURCE_NESTING_DEPTH - 64])
+    def test_it_should_load_a_one_line_chain_at_the_marker_cap_without_the_recursion_backstop(
+        self, indent_levels, stack_depth
+    ):
+        keys = "".join(" " * i + "k%d:\n" % i for i in range(indent_levels))
+        source = keys + " " * indent_levels + "- " * environments.MAX_INLINE_LIST_MARKERS + "x\n"
+        assert environments._source_nesting_depth(source) <= environments.MAX_SOURCE_NESTING_DEPTH
+
+        def load_deep(remaining):
+            if remaining:
+                return load_deep(remaining - 1)
+            return MemoryStorySource({"begin": source}).load()
+
+        with pytest.raises(exceptions.ParseError) as info:
+            load_deep(stack_depth)
+        assert not isinstance(info.value.__cause__, RecursionError)
+        assert "nested too deeply" not in str(info.value)
+
+    def test_it_should_refuse_a_deep_indentation_chain_past_the_depth_cap(self):
+        source = "".join(" " * i + "k%d:\n" % i for i in range(environments.MAX_SOURCE_NESTING_DEPTH + 1))
+        with pytest.raises(exceptions.ParseError, match="maximum supported is 128"):
+            MemoryStorySource({"begin": source}).load()
 
     def test_it_should_accept_nesting_at_the_limit(self, env):
         source = "a:\n" + "".join(" " * (i + 1) + "b:\n" for i in range(environments.MAX_SOURCE_NESTING_DEPTH - 1))
