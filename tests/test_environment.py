@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from ravel import environments, exceptions, loaders
+from ravel.adapters.story_source import MemoryStorySource
 from ravel.engine.engine import start
 from ravel.engine.story import Story
 
@@ -142,3 +143,48 @@ class TestIncludeOrder:
         rulebook = environments.Environment(loader=loader, initializing_name="A").load()
         state = start(Story.from_rulebook(rulebook)).state
         assert state.qualities.get("Mood") == 2
+
+
+def _nested_choice_source(depth):
+    lines = ["rule:"]
+    column = 2
+    for _ in range(depth):
+        lines.append(" " * column + "- choice:")
+        column += 4
+        lines.append(" " * column + "- Intro.")
+    return "\n".join(lines) + "\n"
+
+
+class TestSourceNestingDepth:
+    def test_it_should_count_indentation_levels_ignoring_blanks_and_comments(self):
+        source = "a:\n\n  # comment\n  - b:\n      - c\n  - d\n"
+        assert environments._source_nesting_depth(source) == 3
+
+    def test_it_should_raise_parse_error_naming_the_rulebook_for_deep_nesting(self, env):
+        source = _nested_choice_source(1000)
+
+        with pytest.raises(exceptions.ParseError, match="'deep'.*maximum supported is 128"):
+            env.compile_rulebook(source, "deep")
+
+    def test_it_should_raise_parse_error_from_environment_load_via_memory_source(self):
+        with pytest.raises(exceptions.ParseError, match="'begin'"):
+            MemoryStorySource({"begin": _nested_choice_source(300)}).load()
+
+    def test_it_should_accept_nesting_at_the_limit(self, env):
+        source = "a:\n" + "".join(" " * (i + 1) + "b:\n" for i in range(environments.MAX_SOURCE_NESTING_DEPTH - 1))
+        assert environments._source_nesting_depth(source) == environments.MAX_SOURCE_NESTING_DEPTH
+
+    def test_it_should_convert_a_syml_recursion_error_to_parse_error(self, env, monkeypatch):
+        def explode(*args, **kwargs):
+            raise RecursionError
+
+        monkeypatch.setattr(environments.syml.parsers, "parse", explode)
+
+        with pytest.raises(exceptions.ParseError, match="'x' is nested too deeply"):
+            env.compile_rulebook("a: b\n", "x")
+
+    def test_it_should_label_an_unnamed_rulebook(self, env, monkeypatch):
+        monkeypatch.setattr(environments.syml.parsers, "parse", lambda *a, **k: (_ for _ in ()).throw(RecursionError()))
+
+        with pytest.raises(exceptions.ParseError, match="<rulebook>"):
+            env.compile_rulebook("a: b\n")

@@ -1044,7 +1044,8 @@ exhausting memory or the interpreter stack.
 | Parenthesis nesting in one expression | 20 | `ParseError` at compile time |
 | Total expression tree depth | 200 | `ParseError` at compile time |
 | Digits in an integer literal | 4300 (Python's `sys.get_int_max_str_digits()` default) | `ParseError` at compile time |
-| Choice block nesting | 200 | `ParseError` at compile time |
+| Indentation nesting in one rulebook source (checked before parsing) | 128 levels | `ParseError` at load time |
+| Choice block nesting (guards rulebook data that bypassed the text loader; a text rulebook hits the 128-level indentation cap first) | 200 | `ParseError` at compile time |
 | String length (a quality's value, and the result of any `+` or `+=`) | 65,536 characters | `EvaluationError` |
 | Integer quality range | -2^63 to 2^63 - 1 | `InvalidQualityValueError` on store |
 | Save file size | 1 MiB | `SaveCorruptError` on load |
