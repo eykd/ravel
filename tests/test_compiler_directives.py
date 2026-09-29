@@ -120,3 +120,44 @@ class TestCompileChoiceFailure:
 
         assert excinfo.value.args[0] == "TypeError: bad situation"
         assert isinstance(excinfo.value.__cause__, TypeError)
+
+
+class TestBoundedDirectiveMessages:
+    def test_it_should_bound_the_too_many_directives_message(self, env):
+        raw = {"text": "a" * 450_000, "effect": "b" * 450_000}
+        with pytest.raises(exceptions.ParseError) as info:
+            directives.compile_directive(env, "Situation", Mock(), raw)
+
+        assert len(str(info.value)) < 512
+
+    def test_it_should_bound_the_unknown_directive_message(self, env):
+        with pytest.raises(exceptions.ParseError) as info:
+            directives.compile_directive(env, "Situation", Mock(), {"k\x1b[2J" * 100: "v" * 900_000})
+
+        assert len(str(info.value)) < 512
+        assert "\x1b" not in str(info.value)
+
+    def test_it_should_bound_the_unrecognized_effect_and_end_block_messages(self, env):
+        with pytest.raises(exceptions.ParseError) as info:
+            directives.compile_directive(env, "Situation", Mock(), {"effect": {"k": "v" * 900_000}})
+        assert len(str(info.value)) < 512
+
+        with pytest.raises(exceptions.ParseError) as info:
+            directives.compile_directive(env, "Situation", Mock(), {"end": {"k": "v" * 900_000}})
+        assert len(str(info.value)) < 512
+
+    def test_it_should_bound_the_no_text_found_message(self):
+        from ravel.utils.strings import get_text
+
+        with pytest.raises(exceptions.ParseError) as info:
+            get_text(["z" * 900_000])
+
+        assert len(str(info.value)) < 512
+
+    def test_it_should_bound_an_invalid_operation_message(self):
+        from ravel import parsers
+
+        with pytest.raises(exceptions.OperationParseError) as info:
+            parsers.OperationParser().parse("!" * 900_000)
+
+        assert len(str(info.value)) < 512

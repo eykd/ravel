@@ -47,7 +47,7 @@ def _compile_directive_bodies(environment, concept, parent_rule, first_text, the
 def compile_directive(environment, concept, parent_rule, raw_directive, depth=0):
     if isinstance(raw_directive, Mapping):
         if len(raw_directive) != 1:
-            raise exceptions.ParseError("Too many directives in %s" % raw_directive)
+            raise exceptions.ParseError("Too many directives in %s" % exceptions.bounded_repr(raw_directive))
         key, directive = list(raw_directive.items())[0]
         if get_text(key) == "choice":
             return [compile_choice(environment, concept, parent_rule, directive, depth=depth)]
@@ -59,25 +59,31 @@ def compile_directive(environment, concept, parent_rule, raw_directive, depth=0)
             elif isinstance(directive, Sequence):
                 return effects.compile_effects(environment, concept, parent_rule, directive)
             else:
-                raise exceptions.ParseError("Unrecognized effect type: %r" % directive)
+                raise exceptions.ParseError("Unrecognized effect type: %s" % exceptions.bounded_repr(directive))
         elif get_text(key) == "end":
             return [compile_end(environment, concept, parent_rule, directive)]
         else:
-            raise exceptions.ParseError("Unknown directive %s in %r" % (get_text(key), raw_directive))
+            raise exceptions.ParseError(
+                "Unknown directive %s in %s"
+                % (exceptions.printable(get_text(key)), exceptions.bounded_repr(raw_directive))
+            )
     else:
         return [text.compile_text(environment, concept, parent_rule, raw_directive)]
 
 
 def compile_end(environment, concept, parent_rule, directive):
     if not is_text(directive):
-        raise exceptions.ParseError("end takes an inline outcome label, not a block: %r" % directive)
+        raise exceptions.ParseError(
+            "end takes an inline outcome label, not a block: %s" % exceptions.bounded_repr(directive)
+        )
     return types.End(get_text(directive).strip()), {}
 
 
 def compile_choice(environment, concept, parent_rule, directives, depth=0):
     if depth > MAX_CHOICE_NESTING_DEPTH:
         raise exceptions.ParseError(
-            "Choice nesting exceeds the maximum supported depth (%d) at %r" % (MAX_CHOICE_NESTING_DEPTH, parent_rule)
+            "Choice nesting exceeds the maximum supported depth (%d) at %s"
+            % (MAX_CHOICE_NESTING_DEPTH, exceptions.bounded_repr(parent_rule))
         )
     logger.debug("Compiling choice for %s:%s:\n%r", concept, parent_rule, directives)
     if is_text(directives):
@@ -99,4 +105,4 @@ def compile_choice(environment, concept, parent_rule, directives, depth=0):
             },
         )
     except Exception as e:
-        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, e.args[0])) from e
+        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, exceptions.printable(e.args[0]))) from e

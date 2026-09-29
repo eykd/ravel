@@ -215,7 +215,9 @@ class OperationParser(BaseExpressionParser):
         try:
             return super().parse(text, pos=pos)
         except exceptions.ParsimoniousParseError as e:
-            raise exceptions.OperationParseError("Invalid operation %r: %s" % (text, e)) from e
+            raise exceptions.OperationParseError(
+                "Invalid operation %s: %s" % (exceptions.bounded_repr(text), exceptions.printable(e))
+            ) from e
 
     def visit_constraint(self, node, children):
         return types.Constraint(node.children[0].text, self.reduce_children(children))
@@ -229,6 +231,7 @@ class OperationParser(BaseExpressionParser):
             constraint = None
         if constraint is not None and isinstance(expr, str):
             raise exceptions.OperationParseError(
-                "Invalid operation %r: a constraint cannot apply to a string literal" % node.text.strip()
+                "Invalid operation %s: a constraint cannot apply to a string literal"
+                % exceptions.bounded_repr(node.text.strip())
             )
         return types.Operation(quality, operator, expr, constraint)

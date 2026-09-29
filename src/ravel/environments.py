@@ -97,13 +97,15 @@ class Environment:
         depth = _source_nesting_depth(source)
         if depth > MAX_SOURCE_NESTING_DEPTH:
             raise exceptions.ParseError(
-                "Rulebook %r nests %d indentation levels deep; the maximum supported is %d"
-                % (label, depth, MAX_SOURCE_NESTING_DEPTH)
+                "Rulebook %s nests %d indentation levels deep; the maximum supported is %d"
+                % (exceptions.bounded_repr(label), depth, MAX_SOURCE_NESTING_DEPTH)
             )
         try:
             data = syml.parsers.parse(source, filename=name).as_source()
         except RecursionError as error:
-            raise exceptions.ParseError("Rulebook %r is nested too deeply to parse" % label) from error
+            raise exceptions.ParseError(
+                "Rulebook %s is nested too deeply to parse" % exceptions.bounded_repr(label)
+            ) from error
         except syml.exceptions.ParseError as error:
             raise exceptions.ParseError(str(error)) from error
 

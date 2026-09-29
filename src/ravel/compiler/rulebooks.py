@@ -59,7 +59,9 @@ def compile_preamble(environment, rulebook):
         try:
             rule = next(rulesets)
         except StopIteration as e:
-            raise exceptions.MissingBaggageError("No baggage found after rule: %r" % (last_rule,)) from e
+            raise exceptions.MissingBaggageError(
+                "No baggage found after rule: %s" % exceptions.bounded_repr(last_rule)
+            ) from e
         else:
             key_name = get_text(rule[0])
 

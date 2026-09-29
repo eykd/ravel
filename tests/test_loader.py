@@ -260,3 +260,27 @@ class TestRulebookSourceLimits:
         else:
             with pytest.raises(expected):
                 env.load()
+
+
+class TestBoundedNames:
+    def test_it_should_escape_control_characters_in_a_missing_include_name(self, fs_loader):
+        with pytest.raises(exceptions.RulebookNotFound) as info:
+            fs_loader.get_source(Mock(), "no\x1b[31m\nsuch")
+
+        assert str(info.value) == "no\\x1b[31m\\nsuch"
+
+    def test_it_should_bound_an_oversized_missing_name(self, fs_loader):
+        with pytest.raises(exceptions.RulebookNotFound) as info:
+            fs_loader.get_source(Mock(), "n" * 5000)
+
+        assert len(str(info.value)) < 512
+
+    def test_it_should_escape_the_name_in_the_invalid_and_escaping_messages(self, fs_loader):
+        with pytest.raises(exceptions.RulebookNotFound) as info:
+            fs_loader.get_source(Mock(), "a\0\x1b")
+        assert "\x1b" not in str(info.value)
+
+        with pytest.raises(exceptions.RulebookNotFound) as info:
+            fs_loader.get_source(Mock(), "../\x1b" + "x" * 5000)
+        assert "\x1b" not in str(info.value)
+        assert len(str(info.value)) < 512
