@@ -111,7 +111,7 @@ compare.
 
 1. **Given** a mapping of rulebook names to source strings, **When** an app compiles and starts a
    game from it, **Then** no filesystem access happens and the game plays.
-2. **Given** a story-environment constructed without naming a loader, **When** it's created,
+2. **Given** a story environment constructed without naming a loader, **When** it's created,
    **Then** construction fails with a clear error, rather than silently reaching for the
    filesystem.
 3. **Given** a saved game as bytes, **When** a handler resumes it, makes one choice and saves

@@ -87,7 +87,7 @@ _GATE: passed before Phase 0; re-checked after Phase 1 (below)._
 | Principle | Status | Notes |
 |---|---|---|
 | I. TDD (NON-NEGOTIABLE) | PASS | Every task starts RED, committed via `.venv/bin/python -m tools.commit_red <task-id>`. Doc-only tasks (US5) are gated by US6's spec-examples test and the acceptance checks listed below. The two right-nested parser tests change as part of the RED for the left-fold task. |
-| II. Type Safety | PASS | New code in strict modules (`types.py`, `queries.py`, `engine/*`, `adapters/*`) is fully annotated. `QualityLookup` is a `Protocol`, so `Qualities` and `dict` both type-check without a cast. |
+| II. Type Safety | PASS | New code in strict modules (`types.py`, `queries.py`, `engine/*`, `adapters/*`) is fully annotated. `QualityLookup` is a `Protocol`, so `Qualities` and `dict` both type-check without a cast. **sp:06-analyze caveat:** the per-module strict override block Principle II cites isn't in `pyproject.toml` (probe 2026-09-28: adding it gives 43 errors in `types.py`, `queries.py`, `cli.py`), so "strict" is a convention here, not a mypy gate, until remediation `ravel-h6v.7` lands. |
 | III. Coverage & Lint | PASS | 100% branch kept; no `# pragma: no cover`. |
 | IV. Spec discipline | PASS | Every behavior change cites a spec section or FR (see Spec Conformance). Every open spec question is a dated decision in research.md (R1–R8, PD-01–PD-18). Spec edits land in the same commits as the behavior. |
 | V. Simplicity / YAGNI | PASS, one row in Complexity Tracking | No new dependency. Grammar stays one shared `base_expression_grammar`; `ComparisonParser` stops duplicating it (PD-17). New value types (`QualityRef`, `Value`) go in `types.py`. |
