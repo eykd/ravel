@@ -35,3 +35,8 @@ def get_handler_for(concept):
 def compile_baggage(environment, concept, rule_name, baggage_data):
     """Compile the given baggage using a registered concept handler."""
     return get_handler_for(concept)(environment, concept, rule_name, baggage_data)
+
+
+def is_registered(concept: str) -> bool:
+    """Return whether a handler is registered for the given concept (exact match)."""
+    raise NotImplementedError

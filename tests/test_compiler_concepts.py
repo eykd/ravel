@@ -31,3 +31,14 @@ class Test_DummyHandler:
         )
         expected = {rule_name: value}
         assert result == expected
+
+
+class TestIsRegistered:
+    def test_it_should_report_a_registered_concept(self):
+        assert concepts.is_registered("Situation") is True
+
+    def test_it_should_not_report_an_unregistered_concept(self):
+        assert concepts.is_registered("Hello") is False
+
+    def test_it_should_match_concept_names_exactly(self):
+        assert concepts.is_registered("situation") is False
