@@ -283,3 +283,34 @@ class TestOperationParserQualityReferences:
     def test_reserved_words_and_unary_minus_on_names_are_rejected(self, parser, text):
         with pytest.raises(Exception):  # noqa: B017, PT011
             parser.parse(text)
+
+
+class TestValueKeyword:
+    """`value` is the keyword for the subject's current value, in operations and comparisons."""
+
+    @pytest.mark.parametrize(
+        ("text", "rhs"),
+        [
+            ("X += value", types.VALUE),
+            ("X += value * 2", types.Expression(types.VALUE, "*", 2)),
+            ("X = 3 + value", types.Expression(3, "+", types.VALUE)),
+        ],
+    )
+    def test_value_compiles_to_value_in_operations(self, text, rhs):
+        result = parsers.OperationParser().parse(text)
+        assert result.expression == rhs
+
+    def test_value_compiles_to_value_in_comparisons(self):
+        assert parsers.ComparisonParser().parse("Score > value") == types.Comparison("Score", ">", types.VALUE)
+
+    def test_value_compiles_inside_a_comparison_expression(self):
+        result = parsers.ComparisonParser().parse("Score == value * 2")
+        assert result == types.Comparison("Score", "==", types.Expression(types.VALUE, "*", 2))
+
+    def test_value_keyword_does_not_swallow_longer_identifiers(self):
+        result = parsers.OperationParser().parse("X = valuable")
+        assert result.expression == types.QualityRef("valuable")
+
+    def test_value_keyword_is_distinct_from_quality_references(self):
+        result = parsers.OperationParser().parse("X = value + Value")
+        assert result.expression == types.Expression(types.VALUE, "+", types.QualityRef("Value"))

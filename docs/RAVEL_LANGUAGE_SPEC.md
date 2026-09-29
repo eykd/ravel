@@ -210,6 +210,13 @@ effect:
   - Health -= value / 10    # Reduce Health by 10% of itself
 ```
 
+`value` is `0` for a subject that has never been set, and it works in comparisons as well as
+operations (`Score > value`).
+
+```
+X = 10 ; X += value * 2 → 30
+```
+
 ---
 
 ## 5. Expressions
