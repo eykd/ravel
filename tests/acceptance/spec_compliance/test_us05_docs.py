@@ -30,13 +30,30 @@ def read(relative: str) -> str:
 
 
 def section(text: str, heading: str) -> str:
-    """Return the body of the markdown section whose heading line starts with ``heading``."""
-    match = re.search(rf"^#+ {re.escape(heading)}.*?(?=^#+ |\Z)", text, re.MULTILINE | re.DOTALL)
-    assert match is not None, f"missing section {heading!r}"
-    return match.group(0)
+    """Return the body of the markdown section whose heading line starts with ``heading``.
+
+    Lines inside ``` fenced blocks never start or end a section, so a ``# comment`` in a code fence is not a heading.
+    """
+    lines = text.splitlines(keepends=True)
+    in_fence = False
+    start: int | None = None
+    end = len(lines)
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or not re.match(r"#+ ", line):
+            continue
+        if start is None:
+            if re.match(rf"#+ {re.escape(heading)}", line):
+                start = index
+        else:
+            end = index
+            break
+    assert start is not None, f"missing section {heading!r}"
+    return "".join(lines[start:end])
 
 
-@pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as1_language_spec_is_v02() -> None:
     """US5-AS1: the language spec is v0.2, reflects R1-R8, has a precedence table, PEG matches code."""
     spec = read("docs/RAVEL_LANGUAGE_SPEC.md")
