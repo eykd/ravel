@@ -194,7 +194,7 @@ def _syml_data_depth(source):
 class TestSourceNestingDepth:
     def test_it_should_count_indentation_levels_ignoring_blanks_and_comments(self):
         source = "a:\n\n# comment\n  - b:\n//  comment\n      - c\n  - d\n"
-        assert environments._source_nesting_depth(source) == 3
+        assert environments._source_nesting_depth(source) == 4 == _syml_data_depth(source)
 
     @pytest.mark.parametrize("marker", ["#", "//"])
     def test_it_should_count_an_indented_comment_marker_as_content(self, marker):
@@ -305,6 +305,42 @@ class TestSourceNestingDepth:
     def test_it_should_raise_parse_error_for_badly_shaped_rulebooks(self, source, message):
         with pytest.raises(exceptions.ParseError, match=message):
             MemoryStorySource({"begin": source}).load()
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            "- - - x\n",
+            "-\n",
+            "- -\n",
+            "-  \t - x\n",
+            "a:\n  - - b: c\n    - d\n",
+            "- a: b\n  c: d\n",
+            "- - k:\n      - v\n",
+            "a: - b: - c: d\n",
+            "a:\n  - k: - - v\n",
+        ],
+    )
+    def test_it_should_count_inline_list_markers_and_keys_as_levels_like_syml(self, source):
+        assert environments._source_nesting_depth(source) == _syml_data_depth(source)
+
+    @given(
+        markers=st.integers(min_value=0, max_value=25),
+        tail=st.sampled_from(["", "x", "k:", "k: v", "k: - v", "-x"]),
+        indent=st.integers(min_value=0, max_value=3),
+        spacing=st.sampled_from([" ", "  ", " \t"]),
+    )
+    def test_the_gate_never_undercounts_a_single_inline_chain(self, markers, tail, indent, spacing):
+        source = "a:\n" + " " * (indent + 1) + ("-" + spacing) * markers + tail + "\n"
+        assert environments._source_nesting_depth(source) >= _syml_data_depth(source)
+
+    def test_it_should_refuse_a_one_line_chain_of_more_than_128_list_markers(self):
+        source = "- " * (environments.MAX_SOURCE_NESTING_DEPTH + 1) + "x\n"
+        with pytest.raises(exceptions.ParseError, match="'begin'.*maximum supported is 128"):
+            MemoryStorySource({"begin": source}).load()
+
+    def test_it_should_accept_a_one_line_chain_of_128_list_markers_at_the_limit(self):
+        source = "- " * environments.MAX_SOURCE_NESTING_DEPTH + "x\n"
+        assert environments._source_nesting_depth(source) == environments.MAX_SOURCE_NESTING_DEPTH
 
     def test_it_should_accept_nesting_at_the_limit(self, env):
         source = "a:\n" + "".join(" " * (i + 1) + "b:\n" for i in range(environments.MAX_SOURCE_NESTING_DEPTH - 1))

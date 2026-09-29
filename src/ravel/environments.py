@@ -1,3 +1,4 @@
+import re
 from collections import OrderedDict, defaultdict, deque
 from typing import Any, Final
 
@@ -22,6 +23,11 @@ MAX_SOURCE_NESTING_DEPTH: Final = 128
 # comments (column 0 only) and indentation (spaces only).
 _SYML_COMMENT: Final = syml.parsers.SymlParser.grammar["comment"].re
 _SYML_INDENT: Final = syml.parsers.SymlParser.grammar["indent"].re
+# A line can nest within itself (ravel-h6v.33): after a list marker syml's ``value`` rule tries
+# ``structure`` again, so ``- - - x`` is three nested lists and ``- a: b`` puts the key ``a`` one level
+# below the marker, at the column where the key starts. Each marker and an inline key count as a level.
+_SYML_LIST_MARKER: Final = re.compile(r"-(?:[ \t]+|$)")
+_SYML_KEY: Final = re.compile(syml.basetypes.KEY_PATTERN_SOURCE + r":(?:[ \t]+|$)")
 
 
 def _source_nesting_depth(source: str, filename: str = "") -> int:
@@ -34,11 +40,18 @@ def _source_nesting_depth(source: str, filename: str = "") -> int:
     for line in syml.preprocess.preprocess(source, filename=filename or None).normalized.split("\n"):
         if syml.preprocess.is_blank(line) or _SYML_COMMENT.match(line):
             continue
-        indent = _SYML_INDENT.match(line).end()
-        while stack and stack[-1] > indent:
-            stack.pop()
-        if not stack or stack[-1] < indent:
-            stack.append(indent)
+        column = _SYML_INDENT.match(line).end()
+        columns = []
+        while marker := _SYML_LIST_MARKER.match(line, column):
+            columns.append(column)
+            column = marker.end()
+        if not columns or _SYML_KEY.match(line, column):
+            columns.append(column)  # a plain line (key or text) is a level at its indent; an inline key too
+        for level in columns:
+            while stack and stack[-1] > level:
+                stack.pop()
+            if not stack or stack[-1] < level:
+                stack.append(level)
         deepest = max(deepest, len(stack))
     return deepest
 
