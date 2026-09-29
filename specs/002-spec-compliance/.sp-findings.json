@@ -1,6 +1,7 @@
 [
-  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: long operator chains raise untyped RecursionError at evaluation time", "severity": "CRITICAL", "line": 50, "task_id": "ravel-h6v.8"},
-  {"category": "security", "file": "src/ravel/grammars.py", "title": "Remediate: nested parentheses in expressions raise untyped RecursionError at compile", "severity": "MAJOR", "line": 15, "task_id": "ravel-h6v.9"},
-  {"category": "security", "file": "src/ravel/types.py", "title": "Remediate: string repetition and % formatting allow unbounded memory allocation", "severity": "MAJOR", "line": 101, "task_id": "ravel-h6v.10"},
-  {"category": "security", "file": "src/ravel/grammars.py", "title": "Remediate: oversized integer literals escape as untyped VisitationError", "severity": "MINOR", "line": 60, "task_id": "ravel-h6v.11"}
+  {"category": "security", "file": "src/ravel/engine/state.py", "title": "Remediate: string qualities grow without bound through + concatenation", "severity": "CRITICAL", "line": 29, "task_id": "ravel-h6v.12"},
+  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: expression parsing amplifies long lines before any size gate", "severity": "MAJOR", "line": 43, "task_id": "ravel-h6v.13"},
+  {"category": "security", "file": "src/ravel/environments.py", "title": "Remediate: deeply nested rulebook blocks raise untyped RecursionError from Environment.load", "severity": "MAJOR", "line": 70, "task_id": "ravel-h6v.14"},
+  {"category": "security", "file": "src/ravel/loaders.py", "title": "Remediate: FileSystemLoader reads rulebooks without a size bound or typed read errors", "severity": "MAJOR", "line": 48, "task_id": "ravel-h6v.15"},
+  {"category": "security", "file": "src/ravel/engine/state.py", "title": "Remediate: unstorable-value error formatting raises raw ValueError on huge computed ints", "severity": "MINOR", "line": 45, "task_id": "ravel-h6v.16"}
 ]
