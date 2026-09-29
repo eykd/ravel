@@ -1,4 +1,5 @@
 import os.path
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import attr
@@ -54,8 +55,12 @@ class FileSystemLoader(BaseLoader):
 class MemoryLoader(BaseLoader):
     """Serve rulebooks from an in-memory mapping of name to source text."""
 
-    def __init__(self, sources: dict[str, str]) -> None:
+    def __init__(self, sources: Mapping[str, str]) -> None:
         self.sources = dict(sources)
 
-    def get_source(self, environment, name):
-        raise NotImplementedError()
+    def get_source(self, environment, name) -> tuple[str, Callable[[], bool]]:
+        try:
+            source = self.sources[name]
+        except KeyError:
+            raise exceptions.RulebookNotFound(name) from None
+        return source, lambda: True
