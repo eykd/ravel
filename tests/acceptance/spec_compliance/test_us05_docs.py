@@ -139,7 +139,6 @@ def test_us05_as2_vm_spec_is_v02() -> None:
     assert not re.search(r"^\| .*Expression.*\*\*Implemented\*\*", spec, re.MULTILINE)
 
 
-@pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as3_claude_md_matches_docs() -> None:
     """US5-AS3: CLAUDE.md's Language reference paragraph names both docs as v0.2."""
     claude = read("CLAUDE.md")

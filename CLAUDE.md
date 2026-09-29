@@ -59,9 +59,10 @@ The pipeline is: `.ravel` source → `Environment` → `Loader` → compiler →
 `ravel.engine` (`start`/`choose`/`present`/`resume`) → `ravel.app.GameSession` → an adapter
 (`ravel.cli.ConsoleUI`, or any other caller of `GameSession`).
 
-**Loading and merging** (`environments.py`, `loaders.py`). `Environment.load()` starts at the
-`begin` rulebook and walks `include:` breadth-first, caching each compiled rulebook and
-invalidating it on file mtime. Rule names are namespaced as `filename::rulename` via
+**Loading and merging** (`environments.py`, `loaders.py`). `Environment` requires a loader
+(e.g., `FileSystemLoader` for files, `MemoryLoader` for in-memory sources); its `load()` method
+starts at the `begin` rulebook and walks `include:` breadth-first, caching each compiled rulebook
+and invalidating it on file mtime. Rule names are namespaced as `filename::rulename` via
 `location_separator`. All loaded rulebooks merge into one master dict keyed by concept, each
 holding `{"rules": [...], "locations": {...}}`, plus flattened `metadata` and `givens`.
 
@@ -100,9 +101,9 @@ prefixes. Change the grammar and the parser node visitor in `parsers.py` togethe
 
 ## Language reference
 
-`docs/RAVEL_LANGUAGE_SPEC.md` documents the authoring language and is kept in sync with what the
-compiler accepts. `docs/RAVEL_VM_SPEC.md` predates the pure `ravel.engine` rewrite and describes a
-different, instruction-set VM design; it now carries implemented/deferred annotations pointing at
-the real engine and `specs/001-reentrant-vm/contracts/` — read the annotations, not the
-instruction-set body, for current behavior. Both files are tracked by git. `examples/cloak/` is
-the fullest worked example; `tests/conftest.py` loads it as a fixture.
+**Version 0.2.** `docs/RAVEL_LANGUAGE_SPEC.md` is v0.2 and kept in sync with what the compiler
+accepts; its fenced examples in §4–§7, §9, and §11.4 run as tests via `tests/test_spec_examples.py`.
+`docs/RAVEL_VM_SPEC.md` is v0.2 and describes the shipped pure `ravel.engine`, its ports (`StorySource`,
+`SaveStore`), and host recipes (Realtime, Async, HATEOAS); the old instruction-set design appears
+only in Appendix A as history. Both files are tracked by git. `examples/cloak/` is the fullest
+worked example; `tests/conftest.py` loads it as a fixture.
