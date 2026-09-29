@@ -415,6 +415,34 @@ class TestExpressionLengthLimit:
         assert len(text) > parsers.MAX_EXPRESSION_LENGTH
         assert parsers.PlainTextParser().parse(text).text.startswith("word")
 
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "{q == %s} hello",
+            "{q == %s",
+            '{q == "}" + %s} hello',
+        ],
+        ids=["closed", "unclosed", "brace-in-string"],
+    )
+    def test_an_oversized_text_line_prefix_is_refused_before_parsing(self, monkeypatch, template):
+        def boom(*args, **kwargs):
+            raise AssertionError("the grammar must not run")
+
+        monkeypatch.setattr(parsers.NodeVisitor, "parse", boom)
+        text = template % "+".join(["1"] * 500_000)
+
+        with pytest.raises(exceptions.ComparisonParseError, match=str(parsers.MAX_EXPRESSION_LENGTH)):
+            parsers.PlainTextParser().parse(text)
+
+    def test_a_long_prose_tail_after_a_short_prefix_still_parses(self):
+        text = "{q == 1} " + "word } " * 40_000
+
+        assert len(text) > parsers.MAX_EXPRESSION_LENGTH
+        assert parsers.PlainTextParser().parse(text).predicate is not None
+
+    def test_a_long_unprefixed_prose_line_still_parses(self):
+        assert parsers.PlainTextParser().parse("x" * 500_000).text == "x" * 500_000
+
 
 class TestExpressionDepthLimit:
     """Parentheses let capped chains nest; total depth and paren nesting are capped too."""
