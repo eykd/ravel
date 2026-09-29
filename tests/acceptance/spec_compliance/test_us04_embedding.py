@@ -103,7 +103,6 @@ def test_us4_as1_in_memory_mapping_compiles_and_plays_with_zero_filesystem_acces
     assert state.qualities.get("Location") == "Done"
 
 
-@pytest.mark.xfail(strict=True, reason="US4 not yet implemented; remove when this scenario passes")
 def test_us4_as2_environment_without_loader_fails_with_clear_type_error() -> None:
     """US4-AS2: ``Environment()`` with no loader fails with a clear TypeError."""
     with pytest.raises(TypeError):

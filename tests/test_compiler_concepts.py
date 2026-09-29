@@ -1,4 +1,4 @@
-from ravel import environments
+from ravel import environments, loaders
 from ravel.compiler import concepts
 
 
@@ -26,6 +26,8 @@ class Test_DummyHandler:
         rule_name = "foo"
         value = ["bar"]
 
-        result = concepts._dummy_handler(environments.Environment(), "concept", rule_name, value)
+        result = concepts._dummy_handler(
+            environments.Environment(loader=loaders.MemoryLoader({})), "concept", rule_name, value
+        )
         expected = {rule_name: value}
         assert result == expected

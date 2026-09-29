@@ -4,13 +4,17 @@ from typing import Any
 import attr
 import syml
 
-from ravel import loaders
 from ravel.compiler import rulebooks
+
+
+def _has_load(instance: object, attribute: object, value: object) -> None:
+    if not callable(getattr(value, "load", None)):
+        raise TypeError("Environment loader must have a callable load(); got %s" % type(value).__name__)
 
 
 @attr.s
 class Environment:
-    loader = attr.ib(default=attr.Factory(lambda: loaders.FileSystemLoader()))
+    loader: Any = attr.ib(validator=_has_load)
     location_separator = attr.ib(default="::")
     initializing_name = attr.ib(default="begin")
 

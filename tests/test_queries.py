@@ -3,7 +3,7 @@ import textwrap
 import pytest
 import syml
 
-from ravel import environments, queries, types
+from ravel import environments, loaders, queries, types
 from ravel.compiler.rulebooks import compile_rulebook
 
 
@@ -96,7 +96,7 @@ class TestQueryTop:
     @pytest.fixture
     def rules(self):
         rulebook = syml.loads(TEST_RULES)
-        env = environments.Environment()
+        env = environments.Environment(loader=loaders.MemoryLoader({}))
         return compile_rulebook(env, rulebook)["rulebook"]
 
     def test_it_should_query_a_rules_database_and_reject_mismatched_rules(self, rules):

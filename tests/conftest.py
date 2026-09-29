@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from ravel.environments import Environment
-from ravel.loaders import FileSystemLoader
+from ravel.loaders import FileSystemLoader, MemoryLoader
 
 from .helpers import strict_conditions as _strict_conditions
 
@@ -17,7 +17,7 @@ def examples_path():
 
 @pytest.fixture
 def env():
-    return Environment()
+    return Environment(loader=MemoryLoader({}))
 
 
 @pytest.fixture

@@ -2,6 +2,15 @@
 
 <!--
 Sync Impact Report:
+- Version: 1.2.0 → 1.2.1 (PATCH - wording only, no principle change):
+  - VII (Clean Architecture): the adapter list's file-based adapter is now
+    `loaders.py`'s `FileSystemLoader` alone. `environments.py` is no longer
+    listed as an adapter: it is compile-layer code that takes its loader by
+    injection and no longer imports `ravel.loaders` (feature
+    002-spec-compliance, US4). Every other principle's wording is unchanged.
+  - Templates requiring updates: None. Follow-up TODOs: None.
+  - Amended 2026-09-28 for feature 002-spec-compliance, per plan.md
+    § Constitution Check VII.
 - Version: 1.1.0 → 1.2.0 (MINOR - no principle removed or redefined; each
   keeps its existing rule and only its enumerated file/surface list changes,
   to track the pure re-entrant engine introduced by feature 001-reentrant-vm):
@@ -191,7 +200,7 @@ logic (`queries.py`), the compiler (`compiler/`), and the pure engine
 (`ravel.engine`) — MUST NOT import from or depend on I/O, the CLI, or
 presentation concerns. The application layer (`ravel.app`) depends inward on
 the core. Adapters — `ravel.adapters`, the CLI (`cli.py`), and the file-based
-loaders (`loaders.py`'s `FileSystemLoader`, `environments.py`) — depend
+loader (`loaders.py`'s `FileSystemLoader`) — depend
 inward on the core and application layer; the core never imports them.
 Everything the engine's core exposes outward does so through immutable
 output values holding only plain data (no live state objects, no callables),
@@ -239,4 +248,4 @@ This constitution follows semantic versioning:
   silent exception.
 - Use `CLAUDE.md` for day-to-day runtime guidance to Claude Code.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-27 | **Last Amended**: 2026-09-28
+**Version**: 1.2.1 | **Ratified**: 2026-09-27 | **Last Amended**: 2026-09-28
