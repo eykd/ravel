@@ -50,8 +50,13 @@ Each line in a scoped block is classified; the first matching class wins.
    enclosing YAML key is `given:` or `effect:`. It must parse via `OperationParser` and evaluate
    against empty qualities without raising.
 3. **Comparison item**: a YAML list item under a `when:` key, or a `{…}` prefix at the start of a
-   list item. It must parse via `ComparisonParser` and check against empty qualities without
+   list item. It must parse via `ComparisonParser` and evaluate against empty qualities without
    raising.
+
+**Raising path (RT-11).** `run_example` evaluates comparisons with
+`Comparison.evaluate(qualities.get(subject), qualities=qualities)`, never `check`/`__call__`:
+those return `False` on an evaluation error (RT-10), which would let a broken comparison example
+pass silently. Result lines that end in a comparison use the same raising call.
 4. Everything else (prose, text directives, keys, comments, blank lines) is ignored. A trailing
    ` # comment` on a YAML line is stripped before parsing.
 

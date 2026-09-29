@@ -104,7 +104,7 @@ _GATE: passed before Phase 0; re-checked after Phase 1 (below)._
 | Compiled rulebook: `value` | `types.VALUE` is now a singleton instance, not a class | None: the class form crashed at run time. Equality with `types.VALUE` still holds. |
 | Operation semantics | `min`/`max` now clamp | None: the spec always said so (FR-008). |
 | `ravel.engine` errors | `start`/`choose` can raise the new `InvalidOperationError(EngineError)`, for a `ConstraintError` **and** for a `ZeroDivisionError`/`OverflowError`/`TypeError` from an operation's arithmetic (red-team RT-1) | Let `ConstraintError` escape unwrapped: engine callers would need a second `except`. Let arithmetic errors escape raw (PD-08 as first planned): `X = 100 / Bonus` with `Bonus` unset now divides by zero from ordinary story text, and a raw `ZeroDivisionError` bypasses `GameSession`'s `EngineError` handling. |
-| Predicate evaluation failures | A predicate whose evaluation raises `TypeError`, `ArithmeticError` or `EvaluationError` is a non-match (logged at `WARNING`) in **both** `query_predicates` branches; today only the unset-subject branch catches `TypeError`, and a set subject crashes (red-team RT-2) | Raise a typed `EngineError` instead: every query on that state would raise, so a save sitting in that state could never be played again (US4's stateless resume). |
+| Condition evaluation failures | A comparison (a `when:` predicate or a `{…}` line prefix) whose evaluation raises `TypeError`, `ArithmeticError` or `EvaluationError` is false, logged at `WARNING`; the catch lives in `Comparison.check`/`__call__`. Today only `query_predicates`' unset-subject branch catches `TypeError`; a set subject or a `{…}` prefix crashes (red-team RT-2, RT-10) | Raise a typed `EngineError` instead: every query on that state would raise, so a save sitting in that state could never be played again (US4's stateless resume). |
 
 Unchanged: `Loader` (`BaseLoader.load`/`get_source`), the compiled rulebook's dict shape, `Source`/
 `Pos`, `start`/`choose`/`present`/`resume` signatures, output and state types, `GameSession`, save
@@ -188,8 +188,9 @@ docs/
 
 tests/
 ├── test_parsers.py          # left-nested expectations; new grammar cases
-├── test_types.py            # evaluation, constraints
-├── test_queries.py          # references in predicates; predicate failures are non-matches (RT-2);
+├── test_types.py            # evaluation, constraints; Comparison.check/__call__ soft-fail (RT-10)
+├── test_queries.py          # references in predicates; predicate failures are non-matches (RT-2),
+│                            #   `except TypeError` fallback deleted (RT-10);
 │                            #   its bare Environment() (line 67) passes a loader
 ├── test_compiler_rulebooks.py   # concept detection
 ├── test_compiler_concepts.py    # its bare Environment() (line 29) passes a loader
@@ -306,15 +307,24 @@ adding no new per-failure error type:
   with Bonus unset → `InvalidOperationError` whose `__cause__` is a `ZeroDivisionError`, and
   `X = Name + 1` with `Name = "a"` → `InvalidOperationError` from `TypeError`; a `GameSession`
   test shows the session's state is untouched after either.
-- **Predicates (RT-2).** `query_predicates` treats a predicate that raises `TypeError`,
-  `ArithmeticError` or `EvaluationError` as a non-match, in both branches (set subject and the
-  unset-subject `predicate(0)` fallback), logging the rule, the comparison and the error at
-  `WARNING`. This widens PD-06's fallback on purpose: a raising predicate is evaluated on every
-  query, so raising would make every `present`/`choose` from that state fail and brick any save
-  sitting in it, and US4's stateless handler has no session to recover with. Operations fail loud
-  (they run once per action and the host can report it); predicates fail soft. Tests:
-  `when: X > 10 / Y` with X set and Y unset → the rule doesn't match and the other rules still do;
-  `when: X > Name` with `Name = "a"` → no match, where today it raises.
+- **Conditions (RT-2, placed by RT-10).** A comparison is evaluated from three sites, not one:
+  `when:` predicates in `query_predicates` (both the set-subject branch and the unset-subject
+  `predicate(0)` fallback), and a text line's `{…}` prefix via `Text.check` in `_Run.text`. Pass 1
+  covered only the first; `{X > 10 / Y}Low.` would still raise a raw `ZeroDivisionError` out of
+  `choose`. So the soft failure lives in `Comparison` itself, the one type all three sites call:
+  `Comparison.check(qualities)` and `Comparison.__call__(qvalue, *, qualities)` catch
+  `(TypeError, ArithmeticError, EvaluationError)`, log the comparison and the error at `WARNING` on
+  the `ravel.query` logger, and return `False`. `Comparison.evaluate` still raises, so unit tests
+  can see the underlying error. `query_predicates`' existing `except TypeError` becomes
+  unreachable and is **deleted** (leaving it would break the 100% branch gate). This widens
+  PD-06's fallback on purpose: a raising `when:` predicate is evaluated on every query, so raising
+  would make every `present`/`choose` from that state fail and strand any save sitting in it, and
+  US4's stateless handler has no session to recover with. Operations fail loud (they run once per
+  action and the host can report it); conditions fail soft (a failing `when:` is a non-match, a
+  failing `{…}` prefix hides its line). Tests: `when: X > 10 / Y` with X set and Y unset → the rule
+  doesn't match and the other rules still do; `when: X > Name` with `Name = "a"` → no match, where
+  today it raises; `{Health > 10 / Y}Hidden.` with Y unset → the line isn't shown and play
+  continues; `caplog` sees one `WARNING` per failing evaluation.
 - **Test discipline.** Because `TypeError` is now wrapped, a future bug of the old
   `VALUE`-class kind would surface as `InvalidOperationError`, not as a crash. US1 and US2
   acceptance tests assert computed *values* (and kinds), never just "no exception raised".
@@ -342,6 +352,13 @@ the bracketed line first; v0.2 adds "The bracketed line must be the choice's fir
 contracts/rulebook-compile.md lists the rejected order. No code change: US3's test pins that
 compiling it raises `ravel.exceptions.ParseError` and that the message carries the `Source`
 position (`Line 4, Column 8` in the probe).
+
+### Spec examples must use the raising path (RT-11)
+
+RT-10 makes `Comparison.check`/`__call__` return `False` on an evaluation error. The US6 runner
+would then pass a spec comparison example that can't evaluate (`X > "a"` against 0) as "checked
+without raising". contracts/spec-examples.md pins `run_example` to `Comparison.evaluate`, which
+still raises, for both comparison items and comparison result lines.
 
 ### Kind-sensitive assertions (RT-6)
 

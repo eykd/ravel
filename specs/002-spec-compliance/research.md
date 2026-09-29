@@ -182,9 +182,10 @@ repo). Their results are quoted where they settle a question.
   not start swallowing new failures, so quality-reference evaluation raises nothing new: an unset
   reference reads 0 and a set one returns its value.
   **Amended by red-team pass 1 (2026-09-28)**: that premise fails for arithmetic on a reference
-  (`X > 10 / Y`, Y unset). Both branches now treat `TypeError`, `ArithmeticError` and
-  `EvaluationError` as a non-match, logged at `WARNING`, so no save can be stranded by a raising
-  predicate (plan.md RT-2).
+  (`X > 10 / Y`, Y unset). `Comparison.check`/`__call__` now treat `TypeError`,
+  `ArithmeticError` and `EvaluationError` as false, logged at `WARNING`, covering both
+  `query_predicates` branches and `{…}` prefixes; the `except TypeError` here is deleted as
+  unreachable. No save can be stranded by a raising condition (plan.md RT-2, RT-10).
 
 ### PD-07. `value` outside an operation or comparison (deferred item 5)
 

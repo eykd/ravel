@@ -54,8 +54,11 @@ class Operation:
 
 class Comparison:
     def evaluate(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool: ...
-    def check(self, qualities: QualityLookup) -> bool: ...
-    def __call__(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool: ...
+    def check(self, qualities: QualityLookup) -> bool:
+        """``evaluate`` the subject's value; ``False`` (logged) if evaluation raises (RT-10)."""
+
+    def __call__(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool:
+        """Same soft failure as ``check``."""
 
 
 # ravel/exceptions.py
@@ -79,10 +82,16 @@ calls in `tests/test_types.py` (`exp.evaluate()`, `operation.evaluate(None)`) ke
 `Comparison.evaluate` treats a `None` subject as `0` (unchanged), then passes that as `qvalue`.
 `queries.query_predicates(query, predicates)` builds `lookup = dict(query)` once and calls
 `predicate(qvalue, qualities=lookup)` in both branches (set subject and the unset-subject
-`predicate(0)` fallback). **Both** branches catch `(TypeError, ArithmeticError, EvaluationError)`
-and treat it as a non-match, logging the rule name, the predicate and the error at `WARNING` on the
-`ravel.query` logger (RT-2; widens PD-06's unset-only `except TypeError`, because a raising
-predicate would fail every query from that state and strand any save in it).
+`predicate(0)` fallback). Its `except TypeError` around the fallback is **deleted**: it's
+unreachable once `Comparison` soft-fails (RT-10).
+
+**Conditions fail soft (RT-2, RT-10).** `Comparison.check(qualities)` and
+`Comparison.__call__(qvalue, *, qualities)` catch `(TypeError, ArithmeticError, EvaluationError)`
+from `evaluate`, log `"%r failed: %s" % (comparison, error)` at `WARNING` on the `ravel.query`
+logger, and return `False`. `Comparison.evaluate` itself still raises. This covers every
+condition site: `when:` predicates in both `query_predicates` branches, and `{…}` line prefixes via
+`Text.check` in the engine's text step. (Widens PD-06's unset-only `except TypeError`: a raising
+`when:` would fail every query from that state and strand any save in it.)
 
 `_apply_operation(qualities, operation)`:
 
@@ -142,5 +151,7 @@ Through the engine:
 - `when: X > 10 / Y` with X = 2 and Y unset → the rule doesn't match (the `ZeroDivisionError` is a
   non-match, logged at `WARNING`), and other matching rules are still offered (RT-2).
 - `when: X > Name` with X = 2 and Name = "a" → no match (was: `TypeError` out of `query`; RT-2).
+- `{Health > 10 / Y}Hidden.` with Health = 7 and Y unset → no `TextShown` for the line, play
+  continues, one `WARNING` logged (was: raw `ZeroDivisionError` out of `choose`; RT-10).
 - `X = 100 / Bonus` in a choice's `effect:` → `choose` raises `InvalidOperationError`; a
   `GameSession` holding that game keeps its previous state (RT-1).
