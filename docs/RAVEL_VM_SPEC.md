@@ -313,9 +313,8 @@ new state only after the engine or decoder succeeds, so a failed call leaves the
 `ConsoleUI` in `ravel.cli` is the shipped adapter that renders a session's outputs.
 
 **Story sources are trusted input.** The compiler refuses oversized and deeply nested source with a typed
-`ParseError` rather than a raw `RecursionError`: source bytes, indentation nesting, expression length,
-operand count, parenthesis nesting, expression depth and choice nesting are all capped. See
-`docs/RAVEL_LANGUAGE_SPEC.md` "### E. Limits" for the caps and their errors. A `RecursionError` from the
+`ParseError` rather than a raw `RecursionError`. `docs/RAVEL_LANGUAGE_SPEC.md` "### E. Limits" is the
+single list of what is capped, at what value, and with what error. A `RecursionError` from the
 parser is only a residual backstop, converted to `ParseError` in `Environment.compile_rulebook`. The caps
 bound input size, not compile time, so a host that compiles untrusted rulebooks must still isolate
 compilation in a separate process with time and memory limits (RT-8).
