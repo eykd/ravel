@@ -1,1573 +1,410 @@
-# Ravel Narrative VM Specification
+# Ravel Engine Specification
 
-**Version**: 0.1 (Draft)
-**Status**: Design specification for Ravel narrative engine
+**Version**: 0.2
+**Status**: Describes the shipped engine (`ravel.engine`, `ravel.app`, `ravel.adapters`)
 
 ---
 
-## 0. Implementation Status (2026-09-28)
+## 0. Status and scope
 
-This document is the original 0.1 design draft for an instruction-set VM (opcodes, a global event
-bus, layered qualities, HATEOAS mode). The `001-reentrant-vm` feature built a **different, much
-smaller** design instead: a pure, re-entrant `ravel.engine` that interprets compiled directives
-directly (no bytecode, no IR) and returns immutable state plus a tuple of output values (no event
-bus, no signals). Section-by-section status, per `specs/001-reentrant-vm/plan.md` "Spec
-Conformance":
+This document describes what the code in `src/ravel/` does today. Version 0.1 of this file was a
+design draft for an instruction-set VM (opcodes, an event bus, layered qualities, a JSON IR). That
+design was not built; Appendix A summarizes it as history. Where this document and the code
+disagree, the code wins and this document has a bug.
 
-| Section | Status | Real behavior lives in |
-|---|---|---|
-| §2.1 Value Objects (QualityValue, LocationId, Expression, Comparator, Constraint) | **Implemented**, different types | `ravel.engine.state`, `ravel.types` |
-| §2.2 Entities (Predicate, Instruction, SituationDef) | **Implemented** (Predicate); `Instruction`/`SituationDef` **deferred** — the engine interprets compiled `types.py` directives (`Text`, `Choice`, `Operation`, `End`), not a separate instruction encoding | `ravel.types`, `ravel.engine.engine` |
-| §2.3 StackFrame | **Implemented**, narrower: `Frame(location, ip)` only — **no `local_state`**; nothing in the shipped design needed frame-local variables | `ravel.engine.state.Frame` |
-| §2.3 QualityLayer / QualityState (layering) | **Deferred** — see §3 | not built |
-| §2.3 VMState | **Implemented** as `GameState`; see §6.3 for the shipped shape | `ravel.engine.state.GameState` |
-| §3 Quality State Layering | **Deferred** — one flat `Qualities` mapping, no `global`/`player`/`session`/`location` layers | `ravel.engine.state.Qualities` |
-| §4 Instruction Set (all opcodes) | **Deferred** (PD-03 in plan.md) — the engine dispatches on directive *type*, not a bytecode instruction stream; no codegen pass exists | `ravel.engine.engine._Run` |
-| §4.5 Control Flow: `YIELD`/`HALT` | **Implemented**, as return-not-emit: a `BeginChoices` directive parks `ip` on the following `GetChoice` and the call *returns* (no `pending_events` queue, no separate `YIELD` opcode); `End` halts immediately, clearing the stack. `BRANCH_IF`/`JUMP`/`NOP` are **deferred** — the compiled directive list has no jumps | `ravel.engine.engine._Run.run` |
-| §5 Event Schema | **Rewritten** — see the note at the top of §5 |
-| §6.2 Rulebook Schema (JSON) | **Deferred** — the compiled rulebook stays an in-memory dict (see this repo's `CLAUDE.md` "Compiling"); no JSON IR is serialized | not built |
-| §6.3 VMState Schema (JSON) | **Replaced** — see the note at the top of §6.3 |
-| §7.2 Step Execution | **Implemented**, same shape (frame → dispatch → advance/pop), no separate `step()`/`run_until_yield()` split — `choose`/`start`/`resume` each run to the next yield or halt in one call | `ravel.engine.engine._Run.run` |
-| §7.3 Query Mode | **Implemented**; see the note at the top of §7.3 for the real sort and its tie-break |
-| §7.4 Resume from Input | **Replaced** by `choose(story, state, location)` — no separate `resume(state, input_data)` taking freeform `input_data`; a location *is* the input | `ravel.engine.engine.choose` |
-| §7.5 Execution Modes (Realtime/HATEOAS/Hybrid) | **Deferred** — the shipped design is a single synchronous call/return API; no built-in checkpoint-interval runner or HATEOAS endpoint exists (an adapter could build either on top of `GameSession`, but none does) | not built |
-| §8.1–8.2 Compilation Target / Situation Compilation (codegen to instructions) | **Deferred** — see §4 | not built |
-| §9 Application Ports | **Replaced** — see the note at the top of §9 |
-| §10 Acceptance Tests (AT-*) | **Historical** — these describe the deferred instruction-set design and are not run; the real acceptance tests are `tests/acceptance/test_us02_engine.py` through `test_us06_*.py` (see `specs/001-reentrant-vm/plan.md` "Acceptance Test Strategy") | `tests/acceptance/` |
-| §11 Glossary | Mixed — `Frame`, `Location`, `Predicate`, `Quality`, `Situation`, `Rulebook` still apply; `Instruction`, `Layer`, `Yield` (as a named event) describe the deferred design |
+What ships:
 
-For the shipped contracts themselves, read `specs/001-reentrant-vm/data-model.md` and
-`specs/001-reentrant-vm/contracts/*.md` (`engine-api.md`, `session-api.md`, `save-format.md`,
-`cli.md`, `end-directive.md`) — they are the authoritative, current source; this document is kept
-for its still-valid domain vocabulary and as a record of the road not taken.
+| Surface | Module |
+|---|---|
+| Engine API: `start`, `choose`, `present`, `resume` | `ravel.engine.engine` (re-exported by `ravel.engine`) |
+| State types: `GameState`, `Qualities`, `Frame`, `Status`, `Outcome`, `SavedGame` | `ravel.engine.state` |
+| The read-only compiled story: `Story` | `ravel.engine.story` |
+| The seven output types and `Step` | `ravel.engine.outputs` |
+| Engine errors (`EngineError` and subclasses) | `ravel.engine.errors` |
+| Compiled directive types (`Text`, `Operation`, `Choice`, `BeginChoices`, `GetChoice`, `End`) | `ravel.types` |
+| Save format v1: `encode_save`, `decode_save` | `ravel.app.saves` |
+| Ports `StorySource`, `SaveStore`; the session `GameSession` | `ravel.app.ports`, `ravel.app.session` |
+| Adapters `FileSystemStorySource`, `MemoryStorySource`, `FileSaveStore` | `ravel.adapters` |
+| `Environment`, `FileSystemLoader`, `MemoryLoader` | `ravel.environments`, `ravel.loaders` |
+| The console adapter `ConsoleUI` | `ravel.cli` |
+
+The detailed contracts live in `specs/001-reentrant-vm/contracts/` (`engine-api.md`,
+`save-format.md`, `session-api.md`, `end-directive.md`, `cli.md`) and
+`specs/002-spec-compliance/contracts/` (`embedding.md`, `evaluation.md`). This document summarizes
+them and links rather than repeating byte-level detail. The authoring language is in
+`docs/RAVEL_LANGUAGE_SPEC.md`.
+
+The acceptance tests that pin this behavior are `tests/acceptance/test_us02_engine.py`,
+`test_us03_end.py`, `test_us04_save_load.py`, `test_us05_cli.py`, `test_us06_end_to_end.py` and
+`test_us06_save_load_property.py`, plus `tests/acceptance/spec_compliance/test_us01_expressions.py`,
+`test_us02_constraints.py`, `test_us03_rulebooks.py`, `test_us04_embedding.py`,
+`test_us04_determinism_property.py` and `test_us05_docs.py`.
 
 ---
 
 ## 1. Introduction
 
-This document specifies a Virtual Machine (VM) for executing compiled Ravel rulebooks. The architecture cleanly separates:
+The engine plays a compiled Ravel story. The pipeline is:
 
-1. **Compilation Target**: Serializable Intermediate Representation (IR)
-2. **Execution Context**: Stateless VM with reconstructible state
-3. **Presentation Context**: Event subscribers (out of scope)
+```
+.ravel source → Environment + Loader → compiled rulebook → Story
+             → ravel.engine (start / choose / present / resume) → GameSession → adapter
+```
 
-### 1.1 Design Goals
+Goals:
 
-- **Portable**: Serializable IR for distribution and caching
-- **Reconstructible**: Capture and restore VM state at any point
-- **Decoupled**: Event-driven architecture for UI flexibility
-- **Flexible**: Support realtime, HATEOAS, and hybrid execution modes
-
-### 1.2 Execution Model
-
-The VM implements a **pushdown automaton**:
-
-1. A **stack of frames** tracks active situation execution
-2. Each frame executes a **flow-chart state machine** (instruction sequence)
-3. When the stack is empty, the VM **queries** for applicable top-level situations
-4. Player choices **manipulate the stack** (push, pop, replace, clear)
-5. All operations **emit events** for external subscribers
+- **Deterministic.** The same story and the same choices give the same states, outputs and save
+  bytes (§7).
+- **Savable.** Any resting state encodes to canonical bytes and resumes, even against an edited
+  story (§8).
+- **I/O-free.** The engine reads no files, clock or randomness and writes nothing. It has no
+  mutable module state, no signals and no callbacks.
+- **Embeddable.** Every call takes values and returns values, so a host can drive it from a
+  console loop, an async server or a stateless HTTP handler (§10).
 
 ---
 
-## 2. Domain Model
+## 2. Domain model
 
-### 2.1 Value Objects (Immutable)
+All engine state types are frozen `attrs` classes in `ravel.engine.state`.
 
-#### QualityValue
+**`QualityValue`** is `int | float | str`. The storable domain is: `int` in the signed 64-bit range
+(`INT_QUALITY_RANGE`), finite `float`, and `str` with no lone surrogate. `bool` is not a quality
+value. Anything else raises `InvalidQualityValueError`.
 
-A quality value is one of:
-- **Integer**: `0`, `42`, `-5`
-- **Float**: `3.14`, `0.5`
-- **String**: `"Foyer"`, `"Wearing Cloak"`
+**`LocationId`** is a `str` naming a situation, namespaced `rulebook::rule` and, for a choice,
+`rulebook::rule::choice-slug` (see `Environment.location_separator`).
 
-```
-QualityValue = int | float | str
-```
+**`Qualities`** is an immutable map stored as a tuple of `(name, value)` pairs sorted by name.
+`get(name)` returns `None` for an unset quality; `set(name, value)` returns new `Qualities` and
+validates the value; `as_dict()` returns a fresh `dict`.
 
-Default value for unset qualities: `0` (integer)
+**`Frame(location, ip)`** is one situation on the stack and the index of its next directive.
 
-#### QualityName
+**`Status`** is a `StrEnum`: `RUNNING` (`"running"`), `WAITING` (`"waiting_input"`) and `HALTED`
+(`"halted"`). No engine call returns a `RUNNING` state.
 
-A validated quality identifier supporting three formats:
-- **Simple**: `Location`, `Health`, `Score`
-- **Quoted**: `"Wearing Cloak"`, `"Man of Honor"`
-- **Bracketed**: `[Wearing Cloak]`, `[Score]`
+**`Outcome(label, dead_end=False)`** says how a halted game ended: an `end` label, or `dead_end=True`
+when no situation matched.
 
-Canonical form strips quotes/brackets and preserves original casing.
+**`GameState`** holds `qualities`, `stack` (a tuple of `Frame`), `status`, `offered` (the location
+IDs of the current menu) and `outcome`. A waiting state has `outcome=None`; a halted state has an
+empty stack and empty `offered`.
 
-#### LocationId
+**`Story`** (`ravel.engine.story`) wraps the compiled rulebook, read-only and shareable between
+games. `situation(location)` returns a `types.Situation` or raises `KeyError`; `has_location`
+tests for one; `givens` is the story's initial operations, in order.
 
-A unique situation identifier as a tuple of path segments:
+**Compiled directives** (`ravel.types`). A `Situation` has an `intro` and a list of `directives`:
 
-```
-LocationId = tuple[str, ...]
+| Directive | Meaning |
+|---|---|
+| `Text(text, sticky, predicate)` | a line of prose, shown when its `{…}` predicate holds |
+| `Operation(quality, operator, expression, constraint)` | an `effect:`, or a `given:` |
+| `BeginChoices` | starts a run of consecutive `Choice`s |
+| `Choice(choice)` | one menu option; `choice` is the target `LocationId` |
+| `GetChoice` | ends the run; the engine waits here |
+| `End(outcome)` | ends the game with a label |
 
-Examples:
-  ("begin", "intro")                    → "begin::intro"
-  ("begin", "intro", "press-onward")    → "begin::intro::press-onward"
-  ("foyer", "cloakroom", "hang-cloak")  → "foyer::cloakroom::hang-cloak"
-```
-
-#### Expression
-
-An arithmetic expression tree:
-
-```
-Expression =
-  | Literal(value: QualityValue)
-  | QualityRef(quality: QualityName)
-  | ValueRef()                              # Current quality value
-  | BinaryOp(op: Operator, left: Expression, right: Expression)
-
-Operator = "+" | "-" | "*" | "/" | "//" | "%"
-```
-
-Evaluation: `evaluate(expression, qualities, current_value) → QualityValue`
-
-#### Comparator
-
-```
-Comparator = "=" | "==" | "!=" | ">" | ">=" | "<" | "<="
-```
-
-Note: `=` and `==` are equivalent for comparisons.
-
-#### Constraint
-
-A bound applied after quality operations:
-
-```
-Constraint =
-  | Min(bound: QualityValue)
-  | Max(bound: QualityValue)
-```
-
-Application:
-- `Min(0)`: Result cannot go below 0
-- `Max(100)`: Result cannot exceed 100
+The compiler inserts `BeginChoices` before and `GetChoice` after each run of `choice:` items. Each
+choice's body compiles to its own `Situation` at its own `LocationId`. There is no separate
+instruction encoding: the engine runs these objects directly.
 
 ---
 
-### 2.2 Entities
+## 3. Engine API
 
-#### Predicate
+Four functions in `ravel.engine`. `start`, `choose` and `resume` return a `Step(state, outputs)`,
+where `outputs` is a tuple of the §4 types. None of them mutates its arguments.
 
-A condition testing quality state:
+- **`start(story)`** applies `story.givens` once each (one `QualityChanged` per given), then runs
+  from an empty stack, which means a query (§5).
+- **`choose(story, state, location)`** checks, in order: a `HALTED` state raises `GameOverError`;
+  any other non-`WAITING` state raises `NotWaitingError`; a `location` not in `state.offered`
+  raises `NotOfferedError`. Otherwise it advances the top frame past its `GetChoice` (if there is
+  a frame), pushes `Frame(location, 0)`, emits `SituationEntered(location)` and runs.
+- **`present(story, state)`** runs nothing. It returns `(Halted(...),)` for a halted state, or
+  `(ChoicesOffered(...),)` rebuilt from `state.offered` for a waiting one. It returns a tuple of
+  outputs, not a `Step`.
+- **`resume(story, saved)`** turns a story-free `SavedGame` (from `decode_save`) into a `Step`
+  against `story`, and never raises. See §8.
 
-```
-Predicate = {
-  quality: QualityName,
-  comparator: Comparator,
-  expression: Expression
-}
-```
+**Errors** (`ravel.engine.errors`), all subclasses of `EngineError`:
 
-Evaluation: `evaluate(predicate, qualities) → bool`
+| Error | Raised when |
+|---|---|
+| `NotOfferedError` | `choose` gets a location that isn't in `state.offered` |
+| `GameOverError` | `choose` is called on a halted state |
+| `NotWaitingError` | `choose` is called on a state that isn't waiting |
+| `InvalidOperationError` | an operation's expression or constraint fails (§6); `__cause__` is the `EvaluationError` |
+| `InvalidQualityValueError` | an operation's result is outside the storable domain (§2) |
+| `InvalidStateError` | a hand-built state names an unknown situation, an out-of-range `ip`, or a stray `Choice`/`GetChoice`; engine-produced states never do |
 
-#### Instruction
-
-An atomic VM operation:
-
-```
-Instruction = {
-  opcode: InstructionOpcode,
-  operands: dict[str, Any]
-}
-```
-
-See Section 4 for the complete instruction set.
-
-#### SituationDef
-
-A compiled situation definition:
-
-```
-SituationDef = {
-  location: LocationId,
-  predicates: list[Predicate],
-  intro_text: str,
-  tail_text: str,
-  instructions: list[Instruction]
-}
-```
-
-Properties:
-- `predicate_score`: Number of predicates (for ranking)
-- `matches(qualities)`: True if all predicates pass
+An error leaves the caller's `state` as it was, since the engine never mutated it.
+`GameSession.choose` only assigns the new state after the engine returns.
 
 ---
 
-### 2.3 Aggregates
+## 4. Outputs
 
-#### Rulebook (Aggregate Root)
+`ravel.engine.outputs` defines seven frozen output types. They are plain values, returned in
+`Step.outputs`; nothing is sent over a signal. `Output` is their union.
 
-The compiled story—an immutable artifact:
+| Output | Fields | Emitted when |
+|---|---|---|
+| `TextShown` | `text`, `sticky` | a `Text` directive's predicate holds and its text isn't blank |
+| `ChoicesOffered` | `choices` (non-empty tuple of `ChoiceOption(location, label)`) | the engine waits for a choice |
+| `QualityChanged` | `name`, `old` (`None` if unset), `new` | a given or an operation runs |
+| `SituationEntered` | `location` | `choose` pushes a frame |
+| `SituationExited` | `location` | a frame runs past its last directive and is popped |
+| `Halted` | `outcome`, `dead_end` | an `End` runs, or a query matches nothing |
+| `StoryChanged` | `dropped` (the dropped frames' locations, bottom to top) | `resume` had to drop saved frames that no longer match the story |
 
-```
-Rulebook = {
-  version: str,
-  metadata: dict[str, str],
-  initial_qualities: list[(QualityName, Expression)],
-  situations: dict[LocationId, SituationDef],
-  situation_index: dict[str, list[LocationId]]    # concept → locations
-}
-```
-
-Operations:
-- `get_situation(location) → SituationDef`
-- `query_situations(concept, qualities) → list[SituationDef]`
-
-#### StackFrame
-
-Execution context for an active situation:
-
-```
-StackFrame = {
-  location: LocationId,
-  instruction_pointer: int,              # Default: 0
-  local_state: dict[str, Any]            # Frame-local variables
-}
-```
-
-> **Narrower in practice (2026-09-28, per §0).** The shipped `ravel.engine.state.Frame` is just
-> `Frame(location: LocationId, ip: int)` — **no `local_state`**. Nothing in the shipped design
-> needed frame-scoped variables (§3's quality layering, the only planned consumer, is deferred).
-
-Operations:
-- `advance(delta=1) → StackFrame`: New frame with IP += delta
-- `with_local(key, value) → StackFrame`: New frame with updated local
-
-#### QualityLayer
-
-An immutable quality state layer:
-
-```
-QualityLayer = {
-  layer_id: str,
-  qualities: dict[QualityName, QualityValue]
-}
-```
-
-#### QualityState (Aggregate Root)
-
-Layered quality storage with precedence resolution:
-
-```
-QualityState = {
-  layers: list[QualityLayer]    # Ordered by precedence (first = highest)
-}
-```
-
-**Layer Types**:
-
-| Layer | Scope | Persistence | Default Write |
-|-------|-------|-------------|---------------|
-| `location` | Active frame | Frame-scoped | No |
-| `session` | Current playthrough | Ephemeral | Yes |
-| `player` | Player profile | Persistent | No |
-| `global` | World constants | Read-only | No |
-
-**Resolution Order**: `location → session → player → global → 0`
-
-Operations:
-- `get(quality) → QualityValue`: Resolve through layers
-- `set(layer_id, quality, value) → QualityState`: New state with update
-- `get_layer(layer_id) → QualityLayer`
-
-#### VMState (Aggregate Root)
-
-Complete VM state—fully serializable:
-
-```
-VMState = {
-  stack: list[StackFrame],
-  qualities: QualityState,
-  pending_events: list[VMEvent],
-  status: VMStatus,
-  waiting_context: dict | None
-}
-
-VMStatus = "running" | "waiting_input" | "halted"
-```
-
-Properties:
-- `current_frame`: Top of stack or None
-
-Operations:
-- `push_frame(frame) → VMState`
-- `pop_frame() → VMState`
-- `replace_frame(frame) → VMState`
-- `with_qualities(qualities) → VMState`
-- `with_status(status) → VMState`
-- `emit_event(event) → VMState`
-- `clear_events() → VMState`
+A `ChoiceOption` label is the target situation's intro text. `StoryChanged` is never emitted by
+`start`, `choose`, or a resume against an unchanged story.
 
 ---
 
-## 3. Quality State Layering
+## 5. Execution semantics
 
-### 3.1 Layer Semantics
+One engine call runs until the game waits or halts. The run loop (`_Run.run` in
+`ravel.engine.engine`) repeats:
 
-**Global Layer** (`global`):
-- World constants, story flags shared across all players
-- Read-only at runtime (set during rulebook compilation)
-- Example: `MaxHealth = 100`, `StoryVersion = 2`
+1. **Empty stack → query mode.** Query every `Situation` rule against the current qualities
+   (`ravel.queries.query`). No match: halt with `Outcome("", dead_end=True)` and emit
+   `Halted("", True)`. Otherwise offer every match and wait.
+2. **Top frame past its last directive →** pop it and emit `SituationExited`.
+3. **Otherwise dispatch on the directive's type:**
+   - `Text`: emit `TextShown` if `text.check(qualities)` holds and the text isn't blank; advance.
+   - `Operation`: apply it (§6), emit `QualityChanged`; advance.
+   - `BeginChoices`: park the frame's `ip` on the matching `GetChoice`, emit `ChoicesOffered` for
+     the block's choices, set status `WAITING` and return.
+   - `End`: clear the stack, emit `Halted(label, False)`, set status `HALTED` and return, at any
+     stack depth.
+   - `Choice` or `GetChoice` reached directly: `InvalidStateError`.
 
-**Player Layer** (`player`):
-- Persistent player profile data
-- Survives across sessions
-- Example: `Achievements`, `Unlocks`, `TotalPlaytime`
+**Choice blocks.** A choice menu is not a jump. Choosing pushes the chosen situation on top of the
+situation that offered it. When the chosen situation finishes, it pops, and the parent resumes at
+the directive after its `GetChoice` (the "gather"). When the stack empties, the loop queries again.
 
-**Session Layer** (`session`):
-- Current playthrough state
-- Ephemeral—lost when session ends
-- Default target for quality writes
-- Example: `Location`, `Health`, `Inventory`
+**Query sort.** Query menus sort by the number of predicates on the rule, most first, then by
+location ID descending in Python `str` order. More specific rules come first. In-situation menus
+keep their source order.
 
-**Location Layer** (`location`):
-- Frame-local variables
-- Scoped to the active situation
-- Automatically cleared when frame pops
-- Example: `VisitCount`, `LocalFlags`
-
-### 3.2 Write Targeting
-
-By default, quality operations write to the `session` layer. Future Ravel syntax may support explicit layer targeting:
-
-```yaml
-effect:
-  - Location = "Bar"                # session (default)
-  - @player.Achievement = 1         # player layer
-  - @location.Visited += 1          # location layer
-```
-
-### 3.3 Resolution Example
-
-```
-qualities:
-  global:   {MaxHealth: 100}
-  player:   {Achievement: 1}
-  session:  {Health: 75, Location: "Foyer"}
-  location: {Visited: 2}
-
-get("Health")      → 75       (from session)
-get("MaxHealth")   → 100      (from global)
-get("Achievement") → 1        (from player)
-get("Visited")     → 2        (from location)
-get("Unknown")     → 0        (default)
-```
+**Predicates.** A rule matches when every predicate holds. A predicate on an unset quality tests
+the value 0.
 
 ---
 
-## 4. Instruction Set
+## 6. Expressions, operations and constraints at run time
 
-### 4.1 Instruction Format
+Expressions evaluate against the current qualities. A bare or `[bracketed]` name reads that
+quality, and an unset quality reads 0. `value` reads the subject quality's current value (0 if
+unset). The grammar, precedence and examples are in the language spec §5; the evaluation contract
+is `specs/002-spec-compliance/contracts/evaluation.md`.
 
-```
-Instruction = {
-  opcode: str,
-  operands: dict[str, Any]
-}
-```
+**Conditions fail soft.** `Comparison.check` returns false when its comparison raises
+`EvaluationError`, and logs nothing. This applies to `when:` predicates and to `{…}` text prefixes.
+A condition that cannot be evaluated (for example `X > 10 / Y` with `Y` unset, or `X > Name` with
+`Name` a string) is false. So `X > E` and `X <= E` can both be false, and a story whose conditions
+all fail reaches a dead end. `Comparison.evaluate` still raises, for tools that want to check a
+condition.
 
-### 4.2 Stack Operations
+**Operations fail loud.** Operations run through `_apply_operation`. `Operation.evaluate` computes
+the new value; if applying the operator raises `TypeError` or `ArithmeticError`, it raises
+`EvaluationError`, and the engine re-raises that as `InvalidOperationError` with the
+`EvaluationError` as `__cause__`. Examples: `X = 100 / Bonus` with `Bonus` unset (division by zero),
+`X = Name + 1` with `Name` a string. The result then goes through `Qualities.set`, which raises
+`InvalidQualityValueError` (not wrapped) if it's outside the storable domain, such as an `int`
+past 64 bits.
 
-| Opcode | Operands | Description |
-|--------|----------|-------------|
-| `PUSH` | `{location: LocationId}` | Push new frame onto stack |
-| `POP` | `{}` | Pop current frame from stack |
-| `REPLACE` | `{location: LocationId}` | Pop then push (tail call) |
-| `CLEAR` | `{}` | Clear stack until empty |
+**Constraints clamp.** A `min`/`max` constraint (`Constraint.apply`) clamps a numeric result to its
+bound, for every operator including `=`. A string result under a constraint raises
+`ConstraintError`, an `EvaluationError`, so the engine raises `InvalidOperationError`. Givens are
+operations too: `Gold = 50 max 20` starts `Gold` at 20.
 
-**Semantics**:
+Only the operator call is wrapped. A `TypeError` from elsewhere (a broken `QualityLookup`, a term
+type with the wrong signature) is a bug and propagates unwrapped.
 
-```
-PUSH(location):
-  frame = StackFrame(location, ip=0, local_state={})
-  state = state.push_frame(frame)
-  emit StackPushed(location, len(state.stack))
-  emit SituationEntered(location)
+**Known limits.**
 
-POP:
-  old_frame = state.current_frame
-  state = state.pop_frame()
-  emit StackPopped(old_frame.location, len(state.stack))
-  emit SituationExited(old_frame.location)
-
-REPLACE(location):
-  execute POP
-  execute PUSH(location)
-
-CLEAR:
-  while state.stack is not empty:
-    execute POP
-```
-
-### 4.3 Display Operations
-
-| Opcode | Operands | Description |
-|--------|----------|-------------|
-| `DISPLAY_TEXT` | `{text: str, sticky: bool, predicate: Predicate?}` | Display narrative text |
-| `DISPLAY_INTRO` | `{location: LocationId}` | Display situation intro text |
-| `BEGIN_CHOICES` | `{}` | Signal start of choice block |
-| `DISPLAY_CHOICE` | `{index: int, location: LocationId, text: str}` | Display choice option |
-| `END_CHOICES` | `{}` | Signal end of choice block |
-
-**Semantics**:
-
-```
-DISPLAY_TEXT(text, sticky, predicate):
-  if predicate is None or predicate.evaluate(state.qualities):
-    emit TextDisplayed(text, sticky)
-  advance IP
-
-DISPLAY_INTRO(location):
-  situation = rulebook.get_situation(location)
-  emit TextDisplayed(situation.intro_text, sticky=False)
-  advance IP
-
-BEGIN_CHOICES:
-  emit ChoicesBegin()
-  advance IP
-
-DISPLAY_CHOICE(index, location, text):
-  emit ChoiceDisplayed(index, location, text)
-  advance IP
-
-END_CHOICES:
-  emit ChoicesEnd()
-  advance IP
-```
-
-### 4.4 Quality Operations
-
-| Opcode | Operands | Description |
-|--------|----------|-------------|
-| `SET_QUALITY` | `{layer: str, quality: QualityName, expression: Expression, constraint: Constraint?}` | Set quality to value |
-| `INC_QUALITY` | `{layer: str, quality: QualityName, expression: Expression, constraint: Constraint?}` | Add to quality |
-| `DEC_QUALITY` | `{layer: str, quality: QualityName, expression: Expression, constraint: Constraint?}` | Subtract from quality |
-
-**Semantics**:
-
-```
-SET_QUALITY(layer, quality, expression, constraint):
-  current = state.qualities.get(quality)
-  value = expression.evaluate(state.qualities, current)
-  if constraint:
-    value = constraint.apply(value)
-  state = state.with_qualities(state.qualities.set(layer, quality, value))
-  emit QualityChanged(quality, layer, current, value)
-  advance IP
-
-INC_QUALITY(layer, quality, expression, constraint):
-  current = state.qualities.get(quality)
-  delta = expression.evaluate(state.qualities, current)
-  value = current + delta
-  if constraint:
-    value = constraint.apply(value)
-  state = state.with_qualities(state.qualities.set(layer, quality, value))
-  emit QualityChanged(quality, layer, current, value)
-  advance IP
-
-DEC_QUALITY(layer, quality, expression, constraint):
-  # Same as INC_QUALITY with subtraction
-  current = state.qualities.get(quality)
-  delta = expression.evaluate(state.qualities, current)
-  value = current - delta
-  if constraint:
-    value = constraint.apply(value)
-  state = state.with_qualities(state.qualities.set(layer, quality, value))
-  emit QualityChanged(quality, layer, current, value)
-  advance IP
-```
-
-### 4.5 Control Flow Operations
-
-| Opcode | Operands | Description |
-|--------|----------|-------------|
-| `BRANCH_IF` | `{predicate: Predicate, offset: int}` | Conditional relative jump |
-| `JUMP` | `{offset: int}` | Unconditional relative jump |
-| `YIELD` | `{kind: str, context: dict}` | Pause, wait for input |
-| `HALT` | `{reason: str?}` | Terminate VM |
-| `NOP` | `{}` | No operation |
-
-**Semantics**:
-
-```
-BRANCH_IF(predicate, offset):
-  if predicate.evaluate(state.qualities):
-    advance IP by offset
-  else:
-    advance IP by 1
-
-JUMP(offset):
-  advance IP by offset
-
-YIELD(kind, context):
-  state = state.with_status("waiting_input")
-  state = state.with_waiting_context({kind: kind, **context})
-  emit WaitingForInput(kind, context)
-  # Do NOT advance IP - resume continues from here
-
-HALT(reason):
-  state = state.with_status("halted")
-  emit VMHalted(reason)
-
-NOP:
-  advance IP
-```
-
-### 4.6 Query Operations
-
-| Opcode | Operands | Description |
-|--------|----------|-------------|
-| `QUERY_SITUATIONS` | `{concept: str}` | Find matching situations |
-| `CHECK_PREDICATE` | `{predicate: Predicate, jump_if_false: int}` | Test and branch |
-
-**Semantics**:
-
-```
-QUERY_SITUATIONS(concept):
-  matches = rulebook.query_situations(concept, state.qualities)
-  sorted_matches = sort by predicate_score descending
-  frame = frame.with_local("query_results", sorted_matches)
-  advance IP
-
-CHECK_PREDICATE(predicate, jump_if_false):
-  if not predicate.evaluate(state.qualities):
-    advance IP by jump_if_false
-  else:
-    advance IP by 1
-```
+- Nothing bounds a string's length. `X *= 2` on a string quality doubles it each time, and
+  `Qualities.set` checks the kind of a value, not its size. Memory can grow very large before
+  `MAX_SAVE_BYTES` refuses the save (RT-9).
 
 ---
 
-## 5. Event Schema
+## 7. Determinism guarantee
 
-> **Rewritten (2026-09-28, per §0).** No event bus, no `timestamp`/`sequence` envelope, no
-> `StackPushed`/`StackPopped`/`ChoicesBegin`/`ChoicesEnd`/`WaitingForInput`. The shipped engine
-> returns a tuple of plain, frozen `attrs` values from `ravel.engine.outputs` alongside the new
-> state — never sent, always returned. The six sections below (§5.2–§5.6) describe the *deferred*
-> instruction-set event schema; the real seven output kinds are:
->
-> | Real output (`ravel.engine.outputs`) | Nearest deferred analog below |
-> |---|---|
-> | `TextShown(text, sticky)` | `TextDisplayed` (§5.3) |
-> | `ChoicesOffered(choices: tuple[ChoiceOption, ...])` — one value carrying the whole menu | `ChoicesBegin`/`ChoiceDisplayed`*/`ChoicesEnd` (§5.3) — **not implemented** as three events |
-> | `QualityChanged(name, old, new)` — no `layer` field (§3 deferred) | `QualityChanged` (§5.2) |
-> | `SituationEntered(location)` | `SituationEntered` (§5.4) |
-> | `SituationExited(location)` | `SituationExited` (§5.4) |
-> | `Halted(outcome, dead_end)` | `VMHalted` (§5.5) — `reason` replaced by `outcome`/`dead_end` |
-> | `StoryChanged(dropped)` | none — new in the shipped design; emitted only by `engine.resume` when a loaded save's frames no longer match the current story |
->
-> `WaitingForInput` is **not implemented**: a caller learns it's waiting by the returned
-> `GameState.status` (`WAITING`/`HALTED`), not a distinct output. `StackPushed`/`StackPopped` are
-> **not implemented**: `SituationEntered`/`SituationExited` already carry the location; no
-> separate depth-counter event exists.
-
-### 5.1 Event Base
-
-```
-VMEvent = {
-  timestamp: float,     # Unix timestamp
-  sequence: int         # Monotonic sequence number
-}
-```
-
-### 5.2 Quality Events
-
-```
-QualityChanged = VMEvent & {
-  type: "quality_changed",
-  quality: QualityName,
-  layer: str,
-  old_value: QualityValue,
-  new_value: QualityValue
-}
-```
-
-### 5.3 Display Events
-
-```
-TextDisplayed = VMEvent & {
-  type: "text_displayed",
-  text: str,
-  sticky: bool
-}
-
-ChoicesBegin = VMEvent & {
-  type: "choices_begin"
-}
-
-ChoiceDisplayed = VMEvent & {
-  type: "choice_displayed",
-  index: int,
-  location: LocationId,
-  text: str
-}
-
-ChoicesEnd = VMEvent & {
-  type: "choices_end"
-}
-```
-
-### 5.4 Situation Events
-
-```
-SituationEntered = VMEvent & {
-  type: "situation_entered",
-  location: LocationId
-}
-
-SituationExited = VMEvent & {
-  type: "situation_exited",
-  location: LocationId
-}
-```
-
-### 5.5 Control Events
-
-```
-WaitingForInput = VMEvent & {
-  type: "waiting_for_input",
-  kind: "choice" | "text" | "confirm",
-  context: dict
-}
-
-VMHalted = VMEvent & {
-  type: "vm_halted",
-  reason: str | None
-}
-```
-
-### 5.6 Stack Events
-
-```
-StackPushed = VMEvent & {
-  type: "stack_pushed",
-  location: LocationId,
-  depth: int
-}
-
-StackPopped = VMEvent & {
-  type: "stack_popped",
-  location: LocationId,
-  depth: int
-}
-```
+For a `Story` compiled from the same sources and the same sequence of `choose` locations,
+`start`/`choose` return equal `Step`s (equal outputs, equal `GameState`s), and `encode_save`
+returns equal bytes. This holds across repeated runs and across freshly compiled `Story` objects.
+The engine has no randomness, clock or I/O, and `Qualities` keeps its items sorted, so nothing
+depends on insertion order. `tests/acceptance/spec_compliance/test_us04_determinism_property.py`
+pins this.
 
 ---
 
-## 6. Serialization Format
+## 8. Save format v1
 
-### 6.1 Design Principles
+The code is `ravel.app.saves`; the full contract is `specs/001-reentrant-vm/contracts/save-format.md`.
 
-- **Portable**: JSON primary, MessagePack for performance
-- **Versioned**: Schema version for forward compatibility
-- **Human-readable**: JSON for debugging and tooling
+- **`encode_save(story, state)`** takes a waiting or halted `GameState` and returns canonical UTF-8
+  JSON bytes: sorted keys, no spaces, no ASCII escaping, a trailing newline. A `RUNNING` state
+  raises `InvalidStateError`. Every save starts with `SAVE_MAGIC`.
+- The document is `{"format": "ravel-save", "format_version": 1, "state": {...}}`. `state` holds
+  `qualities` (an object), `stack`, `status` (`"waiting_input"` or `"halted"`) and `outcome`
+  (`null`, or `{"label", "dead_end"}` when halted).
+- Saves carry no story identity and no `ip`. Each saved frame is `{"location", "anchor"}`, where the
+  `Anchor` names the choice block the frame waits at by its choice targets and an `ordinal` among
+  blocks with the same targets. That lets a save survive an edit to the story.
+- **`decode_save(data)`** is story-free. It checks size (`MAX_SAVE_BYTES`, 1 MiB), JSON validity
+  (no duplicate keys, no `NaN`/`Infinity`), exact key sets, value types, the storable quality
+  domain, and that each child frame is one of its parent anchor's choices. It returns a
+  `SavedGame` and raises only `LoadRefusedError` subclasses: `SaveCorruptError` or
+  `UnsupportedSaveVersionError`.
+- **`resume(story, saved)`** resolves the save. A halted save is restored as-is. A waiting save's
+  frames resolve bottom to top: a frame whose location is gone, or whose anchor matches no block,
+  is dropped with every frame above it, reported by one leading `StoryChanged`. If no frame is
+  left, the story is queried fresh from the saved qualities, which may itself dead-end. Givens are
+  never re-applied.
 
-### 6.2 Rulebook Schema (JSON)
-
-```json
-{
-  "$schema": "https://ravel-lang.org/schemas/rulebook/v1",
-  "version": "1.0.0",
-  "metadata": {
-    "title": "Cloak of Darkness",
-    "author": "Roger Firth",
-    "ifid": "UUID-HERE"
-  },
-  "initialQualities": [
-    {
-      "quality": "Location",
-      "expression": {"kind": "literal", "value": "Intro"}
-    },
-    {
-      "quality": "Wearing Cloak",
-      "expression": {"kind": "literal", "value": 1}
-    }
-  ],
-  "situations": {
-    "begin::intro": {
-      "predicates": [
-        {
-          "quality": "Location",
-          "comparator": "=",
-          "expression": {"kind": "literal", "value": "Intro"}
-        }
-      ],
-      "introText": "Hurrying through the rainswept November night...",
-      "tailText": "Hurrying through the rainswept November night, you're glad to see the bright lights of the Opera House.",
-      "instructions": [
-        {
-          "opcode": "DISPLAY_TEXT",
-          "operands": {
-            "text": "Hurrying through the rainswept November night, you're glad to see the bright lights of the Opera House.",
-            "sticky": false,
-            "predicate": null
-          }
-        },
-        {"opcode": "BEGIN_CHOICES", "operands": {}},
-        {
-          "opcode": "DISPLAY_CHOICE",
-          "operands": {
-            "index": 0,
-            "location": "begin::intro::press-onward",
-            "text": "Press onward!"
-          }
-        },
-        {"opcode": "END_CHOICES", "operands": {}},
-        {"opcode": "YIELD", "operands": {"kind": "choice", "context": {}}}
-      ]
-    },
-    "begin::intro::press-onward": {
-      "predicates": [],
-      "introText": "Press onward!",
-      "tailText": "You press onward to the entrance.",
-      "instructions": [
-        {
-          "opcode": "DISPLAY_TEXT",
-          "operands": {
-            "text": "You press onward to the entrance.",
-            "sticky": false,
-            "predicate": null
-          }
-        },
-        {
-          "opcode": "SET_QUALITY",
-          "operands": {
-            "layer": "session",
-            "quality": "Location",
-            "expression": {"kind": "literal", "value": "Foyer"},
-            "constraint": null
-          }
-        }
-      ]
-    }
-  },
-  "situationIndex": {
-    "Situation": ["begin::intro", "foyer::foyer", "foyer::cloakroom"]
-  }
-}
-```
-
-### 6.3 VMState Schema (JSON)
-
-> **Replaced (2026-09-28, per §0)** by the save format actually shipped: format version 1, no
-> `rulebookId`/story identity, no `localState` (§2.3 has none), no `pendingEvents`, no quality
-> layers (flat `qualities`), and no `offered` — each stack frame instead carries an `anchor`
-> (the choice set it was entered from, plus a tie-break `ordinal`), so a reloaded save can be
-> checked for drift against a changed story without needing to re-derive its old menu. The JSON
-> below is illustrative only; do not use it as a save-format reference. The current field table,
-> canonical encoding rules, decode-error catalog, and worked examples live in
-> `specs/001-reentrant-vm/contracts/save-format.md` and
-> `specs/001-reentrant-vm/data-model.md` § Save file.
-
-```json
-{
-  "$schema": "https://ravel-lang.org/schemas/vmstate/v1",
-  "version": "1.0.0",
-  "rulebookId": "cloak-of-darkness",
-  "stack": [
-    {
-      "location": "begin::intro",
-      "instructionPointer": 5,
-      "localState": {}
-    }
-  ],
-  "qualities": {
-    "global": {},
-    "player": {},
-    "session": {
-      "Location": "Intro",
-      "Wearing Cloak": 1
-    },
-    "location": {}
-  },
-  "pendingEvents": [],
-  "status": "waiting_input",
-  "waitingContext": {
-    "kind": "choice",
-    "choices": ["begin::intro::press-onward"]
-  }
-}
-```
-
-### 6.4 Expression Schema
-
-```json
-// Literal
-{"kind": "literal", "value": 42}
-{"kind": "literal", "value": "Foyer"}
-
-// Quality reference
-{"kind": "quality_ref", "quality": "Health"}
-
-// Current value reference
-{"kind": "value_ref"}
-
-// Binary operation
-{
-  "kind": "binary_op",
-  "operator": "+",
-  "left": {"kind": "quality_ref", "quality": "Score"},
-  "right": {"kind": "literal", "value": 10}
-}
-```
-
-### 6.5 Predicate Schema
-
-```json
-{
-  "quality": "Location",
-  "comparator": "=",
-  "expression": {"kind": "literal", "value": "Foyer"}
-}
-```
-
-### 6.6 Constraint Schema
-
-```json
-{"kind": "min", "bound": 0}
-{"kind": "max", "bound": 100}
-```
+Guarantees: for any resting state `s` reached by the engine,
+`resume(story, decode_save(encode_save(story, s))).state == s`, and re-encoding gives the same
+bytes. Every storable quality value decodes equal to what was encoded and of the same type.
 
 ---
 
-## 7. VM Execution
+## 9. Ports and adapters
 
-### 7.1 Executor Interface
+`ravel.app` depends on two `Protocol`s in `ravel.app.ports`, never on a concrete adapter:
+
+- **`StorySource`** has `load() -> Story`.
+- **`SaveStore`** has `write(name, data) -> str` (returns a display path) and
+  `read(name) -> bytes` (reads at most `MAX_SAVE_BYTES + 1` bytes). `OSError` propagates.
+
+Adapters in `ravel.adapters`:
+
+| Adapter | Port | Behavior |
+|---|---|---|
+| `FileSystemStorySource(directory)` | `StorySource` | compiles the `.ravel` files under `directory` on each `load()` |
+| `MemoryStorySource(sources, entry="begin")` | `StorySource` | compiles a mapping of rulebook name to source text; no filesystem access |
+| `FileSaveStore(base=None)` | `SaveStore` | atomic write via a temp file and `os.replace`; refuses to overwrite a non-empty file that isn't a ravel save; reads regular files only |
+
+No in-memory `SaveStore` ships; any object with `write` and `read` satisfies the port.
+
+**Loaders.** `Environment` (`ravel.environments`) requires a `loader`: `Environment()` raises
+`TypeError`, as does a loader without a callable `load`. `ravel.loaders` provides
+`FileSystemLoader(base_path, extension=".ravel")`, which refuses an include that resolves outside
+`base_path` (`RulebookNotFound`), and `MemoryLoader(sources)`, which serves a mapping. Both
+subclass `BaseLoader`. `Environment.load()` starts at `initializing_name` (default `begin`) and
+follows `include:` breadth-first.
+
+**`GameSession`** (`ravel.app.session`) is the one mutable holder. `GameSession(story, saves)`
+offers `new_game()`, `choose(location)`, `menu()`, `save(name)` and `load(name)`, and a `state`
+property that raises `NoGameError` before any game exists. `load` is `saves.read` →
+`decode_save` → `resume`, and raises only `LoadRefusedError` subclasses (`SaveNotFoundError`,
+`SaveUnreadableError`, `SaveCorruptError`, `UnsupportedSaveVersionError`). Every method assigns
+new state only after the engine or decoder succeeds, so a failed call leaves the game as it was.
+`ConsoleUI` in `ravel.cli` is the shipped adapter that renders a session's outputs.
+
+**Story sources are trusted input.** The compiler is not hardened against hostile rulebooks.
+Choice nesting is capped (`MAX_CHOICE_NESTING_DEPTH`, 200) with a `ParseError`, but deeply nested
+parentheses in an expression hit Python's recursion limit inside the parser and raise
+`RecursionError`, and a long flat expression builds an equally deep tree. A host that compiles
+untrusted rulebooks must isolate compilation in a separate process with time and memory limits
+(RT-8).
+
+---
+
+## 10. Host recipes
+
+These are recipes built on the pure API. None of them ships as code.
+
+### 10.1 Realtime (in-process)
+
+Hold one `GameSession` for the player. Call `new_game()` or `load(name)`, render the outputs, then
+loop: read a choice from `menu()`, call `choose(location)`, render. This is what `ConsoleUI` does.
+Save whenever the game is at rest (waiting or halted).
+
+### 10.2 Async
+
+The engine does no I/O, so a call blocks only for its own CPU time and never awaits anything. Share
+one `Story` between all games; it's read-only. Keep one `GameState` per player. Only the
+`SaveStore` touches I/O: run a blocking store under `asyncio.to_thread`, or write a store that
+calls an async backend from the host side. Because every call returns a new state, concurrent
+games never share mutable state.
+
+### 10.3 HATEOAS (stateless server)
+
+Each request carries the save and the chosen location; the response carries the new save, the
+outputs, and links for the offered choices. From `specs/002-spec-compliance/contracts/embedding.md`:
 
 ```python
-class VMExecutor:
-    """Stateless VM executor - all state passed explicitly."""
-
-    def __init__(self, rulebook: Rulebook): ...
-
-    def step(self, state: VMState) -> VMState:
-        """Execute one instruction, return new state."""
-
-    def run_until_yield(self, state: VMState) -> VMState:
-        """Execute until YIELD or HALT."""
-
-    def resume(self, state: VMState, input_data: dict) -> VMState:
-        """Resume from YIELD with player input."""
-```
-
-### 7.2 Step Execution
-
-```
-step(state):
-  if state.status != "running":
-    return state
-
-  frame = state.current_frame
-  if frame is None:
-    return enter_query_mode(state)
-
-  situation = rulebook.get_situation(frame.location)
-  if frame.instruction_pointer >= len(situation.instructions):
-    return execute_implicit_pop(state)
-
-  instruction = situation.instructions[frame.instruction_pointer]
-  return execute_instruction(state, instruction)
-```
-
-### 7.3 Query Mode
-
-> **Pinned tie-break (2026-09-28, per §0).** "Sort by `predicate_score` descending" is
-> implemented, but ties need a second key: two situations that match with equal predicate counts
-> sort **by location ID descending** (`ravel.queries.query` sorts `(score, name, result)` tuples
-> with `reverse=True`, so equal scores fall back to descending name comparison). This is a real,
-> user-visible ordering rule, not an implementation accident — pinned by
-> `tests/engine/test_engine_query.py::test_query_mode_orders_by_predicate_count_then_location_descending`.
-> The pseudocode below still applies with that tie-break folded into "sort by predicate_score
-> descending"; there is no separate `pending_events`/`WaitingForInput` step (§5).
-
-When the stack is empty, the VM enters query mode:
-
-```
-enter_query_mode(state):
-  matches = rulebook.query_situations("Situation", state.qualities)
-  sorted_matches = sort by predicate_score descending
-
-  emit ChoicesBegin()
-  for i, situation in enumerate(sorted_matches):
-    emit ChoiceDisplayed(i, situation.location, situation.intro_text)
-  emit ChoicesEnd()
-
-  state = state.with_status("waiting_input")
-  state = state.with_waiting_context({
-    kind: "choice",
-    choices: [s.location for s in sorted_matches]
-  })
-  emit WaitingForInput("choice", state.waiting_context)
-  return state
-```
-
-### 7.4 Resume from Input
-
-```
-resume(state, input_data):
-  if state.status != "waiting_input":
-    raise VMError("Not waiting for input")
-
-  kind = state.waiting_context["kind"]
-
-  if kind == "choice":
-    location = LocationId.parse(input_data["choice"])
-    state = state.with_status("running")
-    state = state.push_frame(StackFrame(location))
-    emit SituationEntered(location)
-
-    # Display tail text
-    situation = rulebook.get_situation(location)
-    emit TextDisplayed(situation.tail_text, sticky=False)
-
-  return run_until_yield(state)
-```
-
-### 7.5 Execution Modes
-
-> **Deferred (2026-09-28, per §0).** None of Realtime/HATEOAS/Hybrid mode as described below is
-> built. The shipped design has one calling convention: a synchronous function call
-> (`start`/`choose`/`present`/`resume`) that returns a `Step` (new `GameState` + outputs) in one
-> shot — no `run_until_yield`/`resume(state, input_data)` split, no server loop, no checkpoint
-> interval. `ravel.app.GameSession` composes those calls into `new_game`/`choose`/`save`/`load`
-> for an adapter to drive (`ravel.cli.ConsoleUI` does, in a synchronous prompt loop); nothing
-> stops a caller from building an async HATEOAS endpoint or a checkpointing runner on top of
-> `GameSession`, but neither exists today.
-
-#### Realtime Mode (In-Memory)
-
-```python
-executor = VMExecutor(rulebook)
-state = VMState.initial(rulebook)
-
-while True:
-    state = executor.run_until_yield(state)
-
-    for event in state.pending_events:
-        ui.handle_event(event)
-    state = state.clear_events()
-
-    if state.status == "halted":
-        break
-
-    user_input = ui.get_input(state.waiting_context)
-    state = executor.resume(state, user_input)
-```
-
-#### HATEOAS Mode (Stateless Server)
-
-```python
-@app.post("/game/{game_id}/action")
-async def game_action(game_id: str, input_data: dict):
-    state = await storage.load_state(game_id)
-    rulebook = await storage.load_rulebook(state.rulebook_id)
-
-    executor = VMExecutor(rulebook)
-    state = executor.resume(state, input_data)
-
-    await storage.save_state(game_id, state)
-
-    return {
-        "events": [e.to_dict() for e in state.pending_events],
-        "status": state.status,
-        "waiting": state.waiting_context,
-    }
-```
-
-#### Hybrid Mode
-
-```python
-class HybridRunner:
-    def __init__(self, rulebook, checkpoint_interval=10):
-        self.executor = VMExecutor(rulebook)
-        self.checkpoint_interval = checkpoint_interval
-        self.steps = 0
-
-    async def step(self, state, input_data=None):
-        if input_data:
-            state = self.executor.resume(state, input_data)
-        else:
-            state = self.executor.run_until_yield(state)
-
-        self.steps += 1
-        if self.steps >= self.checkpoint_interval:
-            await self.checkpoint_to_server(state)
-            self.steps = 0
-
-        return state
-```
-
----
-
-## 8. Compilation Target
-
-### 8.1 Compilation Pipeline
-
-```
-.ravel files → Parser (SYML) → Analyzer → Codegen → Rulebook (IR)
-```
-
-### 8.2 Situation Compilation
-
-Source (`begin.ravel`):
-```yaml
-intro:
-  - Hurrying through the rainswept November night[…], you're glad to see
-    the bright lights of the Opera House.
-  - {"Wearing Cloak" == 0}The rain drenches you.
-  - choice:
-    - [Press onward!]You press onward to the entrance.
-    - effect:
-      - Location = "Foyer"
-```
-
-Compiled instructions:
-```
-SituationDef("begin::intro"):
-  predicates: [Location = "Intro"]
-  intro_text: "Hurrying through the rainswept November night..."
-  tail_text: "Hurrying through the rainswept November night, you're glad to see the bright lights of the Opera House."
-  instructions:
-    [0] DISPLAY_TEXT(text="Hurrying through...", sticky=false, predicate=null)
-    [1] DISPLAY_TEXT(text="The rain drenches you.", sticky=false,
-                     predicate={quality="Wearing Cloak", comparator="=", value=0})
-    [2] BEGIN_CHOICES
-    [3] DISPLAY_CHOICE(index=0, location="begin::intro::press-onward", text="Press onward!")
-    [4] END_CHOICES
-    [5] YIELD(kind="choice")
-
-SituationDef("begin::intro::press-onward"):
-  predicates: []
-  intro_text: "Press onward!"
-  tail_text: "You press onward to the entrance."
-  instructions:
-    [0] DISPLAY_TEXT(text="You press onward to the entrance.", sticky=false)
-    [1] SET_QUALITY(layer="session", quality="Location", value="Foyer")
-```
-
----
-
-## 9. Application Ports
-
-### 9.1 Port Interfaces
-
-> **Replaced (2026-09-28, per §0).** None of the four async ports below were built. The shipped
-> application layer (`ravel.app.ports`) defines exactly two synchronous `Protocol`s, both in
-> `specs/001-reentrant-vm/contracts/session-api.md`:
->
-> ```python
-> class StorySource(Protocol):
->     def load(self) -> Story: ...  # raises ravel.exceptions.* on a bad source
->
-> class SaveStore(Protocol):
->     def write(self, name: str, data: bytes) -> str: ...  # returns a display path
->     def read(self, name: str) -> bytes: ...               # at most MAX_SAVE_BYTES + 1 bytes
-> ```
->
-> `ravel.adapters.story_source.FileSystemStorySource` and `ravel.adapters.save_store.FileSaveStore`
-> are the only implementations. There is no `EventPublisherPort` (no events, §5) and no separate
-> `StateRepositoryPort`/`RulebookRepositoryPort` split — a `Story` is immutable and loaded once per
-> `GameSession`, and state is persisted only as an encoded save via `SaveStore`, never as a
-> standalone repository entity.
-
-The historical design (not built):
-
-```python
-class VMExecutorPort(Protocol):
-    def step(self, state: VMState) -> VMState: ...
-    def run_until_yield(self, state: VMState) -> VMState: ...
-    def resume(self, state: VMState, input_data: dict) -> VMState: ...
-
-
-class StateRepositoryPort(Protocol):
-    async def load(self, state_id: str) -> VMState: ...
-    async def save(self, state_id: str, state: VMState) -> None: ...
-    async def delete(self, state_id: str) -> None: ...
-
-
-class RulebookRepositoryPort(Protocol):
-    async def load(self, rulebook_id: str) -> Rulebook: ...
-    async def save(self, rulebook_id: str, rulebook: Rulebook) -> None: ...
-
-
-class EventPublisherPort(Protocol):
-    def publish(self, event: VMEvent) -> None: ...
-    def subscribe(self, handler: Callable[[VMEvent], None]) -> Subscription: ...
-```
-
----
-
-## 10. Acceptance Tests
-
-### 10.1 Value Object Tests
-
-#### AT-VO-1: QualityValue Arithmetic
-```
-GIVEN QualityValue(10) and QualityValue(5)
-WHEN added together
-THEN result is QualityValue(15)
-
-GIVEN QualityValue(10) and QualityValue(3)
-WHEN subtracted
-THEN result is QualityValue(7)
-
-GIVEN QualityValue("hello") and QualityValue(5)
-WHEN added together
-THEN TypeError is raised
-```
-
-#### AT-VO-2: QualityName Parsing
-```
-GIVEN raw string "Location"
-WHEN parsed as QualityName
-THEN canonical name is "Location"
-
-GIVEN raw string '"Wearing Cloak"'
-WHEN parsed as QualityName
-THEN canonical name is "Wearing Cloak"
-
-GIVEN raw string "[Score]"
-WHEN parsed as QualityName
-THEN canonical name is "Score"
-```
-
-#### AT-VO-3: LocationId Operations
-```
-GIVEN LocationId(("begin", "intro"))
-WHEN qualified_name is accessed
-THEN result is "begin::intro"
-
-GIVEN LocationId(("begin", "intro"))
-WHEN child("press-onward") is called
-THEN result is LocationId(("begin", "intro", "press-onward"))
-```
-
-#### AT-VO-4: Expression Evaluation
-```
-GIVEN Expression(Literal(5))
-WHEN evaluated with qualities={}, current_value=0
-THEN result is 5
-
-GIVEN Expression(QualityRef("Health"))
-WHEN evaluated with qualities={"Health": 75}, current_value=0
-THEN result is 75
-
-GIVEN Expression(BinaryOp("+", QualityRef("Score"), Literal(10)))
-WHEN evaluated with qualities={"Score": 50}, current_value=0
-THEN result is 60
-
-GIVEN Expression(ValueRef())
-WHEN evaluated with qualities={}, current_value=42
-THEN result is 42
-```
-
-#### AT-VO-5: Constraint Application
-```
-GIVEN Constraint(Min(0)) and value -5
-WHEN constraint is applied
-THEN result is 0
-
-GIVEN Constraint(Max(100)) and value 150
-WHEN constraint is applied
-THEN result is 100
-
-GIVEN Constraint(Min(0)) and value 50
-WHEN constraint is applied
-THEN result is 50 (unchanged)
-```
-
-### 10.2 Predicate Tests
-
-#### AT-PR-1: Predicate Evaluation
-```
-GIVEN Predicate(quality="Location", comparator="=", expression=Literal("Foyer"))
-WHEN evaluated with qualities={"Location": "Foyer"}
-THEN result is true
-
-GIVEN Predicate(quality="Health", comparator=">", expression=Literal(50))
-WHEN evaluated with qualities={"Health": 75}
-THEN result is true
-
-GIVEN Predicate(quality="Health", comparator=">", expression=Literal(50))
-WHEN evaluated with qualities={"Health": 25}
-THEN result is false
-
-GIVEN Predicate(quality="Unknown", comparator="=", expression=Literal(0))
-WHEN evaluated with qualities={}
-THEN result is true (unset qualities default to 0)
-```
-
-### 10.3 Stack Operation Tests
-
-#### AT-SO-1: PUSH Instruction
-```
-GIVEN VMState with empty stack
-WHEN PUSH("begin::intro") is executed
-THEN stack has one frame with location="begin::intro", ip=0
-AND SituationEntered event is emitted
-AND StackPushed event is emitted with depth=1
-```
-
-#### AT-SO-2: POP Instruction
-```
-GIVEN VMState with stack=[Frame("begin::intro")]
-WHEN POP is executed
-THEN stack is empty
-AND SituationExited event is emitted
-AND StackPopped event is emitted with depth=0
-```
-
-#### AT-SO-3: REPLACE Instruction
-```
-GIVEN VMState with stack=[Frame("begin::intro")]
-WHEN REPLACE("foyer::look") is executed
-THEN stack has one frame with location="foyer::look", ip=0
-AND SituationExited event for "begin::intro" is emitted
-AND SituationEntered event for "foyer::look" is emitted
-```
-
-#### AT-SO-4: CLEAR Instruction
-```
-GIVEN VMState with stack=[Frame("a"), Frame("b"), Frame("c")]
-WHEN CLEAR is executed
-THEN stack is empty
-AND three SituationExited events are emitted (c, b, a order)
-```
-
-### 10.4 Display Operation Tests
-
-#### AT-DO-1: DISPLAY_TEXT without Predicate
-```
-GIVEN DISPLAY_TEXT(text="Hello world", sticky=false, predicate=null)
-WHEN executed
-THEN TextDisplayed event is emitted with text="Hello world", sticky=false
-AND instruction pointer advances by 1
-```
-
-#### AT-DO-2: DISPLAY_TEXT with Passing Predicate
-```
-GIVEN DISPLAY_TEXT(text="You have the key", predicate={quality="HasKey", comparator=">=", value=1})
-AND qualities={"HasKey": 1}
-WHEN executed
-THEN TextDisplayed event is emitted
-AND instruction pointer advances by 1
-```
-
-#### AT-DO-3: DISPLAY_TEXT with Failing Predicate
-```
-GIVEN DISPLAY_TEXT(text="You have the key", predicate={quality="HasKey", comparator=">=", value=1})
-AND qualities={"HasKey": 0}
-WHEN executed
-THEN no TextDisplayed event is emitted
-AND instruction pointer advances by 1
-```
-
-#### AT-DO-4: Choice Block Sequence
-```
-GIVEN instructions:
-  [0] BEGIN_CHOICES
-  [1] DISPLAY_CHOICE(0, "choice-a", "Go left")
-  [2] DISPLAY_CHOICE(1, "choice-b", "Go right")
-  [3] END_CHOICES
-WHEN executed in sequence
-THEN events are emitted in order:
-  ChoicesBegin
-  ChoiceDisplayed(0, "choice-a", "Go left")
-  ChoiceDisplayed(1, "choice-b", "Go right")
-  ChoicesEnd
-```
-
-### 10.5 Quality Operation Tests
-
-#### AT-QO-1: SET_QUALITY
-```
-GIVEN SET_QUALITY(layer="session", quality="Location", expression=Literal("Bar"))
-AND qualities.session={"Location": "Foyer"}
-WHEN executed
-THEN qualities.session={"Location": "Bar"}
-AND QualityChanged event is emitted with old="Foyer", new="Bar"
-```
-
-#### AT-QO-2: INC_QUALITY
-```
-GIVEN INC_QUALITY(layer="session", quality="Score", expression=Literal(10))
-AND qualities.session={"Score": 50}
-WHEN executed
-THEN qualities.session={"Score": 60}
-AND QualityChanged event is emitted with old=50, new=60
-```
-
-#### AT-QO-3: DEC_QUALITY with Constraint
-```
-GIVEN DEC_QUALITY(layer="session", quality="Health", expression=Literal(30), constraint=Min(0))
-AND qualities.session={"Health": 20}
-WHEN executed
-THEN qualities.session={"Health": 0} (constrained from -10)
-AND QualityChanged event is emitted with old=20, new=0
-```
-
-#### AT-QO-4: Quality Layer Targeting
-```
-GIVEN SET_QUALITY(layer="player", quality="Achievement", expression=Literal(1))
-AND qualities.player={}
-WHEN executed
-THEN qualities.player={"Achievement": 1}
-AND qualities.session is unchanged
-```
-
-### 10.6 Control Flow Tests
-
-#### AT-CF-1: BRANCH_IF with True Condition
-```
-GIVEN BRANCH_IF(predicate={quality="Flag", comparator="=", value=1}, offset=3)
-AND qualities={"Flag": 1}
-AND current IP=5
-WHEN executed
-THEN IP becomes 8 (5 + 3)
-```
-
-#### AT-CF-2: BRANCH_IF with False Condition
-```
-GIVEN BRANCH_IF(predicate={quality="Flag", comparator="=", value=1}, offset=3)
-AND qualities={"Flag": 0}
-AND current IP=5
-WHEN executed
-THEN IP becomes 6 (5 + 1)
-```
-
-#### AT-CF-3: YIELD
-```
-GIVEN YIELD(kind="choice", context={choices: ["a", "b"]})
-AND status="running"
-WHEN executed
-THEN status becomes "waiting_input"
-AND waiting_context is {kind: "choice", choices: ["a", "b"]}
-AND WaitingForInput event is emitted
-AND IP does NOT advance
-```
-
-#### AT-CF-4: HALT
+def handle(story: Story, save: bytes, location: LocationId) -> tuple[bytes, tuple[Output, ...]]:
+    step = engine.resume(story, decode_save(save))
+    step = engine.choose(story, step.state, location)
+    return encode_save(story, step.state), step.outputs
 ```
-GIVEN HALT(reason="game over")
-AND status="running"
-WHEN executed
-THEN status becomes "halted"
-AND VMHalted event is emitted with reason="game over"
-```
-
-### 10.7 Query Tests
-
-#### AT-QR-1: QUERY_SITUATIONS
-```
-GIVEN rulebook with situations:
-  - "a" with predicates [Location="X"]
-  - "b" with predicates [Location="X", Flag>=1]
-  - "c" with predicates [Location="Y"]
-AND qualities={"Location": "X", "Flag": 1}
-WHEN QUERY_SITUATIONS("Situation") is executed
-THEN local_state["query_results"] contains ["b", "a"] (b first due to higher score)
-AND "c" is not included (predicate fails)
-```
-
-#### AT-QR-2: CHECK_PREDICATE True
-```
-GIVEN CHECK_PREDICATE(predicate={quality="HasKey", comparator=">=", value=1}, jump_if_false=5)
-AND qualities={"HasKey": 1}
-AND IP=10
-WHEN executed
-THEN IP becomes 11
-```
-
-#### AT-QR-3: CHECK_PREDICATE False
-```
-GIVEN CHECK_PREDICATE(predicate={quality="HasKey", comparator=">=", value=1}, jump_if_false=5)
-AND qualities={"HasKey": 0}
-AND IP=10
-WHEN executed
-THEN IP becomes 15 (10 + 5)
-```
-
-### 10.8 Execution Flow Tests
-
-#### AT-EF-1: Empty Stack Enters Query Mode
-```
-GIVEN VMState with empty stack and status="running"
-WHEN step() is called
-THEN VM enters query mode
-AND matching situations are displayed as choices
-AND status becomes "waiting_input"
-```
-
-#### AT-EF-2: Resume from Choice
-```
-GIVEN VMState with status="waiting_input"
-AND waiting_context={kind: "choice", choices: ["begin::intro"]}
-WHEN resume(state, {choice: "begin::intro"}) is called
-THEN stack contains Frame("begin::intro")
-AND SituationEntered event is emitted
-AND status becomes "running"
-AND execution continues until next YIELD
-```
-
-#### AT-EF-3: End of Situation Pops Frame
-```
-GIVEN VMState with stack=[Frame("a", ip=5)]
-AND situation "a" has 5 instructions (indices 0-4)
-WHEN step() is called with ip=5 (past end)
-THEN frame is popped
-AND SituationExited event is emitted
-```
-
-#### AT-EF-4: run_until_yield Executes Multiple Steps
-```
-GIVEN VMState at start of situation with 3 instructions then YIELD
-WHEN run_until_yield() is called
-THEN all 3 instructions execute
-AND YIELD is executed
-AND status is "waiting_input"
-```
-
-### 10.9 Serialization Tests
-
-#### AT-SR-1: Rulebook Round-Trip
-```
-GIVEN a compiled Rulebook
-WHEN serialized to JSON
-AND deserialized back
-THEN resulting Rulebook is equivalent to original
-AND all situations, predicates, instructions are preserved
-```
-
-#### AT-SR-2: VMState Round-Trip
-```
-GIVEN a VMState with:
-  - stack with 2 frames
-  - qualities in multiple layers
-  - status="waiting_input"
-  - waiting_context with choices
-WHEN serialized to JSON
-AND deserialized back
-THEN resulting VMState is equivalent to original
-AND execution can continue correctly
-```
-
-#### AT-SR-3: Expression Serialization
-```
-GIVEN Expression(BinaryOp("+", QualityRef("A"), BinaryOp("*", Literal(2), ValueRef())))
-WHEN serialized to JSON
-AND deserialized back
-THEN expression evaluates identically to original
-```
-
-### 10.10 Quality Layer Tests
-
-#### AT-QL-1: Layer Resolution Order
-```
-GIVEN QualityState with:
-  - global: {"A": 1}
-  - player: {"A": 2}
-  - session: {"A": 3}
-  - location: {"A": 4}
-WHEN get("A") is called
-THEN result is 4 (location layer wins)
-```
-
-#### AT-QL-2: Layer Resolution Fallthrough
-```
-GIVEN QualityState with:
-  - global: {"A": 1}
-  - player: {}
-  - session: {}
-  - location: {}
-WHEN get("A") is called
-THEN result is 1 (falls through to global)
-```
-
-#### AT-QL-3: Layer Write Isolation
-```
-GIVEN QualityState with session={"A": 1}, player={}
-WHEN set("session", "A", 5) is called
-THEN session={"A": 5}
-AND player={} (unchanged)
-```
-
-### 10.11 Integration Tests
-
-#### AT-INT-1: Cloak of Darkness Intro
-```
-GIVEN compiled Cloak of Darkness rulebook
-AND fresh VMState
-WHEN executed until first YIELD
-THEN events include:
-  - ChoicesBegin
-  - ChoiceDisplayed for "begin::intro"
-  - ChoicesEnd
-  - WaitingForInput(kind="choice")
-AND qualities include Location="Intro", "Wearing Cloak"=1
-```
 
-#### AT-INT-2: Cloak of Darkness Choice Navigation
-```
-GIVEN VMState after intro display
-WHEN resume with choice="begin::intro"
-AND resume with choice="begin::intro::press-onward"
-THEN qualities include Location="Foyer"
-AND next YIELD shows foyer situations
-```
+Build the links from `step.state.offered` (or the `ChoicesOffered` output).
 
-#### AT-INT-3: State Persistence Across Execution
-```
-GIVEN VMState mid-execution
-WHEN serialized
-AND server restarted
-AND deserialized
-AND execution resumed
-THEN narrative continues correctly
-AND no events are lost or duplicated
-```
+**Save integrity is the host's job.** Saves are not tamper-evident: `decode_save` checks shape and
+size only, and `resume` accepts any well-formed qualities and stack. If the save bytes travel
+through the client (a hidden field, a URL, a cookie), a player can forge any quality. The host must
+do one of two things:
 
-#### AT-INT-4: Predicate Conditional Text
-```
-GIVEN situation with conditional text:
-  - DISPLAY_TEXT("You have the cloak", predicate={"Wearing Cloak" >= 1})
-AND qualities={"Wearing Cloak": 0}
-WHEN situation executes
-THEN conditional text is NOT displayed
+1. **Keep saves server-side** behind an opaque id, stored through a `SaveStore`, and send only the
+   id to the client.
+2. **Authenticate the bytes**: HMAC the save with a key only the server holds, and verify the tag
+   before calling `decode_save`.
 
-WHEN qualities changed to {"Wearing Cloak": 1}
-AND situation re-executes
-THEN conditional text IS displayed
-```
+The engine ships neither. `choose` still refuses a location that isn't in `state.offered`
+(`NotOfferedError`), so a forged location can't skip the menu, but a forged save can.
 
 ---
 
 ## 11. Glossary
 
-| Term | Definition |
-|------|------------|
-| **Frame** | Stack entry for active situation execution |
-| **Instruction** | Atomic VM operation |
-| **Layer** | Quality state scope (global/session/player/location) |
-| **Location** | Unique situation identifier (`rulebook::situation::choice`) |
-| **Predicate** | Condition testing quality state |
-| **Quality** | Named variable in narrative state |
-| **Rulebook** | Compiled story (situations + metadata) |
-| **Situation** | Narrative unit with predicates, text, and instructions |
-| **Yield** | VM pause waiting for external input |
+| Term | Meaning |
+|---|---|
+| Anchor | a saved frame's reference to its choice block, by targets and ordinal |
+| Choice block | a run of `Choice` directives between `BeginChoices` and `GetChoice` |
+| Dead end | a query that matches no situation; the game halts with `dead_end=True` |
+| Directive | one compiled item in a situation (§2) |
+| Frame | a situation on the stack plus its next directive index (`ip`) |
+| Gather | the parent situation's directives after a choice block, run when the chosen situation pops |
+| Given | an operation applied once by `start` |
+| Location | the namespaced ID of a situation |
+| Output | one of the seven values an engine call returns (§4) |
+| Quality | a named `int`, `float` or `str` value in `Qualities` |
+| Query mode | what the engine does with an empty stack: offer every matching situation |
+| Situation | a compiled rule body: intro text plus directives |
+| Story | the compiled rulebook, read-only |
 
 ---
 
-## 12. Version History
+## Appendix A. Design history
+
+Version 0.1 of this document (2025) specified a different design. None of it shipped.
+
+- **Instruction set and codegen** (*not planned*). 0.1 compiled situations to opcodes (`PUSH`,
+  `POP`, `DISPLAY_TEXT`, `SET_QUALITY`, `BRANCH_IF`, `JUMP`, `YIELD`, `HALT`, `QUERY_SITUATIONS`,
+  …) run by a `step()`/`run_until_yield()` executor. The engine instead dispatches on compiled
+  directive types (001 PD-03), and the directive list has no jumps.
+- **Serialized JSON IR** (*deferred*). 0.1 defined a JSON schema for compiled rulebooks,
+  expressions, predicates and constraints. The compiled rulebook stays an in-memory `dict`.
+- **Layered qualities** (*deferred*). 0.1 resolved qualities through `global`, `player`, `session`
+  and `location` layers with write targeting. The engine has one flat `Qualities` map.
+- **Event bus** (*not planned*). 0.1 published typed events to subscribers with a
+  `pending_events` queue. The engine returns output values instead (§4).
+- **Frame-local state** (*deferred*). 0.1's `StackFrame` carried `local_state`; `Frame` has only
+  `location` and `ip`.
+- **Execution modes** (*not planned as code*). 0.1's realtime, HATEOAS and hybrid runners became
+  the recipes in §10.
+- **The 0.1 `AT-*` acceptance tests** were never run and are dropped; §0 names the real ones.
 
 | Version | Date | Changes |
-|---------|------|---------|
-| 0.1 | 2025 | Initial specification draft |
-
----
-
-*This specification defines the Ravel Narrative VM, designed for Clean Architecture and Domain-Driven Design principles.*
+|---|---|---|
+| 0.1 | 2025 | Instruction-set VM design draft |
+| 0.2 | 2026-09-28 | Rewritten to describe the shipped engine; 0.1 design moved to Appendix A |

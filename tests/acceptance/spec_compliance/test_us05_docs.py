@@ -123,7 +123,6 @@ def test_us05_section12_cloak_listing_is_current() -> None:
         assert actual == expected_content, f"Content mismatch for {heading}"
 
 
-@pytest.mark.xfail(strict=True, reason="US5 not yet implemented; remove when this scenario passes")
 def test_us05_as2_vm_spec_is_v02() -> None:
     """US5-AS2: the VM spec is v0.2 and describes the shipped engine, with the design in Appendix A."""
     spec = read("docs/RAVEL_VM_SPEC.md")
