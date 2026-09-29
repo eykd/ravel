@@ -43,6 +43,10 @@ def compile_givens(environment, data):
 
 
 def compile_about(data):
+    if not isinstance(data, Mapping):
+        raise exceptions.ParseError(
+            "`about` must be a mapping of names to text, not: %s" % exceptions.bounded_repr(data)
+        )
     return {get_text(key): get_text(value) for key, value in data.items()}
 
 
@@ -51,6 +55,11 @@ def compile_preamble(environment, rulebook):
     givens = []
     common_predicates = []
     metadata = {}
+
+    if not isinstance(rulebook, Mapping):
+        raise exceptions.ParseError(
+            "A rulebook must be a mapping of rule names to rules, not: %s" % exceptions.bounded_repr(rulebook)
+        )
 
     rule = None
     rulesets = iter(rulebook.items())
@@ -98,6 +107,11 @@ def compile_rulebook(environment, rulebook, prefix=""):
     common_predicates = compile_ruleset(environment, "", "", preamble["common_predicates"])
 
     for rule_name, data in preamble["rulesets"]:
+        if not isinstance(data, list) or not data:
+            raise exceptions.ParseError(
+                "Rule %s must be a non-empty list of directives, not: %s"
+                % (exceptions.bounded_repr(rule_name), exceptions.bounded_repr(data))
+            )
         if is_when(data[0]):
             concept = "Situation"
             ruleset_predicates = get_list_of_sources(get_next(data[0].values()))

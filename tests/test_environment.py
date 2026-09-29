@@ -185,6 +185,25 @@ class TestSourceNestingDepth:
 
         assert isinstance(excinfo.value.__cause__, syml_error)
 
+    @pytest.mark.parametrize(
+        ("source", "message"),
+        [
+            ("", "A rulebook must be a mapping"),
+            ("# c", "A rulebook must be a mapping"),
+            ("hello", "A rulebook must be a mapping"),
+            ("- a", "A rulebook must be a mapping"),
+            ("foo: bar", "Rule .*foo.* must be a non-empty list"),
+            ("foo:", "Rule .*foo.* must be a non-empty list"),
+            ("foo:\n    a: b", "Rule .*foo.* must be a non-empty list"),
+            ("foo:\n    a: a: hi", "Rule .*foo.* must be a non-empty list"),
+            ("about: x", "`about` must be a mapping"),
+            ("about:\n    - a", "`about` must be a mapping"),
+        ],
+    )
+    def test_it_should_raise_parse_error_for_badly_shaped_rulebooks(self, source, message):
+        with pytest.raises(exceptions.ParseError, match=message):
+            MemoryStorySource({"begin": source}).load()
+
     def test_it_should_accept_nesting_at_the_limit(self, env):
         source = "a:\n" + "".join(" " * (i + 1) + "b:\n" for i in range(environments.MAX_SOURCE_NESTING_DEPTH - 1))
         assert environments._source_nesting_depth(source) == environments.MAX_SOURCE_NESTING_DEPTH
