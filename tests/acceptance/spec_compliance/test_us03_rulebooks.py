@@ -63,6 +63,7 @@ def last_menu(outputs: tuple[Output, ...]) -> ChoicesOffered:
     return [output for output in outputs if isinstance(output, ChoicesOffered)][-1]
 
 
+@pytest.mark.xfail(strict=True, reason="US3 not yet implemented; remove when this scenario passes")
 def test_us3_as1_situation_first_item_declares_a_situation_concept_not_intro_text() -> None:
     """US3-AS1: a rule whose first item is the word ``Situation`` and has no ``when:`` is a Situation concept."""
     source = "declared:\n  - Situation\n  - You are here[.], somewhere.\n"
