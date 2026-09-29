@@ -99,6 +99,10 @@ def compile_rulebook(environment, rulebook, prefix=""):
             concept = data[0]
             ruleset_predicates = get_list_of_sources(get_next(data[1].values()))
             baggage_data = data[2:]
+        elif is_text(data[0]) and concepts.is_registered(get_text(data[0])):
+            concept = data[0]
+            ruleset_predicates = []
+            baggage_data = data[1:]
         else:
             concept = "Situation"
             ruleset_predicates = []

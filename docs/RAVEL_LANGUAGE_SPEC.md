@@ -404,6 +404,11 @@ The first list item can declare a concept type. Currently supported:
 
 Custom concepts can be registered via the compiler's handler system.
 
+**Detection rule.** The first list item is a concept line if a `when:` item follows it, or if it exactly
+names a registered concept (for example a bare `Situation`). Otherwise it is the rule's intro text and the
+rule is a `Situation`. Trade-off: a one-word intro line that equals a registered concept name is read as
+the concept, not as text.
+
 ### 8.3 Location Names
 
 Each rule compiles to a **location** in the rulebook. Locations are hierarchical, using `::` as separator:
@@ -436,6 +441,8 @@ Simple narrative text:
 - You stand in a spacious hall, splendidly decorated in red and gold.
 - The rain pours down outside.
 ```
+
+A rule's first line uses intro syntax only (no `{cond}` or `<>`).
 
 #### Intro Text (Bracket Syntax)
 
