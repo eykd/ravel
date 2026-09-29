@@ -13,6 +13,15 @@ from ravel.utils.data import evaluate_term
 type QualityValue = int | float | str
 
 
+class QualityLookup(Protocol):
+    """Read-only access to current quality values by name."""
+
+    def get(self, name: str, /) -> QualityValue | None: ...
+
+
+EMPTY_QUALITIES: Final[Mapping[str, QualityValue]] = MappingProxyType({})
+
+
 @attr.s(slots=True)
 class Choice:
     choice: Any = attr.ib()
@@ -129,16 +138,15 @@ class Operation:
     def get_operator(self) -> Callable[[Any, Any], Any]:
         return self._operators[self.operator]
 
-    def get_expression(self, **kwargs: Any) -> None:
-        return
-
-    def evaluate(self, initial_value: Any, **kwargs: Any) -> Any:
-        if initial_value is None:
-            initial_value = 0
-        result = self.get_operator()(
-            initial_value,
-            evaluate_term(self.expression, **kwargs),
-        )
+    def evaluate(
+        self, initial_value: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES
+    ) -> QualityValue:
+        current = 0 if initial_value is None else initial_value
+        rhs = evaluate_term(self.expression, qualities=qualities, qvalue=current)
+        try:
+            result: QualityValue = self.get_operator()(current, rhs)
+        except (TypeError, ArithmeticError) as error:
+            raise EvaluationError("%r: %s" % (self, error)) from error
         return result
 
 
@@ -174,15 +182,6 @@ class Text:
 
     def __str__(self) -> str:
         return str(self.text)
-
-
-class QualityLookup(Protocol):
-    """Read-only access to current quality values by name."""
-
-    def get(self, name: str, /) -> QualityValue | None: ...
-
-
-EMPTY_QUALITIES: Final[Mapping[str, QualityValue]] = MappingProxyType({})
 
 
 @attr.s(frozen=True, slots=True)
