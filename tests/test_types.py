@@ -1,6 +1,6 @@
 import pytest
 
-from ravel import types
+from ravel import exceptions, types
 
 
 class TestText:
@@ -208,3 +208,24 @@ class TestExpressionContextThreading:
 
     def test_it_should_still_evaluate_without_context(self):
         assert types.Expression(3, "+", 2).evaluate() == 5
+
+
+class TestExpressionEvaluationFailures:
+    def test_it_should_raise_evaluation_error_on_division_by_zero(self):
+        with pytest.raises(exceptions.EvaluationError) as excinfo:
+            types.Expression(1, "/", 0).evaluate()
+        assert isinstance(excinfo.value.__cause__, ZeroDivisionError)
+
+    def test_it_should_raise_evaluation_error_on_a_type_mismatch(self):
+        with pytest.raises(exceptions.EvaluationError) as excinfo:
+            types.Expression("a", "+", 1).evaluate()
+        assert isinstance(excinfo.value.__cause__, TypeError)
+
+    def test_it_should_not_wrap_a_term_evaluation_failure(self):
+        class BadTerm:
+            def evaluate(self, **kwargs):
+                raise TypeError("bad term")
+
+        with pytest.raises(TypeError) as excinfo:
+            types.Expression(BadTerm(), "+", 1).evaluate()
+        assert not isinstance(excinfo.value, exceptions.EvaluationError)

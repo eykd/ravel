@@ -17,3 +17,8 @@ class TestRaiseParseError:
     def test_it_should_raise_a_parse_error_for_unknown_source(self):
         with pytest.raises(exceptions.ParseError):
             exceptions.raise_parse_error("foo")
+
+
+class TestEvaluationError:
+    def test_it_should_be_a_value_error(self):
+        assert issubclass(exceptions.EvaluationError, ValueError)

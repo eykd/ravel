@@ -36,3 +36,7 @@ def raise_parse_error(position, error_type=ParseError):
         )
     else:
         raise error_type("Could not determine source position:\n%r" % position, position)
+
+
+class EvaluationError(ValueError):
+    pass
