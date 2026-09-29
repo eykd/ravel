@@ -66,6 +66,22 @@ class TestPlainTextParser:
         expected = types.Text("Nothing to see here. Move along.")
         assert result == expected
 
+    @pytest.mark.parametrize("text", ["a <> b", "a<><>", "{x == 1} a <> b", "<> a", "\x1b[2J <> b"])
+    def test_it_should_raise_parse_error_for_glue_before_the_end_of_the_line(self, parser, text):
+        with pytest.raises(
+            exceptions.ParseError, match="Invalid text line.*glue is only allowed at the end"
+        ) as excinfo:
+            parser.parse(text)
+
+        assert isinstance(excinfo.value.__cause__, exceptions.ParsimoniousParseError)
+        assert "\x1b" not in str(excinfo.value)
+
+    def test_it_should_bound_the_invalid_text_line_message(self, parser):
+        with pytest.raises(exceptions.ParseError) as excinfo:
+            parser.parse("<>" * 900_000)
+
+        assert len(str(excinfo.value)) < 512
+
     def test_it_should_parse_plain_text_with_glue(self, parser):
         result = parser.parse("Caught in a sticky web. <>")
         expected = types.Text("Caught in a sticky web. ", sticky=True)
@@ -509,7 +525,7 @@ class TestExpressionLengthLimit:
             except exceptions.ComparisonParseError:
                 assert len(line) > cap + 2
                 return
-            except exceptions.ParsimoniousParseError:
+            except exceptions.ParseError:
                 return  # prose holding "<>" before its end is malformed, as it always was
         prefix_length = len(line) - len(result.text) - (2 if result.sticky else 0)
         assert prefix_length <= cap + 2

@@ -213,7 +213,12 @@ class PlainTextParser(ComparisonParser):
             else:
                 predicate = self.visit(prefix)
                 prose = line[prefix.end :]
-        result = self.visit(self.grammar["prose"].parse(prose))
+        try:
+            result = self.visit(self.grammar["prose"].parse(prose))
+        except exceptions.ParsimoniousParseError as e:
+            raise exceptions.ParseError(
+                "Invalid text line %s: `<>` glue is only allowed at the end of a line" % exceptions.bounded_repr(line)
+            ) from e
         return types.Text(result.text, sticky=result.sticky, predicate=predicate)
 
     def visit_text(self, node, children):

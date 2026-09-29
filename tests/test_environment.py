@@ -183,6 +183,11 @@ class TestSourceNestingDepth:
         with pytest.raises(exceptions.ParseError, match="Invalid intro text"):
             MemoryStorySource({"begin": source}).load()
 
+    @pytest.mark.parametrize("line", ["a <> b", "{x == 1} a <> b"])
+    def test_it_should_raise_parse_error_for_mid_line_glue_via_memory_source(self, line):
+        with pytest.raises(exceptions.ParseError, match="Invalid text line"):
+            MemoryStorySource({"begin": "foo:\n    - Intro.\n    - %s\n" % line}).load()
+
     @pytest.mark.parametrize(
         ("source", "syml_error", "message"),
         [

@@ -493,7 +493,7 @@ Text with a predicate prefix—only displayed if condition is true:
 
 #### Sticky Text (Glue)
 
-The `<>` marker at the end of text indicates it should "glue" to the next text element (no line break):
+The `<>` marker at the end of text indicates it should "glue" to the next text element (no line break). `<>` is only allowed at the end of a line; a `<>` anywhere else in the line (for example `a <> b`) is a parse error:
 
 ```yaml
 - You see a door<>
