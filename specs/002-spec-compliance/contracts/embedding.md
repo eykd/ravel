@@ -49,6 +49,13 @@ session.new_game()  # plays with zero filesystem reads (SC-003)
 
 (`InMemorySaveStore` is the test double from 001's property test; no new save adapter ships.)
 
+**How "zero filesystem reads" is tested (US4-AS1).** After all imports, one
+`pytest.MonkeyPatch.context()` replaces `builtins.open`, `io.open`, `os.open` and `os.stat` with
+functions raising `AssertionError`, around `load()`, `new_game()` and one `choose` only. In the same
+context, `FileSystemStorySource(tmp_path).load()` over a pre-written one-file story must raise that
+`AssertionError` (positive control), so the check can't pass vacuously. See plan.md, "Proving zero
+filesystem reads".
+
 ## Stateless request/response (FR-014, PD-13)
 
 No new API. The recipe the acceptance test and VM spec §10 use:

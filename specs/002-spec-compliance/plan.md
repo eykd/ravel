@@ -127,7 +127,7 @@ dependency, no new grammar dialect, and no layer crossing.
 | Constraints (FR-008) | §7.3, §10.1 | Yes: one per operation; applies to `=` and `given`; string result is an error; clamped value takes the bound's kind |
 | Concept line (FR-009, R6) | §8.1, §8.2 | Yes: the detection rule and its one-word-intro trade-off |
 | Include cycles, ordering (FR-010, R1, R2) | §3.1, §3.2 | Yes: cycles allowed, BFS, real ordering, later `given` wins |
-| `text:` in `choice:` (FR-011) | §9.2 | One sentence: "(optional additional text)" already matches (PD-10); v0.2 adds that the bracketed line must be the choice's first item (RT-5) |
+| `text:` in `choice:` (FR-011) | §9.2 | Two sentences: "(optional additional text)" already matches (PD-10); v0.2 adds that the bracketed line must be the choice's first item (RT-5) and that the items after it run in the order written, so a `text:` after an `effect:` sees it (never "before its effects") |
 | `[.]` example (R5) | §9.1 | Yes: fix the tail comment |
 | First line intro-only (R7) | §9.1 | Yes: one sentence |
 | Whitespace (R8) | §6.2, §7.2 | Yes: one sentence each |
@@ -196,10 +196,11 @@ tests/
 ├── test_compiler_concepts.py    # its bare Environment() (line 29) passes a loader
 ├── test_environment.py      # required loader, cycles
 ├── test_loader.py           # MemoryLoader
-├── helpers.py               # strict_conditions fixture: raising-path conditions for story tests (RT-15)
+├── helpers.py               # strict_conditions() context manager: raising-path conditions (RT-15)
 ├── spec_examples.py         # new helper: extract_examples / run_example (PD-16)
 ├── test_spec_examples.py    # new (PD-16)
-├── conftest.py              # Environment() callers pass a loader (the `Environment()` fixture at
+├── conftest.py              # + thin `strict_conditions` fixture (helpers.py isn't a conftest; RT-15);
+│                            #   Environment() callers pass a loader (the `Environment()` fixture at
 │                            #   line 18; with test_queries.py and test_compiler_concepts.py these
 │                            #   are the only bare callers, per `rg 'Environment\(\)'`)
 ├── adapters/test_story_source.py   # MemoryStorySource
@@ -231,7 +232,7 @@ public surfaces only: `ravel.parsers` + `ravel.types` for expression semantics, 
 | US1: expressions | `tests/acceptance/spec_compliance/test_us01_expressions.py` | parsers + `evaluate`; a one-file story through `engine.start` for AS5/AS7; plus the RT-1 arithmetic-failure checks (`InvalidOperationError`) | 8 (+2 RT-1) |
 | US2: constraints | `tests/acceptance/spec_compliance/test_us02_constraints.py` | situation effect via `engine.choose`; `given` via `engine.start` | 4 |
 | US3: rulebooks | `tests/acceptance/spec_compliance/test_us03_rulebooks.py` | `Environment(MemoryLoader)`; counting loader for AS3; engine for AS4 | 4 |
-| US4: embedding | `tests/acceptance/spec_compliance/test_us04_embedding.py` (AS1, AS2, AS3, AS5), `test_us04_determinism_property.py` (AS4; hypothesis, `max_examples=200`, `deadline=None`, `derandomize=True`, `database=None`) | `MemoryStorySource`, filesystem calls patched to raise; stateless handler | 5 |
+| US4: embedding | `tests/acceptance/spec_compliance/test_us04_embedding.py` (AS1, AS2, AS3, AS5), `test_us04_determinism_property.py` (AS4; hypothesis, `max_examples=200`, `deadline=None`, `derandomize=True`, `database=None`) | `MemoryStorySource`, filesystem calls patched to raise with a positive control (see "Proving zero filesystem reads"); stateless handler | 5 |
 | US5: docs | `tests/acceptance/spec_compliance/test_us05_docs.py` | reads both docs and `CLAUDE.md`: versions are 0.2; §5.1 has the precedence table; each ruling's key sentence is present; §12 shows **all five** `examples/cloak/*.ravel` files and each listing equals its file's text (today it shows three, and its `begin.ravel` is out of date); VM spec names `start`/`choose`/`present`/`resume`, all seven output types, the three host recipes, and has a design-history appendix | 3 |
 | US6: spec can't drift | `tests/acceptance/spec_compliance/test_us06_spec_examples.py` | AS1 is thin: it asserts `extract_examples` finds examples in every scoped section and that none of them fails (one loop, not a second parametrization of `tests/test_spec_examples.py`); AS2 runs the extractor over a copy with one result edited, asserting the failure names the example | 2 |
 
@@ -240,11 +241,15 @@ three `### <file>.ravel` headings (`begin`, `foyer`, `cloakroom`), each followed
 ` ```yaml ` fenced block; `examples/cloak/` has five files, each ending in exactly one `\n`. The
 test in `test_us05_docs.py`:
 
-1. Slices the text from the `## 12.` heading to the next `## ` heading.
+1. Slices the text from the `## 12.` heading to the next `## ` heading outside a fenced block.
 2. Collects the `### ` headings in that slice, in order, and asserts they equal
    `["begin.ravel", "foyer.ravel", "cloakroom.ravel", "bar-dark.ravel", "bar-light.ravel"]`
-   (the `include:` order in `begin.ravel`). It also asserts the set equals
-   `{p.name for p in Path("examples/cloak").glob("*.ravel")}`, so a sixth file fails the test.
+   (breadth-first load order from `begin`: `begin.ravel` includes only `foyer`, and `foyer.ravel`
+   includes `cloakroom`, `bar-dark`, `bar-light`; the four-include `begin.ravel` in today's §12 is
+   the stale copy). It also asserts the set equals `{p.name for p in CLOAK.glob("*.ravel")}`, so a
+   sixth file fails the test. `CLOAK` and the spec path are anchored on the test file
+   (`Path(__file__).resolve().parents[…]`, as `tests/conftest.py`'s `PATH` is), never the working
+   directory.
 3. For each heading, takes the first fenced block after it: the lines strictly between its opening
    fence and the next line that is exactly ` ``` `. It asserts `"\n".join(lines) + "\n" ==
    (CLOAK / name).read_text()`. No other normalization, so drift in whitespace fails too.
@@ -354,12 +359,27 @@ pinned:
 ### `text:` placement inside `choice:` (PD-10, RT-5)
 
 Confirmed by probe (2026-09-28): with the `[Go]…` line first, `text:` is additional text shown after
-the choice's own text and before its effects; the label is unchanged. With `text:` *first*, compile
+the choice's own text; the label is unchanged. With `text:` *first*, compile
 fails with a bare `ParseError("No text found, instead: {…}")`. §9.2's structure block already shows
 the bracketed line first; v0.2 adds "The bracketed line must be the choice's first item." and
 contracts/rulebook-compile.md lists the rejected order. No code change: US3's test pins that
 compiling it raises `ravel.exceptions.ParseError` and that the message carries the `Source`
 position (`Line 4, Column 8` in the probe).
+
+**Source order, not a fixed slot (red-team outer iteration 3).** "Shown after the choice's own
+text and before its effects" is only true of the order §9.2's structure block happens to use. The
+items after the bracketed line run as one directive sequence, in source order, and `text:` is an
+ordinary text line, `{…}` prefix included. Probe (2026-09-28): `[Go]You go.`, `effect: X += 1`,
+`text: {X == 1}After effect.` → `TextShown("You go.")`, `QualityChanged("X", None, 1)`,
+`TextShown("After effect.")`. Two `text:` entries show in order. So:
+
+- §9.2 v0.2 says "The items after the bracketed line run in the order written; a `text:` line may
+  carry a `{…}` condition, and one placed after an `effect:` sees that effect." It must **not** say
+  "before its effects": neither US5's sentence check nor US6 (which ignores prose) would catch it.
+- US3-AS4's test pins both orders (contracts/rulebook-compile.md): the text-then-effect sequence
+  and the effect-then-conditional-text sequence above.
+- Known limitation, no change: the bracketed line is not a text directive, so `[Go]You go<>` shows
+  `<>` literally. §9.2 doesn't claim otherwise; v0.2 adds nothing about it.
 
 ### Soft-failing conditions stay visible to authors (RT-12)
 
@@ -454,10 +474,29 @@ the test suite doesn't have to be:
   examples anyway. So the helper is a context manager, `strict_conditions()` built on
   `pytest.MonkeyPatch.context()`, entered *inside* each example's body in the determinism property
   test; the plain tests use a thin fixture that wraps the same context manager. No health check is
-  suppressed.
+  suppressed. The context manager lives in `tests/helpers.py` (today only `source()` and `Any`);
+  the fixture lives in the root `tests/conftest.py`, because pytest discovers fixtures only from
+  conftest files and 001's `tests/acceptance/test_us06_end_to_end.py` must see it.
 - Checked 2026-09-28: no shipped story compares a quality to a string with `<`/`>`/`<=`/`>=`
   (`rg` over `examples/` and `tests/fixtures/stories/`), so the raising path won't trip the
   unset-subject `0 > "Bar"` case the old `except TypeError` existed for.
+
+### Proving zero filesystem reads (US4-AS1, SC-003; red-team outer iteration 3)
+
+"Filesystem calls patched to raise" can pass vacuously: patching only `FileSystemLoader` (or
+nothing `MemoryLoader` would touch anyway) proves nothing. The test pins the mechanism:
+
+- **What is patched.** `builtins.open`, `io.open`, `os.open` and `os.stat` (which `os.path.getmtime`,
+  `Path.stat` and `Path.exists` go through), each replaced with a function that raises
+  `AssertionError("filesystem access: …")`, via one `pytest.MonkeyPatch.context()`.
+- **When.** The context is entered after every import the test needs has run (importlib's path
+  finder calls `os.stat`), and wraps only `MemoryStorySource(...).load()`, `GameSession.new_game()`
+  and one `choose`. Assertions run after it exits.
+- **Positive control, same test.** Inside the identical context, `FileSystemStorySource(tmp_path)
+  .load()` over a one-file story (written before entering) must raise that `AssertionError`. If the
+  patch stops covering the loader's real calls, the control fails, not the claim.
+
+contracts/embedding.md's SC-003 example carries the same procedure.
 
 ### Kind-sensitive assertions (RT-6)
 

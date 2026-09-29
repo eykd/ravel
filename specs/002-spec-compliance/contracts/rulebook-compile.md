@@ -75,6 +75,24 @@ intro:
 `QualityChanged("X", None, 1)`, `SituationExited` ×2, then the next menu. The menu label stays `Go`.
 (Verified by probe against the shipped engine, 2026-09-28.)
 
+**Source order.** The items after the bracketed line run in the order written, and `text:` is an
+ordinary text line (a `{…}` prefix is evaluated where it stands). So `text:` is not fixed "before
+the effects":
+
+```yaml
+intro:
+  - Hello[.] there.
+  - choice:
+      - [Go]You go.
+      - effect: X += 1
+      - text: {X == 1}After effect.
+```
+
+`choose(begin::intro::go)` → `SituationEntered("begin::intro::go")`, `TextShown("You go.")`,
+`QualityChanged("X", None, 1)`, `TextShown("After effect.")`, `SituationExited` ×2, then the next
+menu. (Probe, 2026-09-28.) US3-AS4's test pins this sequence as well as the one above; §9.2 v0.2
+states the source-order rule and must not say "before its effects".
+
 **Rejected order (RT-5).** The bracketed `[Label]…` line must be the choice's first item:
 
 ```yaml
