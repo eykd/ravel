@@ -1,6 +1,6 @@
 from parsimonious import Grammar, NodeVisitor
 
-from ravel import grammars, types
+from ravel import exceptions, grammars, types
 
 
 class BaseParser(NodeVisitor):
@@ -125,6 +125,14 @@ class PlainTextParser(ComparisonParser):
 
 class OperationParser(BaseExpressionParser):
     grammar = Grammar(grammars.operation_grammar)
+    unwrapped_exceptions = (exceptions.OperationParseError,)
+
+    def parse(self, text, pos=0):
+        """Parse an operation, reporting any malformed one as an OperationParseError naming the text."""
+        try:
+            return super().parse(text, pos=pos)
+        except exceptions.ParsimoniousParseError as e:
+            raise exceptions.OperationParseError("Invalid operation %r: %s" % (text, e)) from e
 
     def visit_constraint(self, node, children):
         return types.Constraint(node.children[0].text, self.reduce_children(children))
@@ -136,4 +144,8 @@ class OperationParser(BaseExpressionParser):
             expr, constraint = expr
         else:
             constraint = None
+        if constraint is not None and isinstance(expr, str):
+            raise exceptions.OperationParseError(
+                "Invalid operation %r: a constraint cannot apply to a string literal" % node.text.strip()
+            )
         return types.Operation(quality, operator, expr, constraint)
