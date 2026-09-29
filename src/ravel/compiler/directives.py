@@ -30,8 +30,13 @@ def _compile_directive_bodies(environment, concept, parent_rule, first_text, the
     subsituations = []
     if the_rest:
         last_directive = None
+        menu = {}
         for item in the_rest:
             for directive, situations in compile_directive(environment, concept, parent_rule, item, depth=depth):
+                if isinstance(directive, types.Choice):
+                    _register_menu_entry(environment, menu, directive, situations)
+                else:
+                    menu = {}
                 if not isinstance(last_directive, types.Choice) and isinstance(directive, types.Choice):
                     directives.append(types.BeginChoices())
                 if isinstance(last_directive, types.Choice) and not isinstance(directive, types.Choice):
@@ -42,6 +47,26 @@ def _compile_directive_bodies(environment, concept, parent_rule, first_text, the
         if isinstance(last_directive, types.Choice):
             directives.append(types.GetChoice())
     return list(it.chain([first_text], directives)), subsituations
+
+
+def _register_menu_entry(environment, menu, choice, situations):
+    """Record a choice in its menu (a run of adjacent choices), rejecting a slug shared with a sibling.
+
+    Two sibling entries with one location would lead to the same body, and the merge would silently
+    drop the first one's text and effects. Choices in separate menus may share a slug (001 design).
+    """
+    label = get_text(situations[choice.choice].intro)
+    if choice.choice in menu:
+        slug = choice.choice.rsplit(environment.location_separator, 1)[-1]
+        raise exceptions.ParseError(
+            "Sibling choices %s and %s in one menu both slugify to %s"
+            % (
+                exceptions.bounded_repr(menu[choice.choice]),
+                exceptions.bounded_repr(label),
+                exceptions.bounded_repr(slug),
+            )
+        )
+    menu[choice.choice] = label
 
 
 def compile_directive(environment, concept, parent_rule, raw_directive, depth=0):

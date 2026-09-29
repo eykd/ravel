@@ -552,6 +552,8 @@ Multiple `choice:` blocks in sequence create a choice menu:
     - [Stay here]You decide to remain.
 ```
 
+Sibling choices in one menu (adjacent `choice:` blocks) must have distinct labels after slugification (`[Go]` and `[Go!]` both become `go`, and two empty `[]` labels collide too); otherwise the compiler raises a `ParseError` naming both labels and the shared slug, since both entries would lead to the same body. A `choice:` block in a separate menu (split from the first by a non-choice directive such as an `effect:`) may reuse a label: the later block with that label reuses the same slug and its body overrides the earlier one's.
+
 ### 9.3 Effect Directives
 
 Standalone effects outside of choices:
