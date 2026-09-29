@@ -210,3 +210,36 @@ class TestOperationsParser:
         result = parser.parse(statement)
         assert isinstance(result, types.Operation)
         assert result == expected
+
+    @pytest.mark.parametrize(
+        ("text", "rhs"),
+        [
+            ("X = -5", -5),
+            ("X = -1.5", -1.5),
+            ("X = 10 - -4", types.Expression(10, "-", -4)),
+            ("X = 10 -4", types.Expression(10, "-", 4)),
+            ('X = ""', ""),
+        ],
+    )
+    def test_signed_number_literals_and_empty_strings_parse(self, parser, text, rhs):
+        assert parser.parse(text) == types.Operation("X", "=", rhs, None)
+
+    @pytest.mark.parametrize(
+        ("text", "op", "con", "bound"),
+        [
+            ("X += 1 max -5", "+=", "max", -5),
+            ("X -= 3 min -2", "-=", "min", -2),
+        ],
+    )
+    def test_constraint_bounds_may_be_negative(self, parser, text, op, con, bound):
+        value = 1 if op == "+=" else 3
+        assert parser.parse(text) == types.Operation("X", op, value, types.Constraint(con, bound))
+
+    def test_unary_minus_on_a_group_is_rejected(self, parser):
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            parser.parse("X = -(1 + 2)")
+
+
+class TestComparisonParserSignedNumbers:
+    def test_comparison_against_a_negative_number_parses(self):
+        assert parsers.ComparisonParser().parse("Health > -1") == types.Comparison("Health", ">", -1)
