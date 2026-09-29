@@ -108,7 +108,7 @@ class TestEngineExpressions:
         story = build_story(
             tmp_path,
             "given:\n  - Health = 7\n  - Bonus = 3\n  - X = [Health] + Bonus\n\n"
-            "start:\n  - when:\n      - Health = 7\n  - choice:\n      - [Go]Going.\n",
+            "start:\n  - when:\n      - Health = 7\n  - Start.\n  - choice:\n      - [Go]Going.\n",
         )
         step = engine.start(story)
         changes = [o for o in step.outputs if isinstance(o, QualityChanged) and o.name == "X"]
@@ -188,9 +188,9 @@ class TestEvaluationFailures:
         story = build_story(
             tmp_path,
             "given:\n  - X = 2\n  - Name = 'a'\n\n"
-            "broken:\n  - when:\n      - X > 10 / Y\n  - choice:\n      - [Broken]Broken.\n\n"
-            "typed:\n  - when:\n      - X > Name\n  - choice:\n      - [Typed]Typed.\n\n"
-            "fine:\n  - when:\n      - X = 2\n  - choice:\n      - [Fine]Fine.\n",
+            "broken:\n  - when:\n      - X > 10 / Y\n  - Broken.\n  - choice:\n      - [Broken]Broken.\n\n"
+            "typed:\n  - when:\n      - X > Name\n  - Typed.\n  - choice:\n      - [Typed]Typed.\n\n"
+            "fine:\n  - when:\n      - X = 2\n  - Fine.\n  - choice:\n      - [Fine]Fine.\n",
         )
         step = engine.start(story)
         offered = [c.location for o in step.outputs if hasattr(o, "choices") for c in o.choices]
@@ -201,10 +201,10 @@ class TestEvaluationFailures:
         story = build_story(
             tmp_path,
             "given:\n  - Health = 5\n\n"
-            "start:\n  - when:\n      - Health = 5\n  - '{Health > 10 / Y}Hidden.'\n"
+            "start:\n  - when:\n      - Health = 5\n  - Start.\n  - '{Health > 10 / Y}Hidden.'\n"
             "  - Visible.\n  - choice:\n      - [Go]Going.\n",
         )
-        step = engine.start(story)
+        step = engine.choose(story, engine.start(story).state, "begin::start")
         texts = [o.text for o in step.outputs if isinstance(o, TextShown)]
         assert "Hidden." not in texts
         assert "Visible." in texts
