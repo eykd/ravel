@@ -449,6 +449,15 @@ the test suite doesn't have to be:
   and fixture-story play tests use it, so any condition in a shipped story that can't evaluate on
   the paths they play fails the build with the underlying error.
 - The RT-2/RT-10/RT-14 soft-failure tests don't use it; they pin the silent behavior.
+- **Hypothesis compatibility.** A function-scoped fixture (`monkeypatch`) on a `@given` test fails
+  Hypothesis's `function_scoped_fixture` health check, and the patch would be shared across
+  examples anyway. So the helper is a context manager, `strict_conditions()` built on
+  `pytest.MonkeyPatch.context()`, entered *inside* each example's body in the determinism property
+  test; the plain tests use a thin fixture that wraps the same context manager. No health check is
+  suppressed.
+- Checked 2026-09-28: no shipped story compares a quality to a string with `<`/`>`/`<=`/`>=`
+  (`rg` over `examples/` and `tests/fixtures/stories/`), so the raising path won't trip the
+  unset-subject `0 > "Bar"` case the old `except TypeError` existed for.
 
 ### Kind-sensitive assertions (RT-6)
 
