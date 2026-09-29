@@ -58,8 +58,10 @@ def choice_blocks(situation: types.Situation) -> tuple[ChoiceBlock, ...]:
 def _apply_operation(qualities: Qualities, operation: types.Operation) -> tuple[Qualities, QualityChanged]:
     """Apply ``operation`` to ``qualities``; the one choke point every quality change passes through.
 
-    ``Qualities.set`` validates the result, raising ``InvalidQualityValueError`` for a value outside
-    the storable domain. ``min``/``max`` constraints are not applied (an inherited gap).
+    ``Operation.evaluate`` computes the new value and applies any ``min``/``max`` constraint, clamping
+    the result. An ``EvaluationError`` (including ``ConstraintError``) is re-raised as
+    ``InvalidOperationError``. ``Qualities.set`` then validates the result, raising
+    ``InvalidQualityValueError`` for a value outside the storable domain. These are the two errors raised.
     """
     old = qualities.get(operation.quality)
     try:
