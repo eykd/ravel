@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "category": "test-quality",
+    "file": "tests/test_environment.py",
+    "title": "Remediate: shared-sort-key test name claims both sites but asserts only one",
+    "severity": "MINOR",
+    "line": 417,
+    "task_id": "ravel-h6v.46"
+  }
+]
