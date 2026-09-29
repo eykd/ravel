@@ -27,7 +27,7 @@ from ravel.app import GameSession
 from ravel.engine.outputs import Halted
 from ravel.engine.state import Outcome, Status
 
-pytestmark = pytest.mark.acceptance
+pytestmark = [pytest.mark.acceptance, pytest.mark.usefixtures("strict_conditions")]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CLOAK_PATH = REPO_ROOT / "examples" / "cloak"

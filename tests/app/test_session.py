@@ -25,6 +25,8 @@ from ravel.engine.outputs import ChoiceOption, ChoicesOffered, Halted, StoryChan
 from ravel.engine.state import Status
 from ravel.engine.story import Story
 
+pytestmark = pytest.mark.usefixtures("strict_conditions")
+
 
 class FakeSaveStore:
     """An in-memory ``SaveStore``: no filesystem, no real errors unless asked for."""
