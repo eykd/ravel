@@ -1,8 +1,1 @@
-[
-  {"category": "stale-comment", "file": "src/ravel/engine/engine.py", "title": "Remediate: stale _apply_operation docstring says constraints are not applied", "severity": "MAJOR", "line": 62, "task_id": "ravel-h6v.40"},
-  {"category": "duplication", "file": "src/ravel/environments.py", "title": "Remediate: Environment.load_rulebook sorts rules by attrs default order, not _rule_sort_key", "severity": "MINOR", "line": 123, "task_id": "ravel-h6v.41"},
-  {"category": "duplication", "file": "src/ravel/engine/state.py", "title": "Remediate: QualityValue type alias defined twice (types.py and engine/state.py)", "severity": "MINOR", "line": 14, "task_id": "ravel-h6v.42"},
-  {"category": "stale-comment", "file": "src/ravel/utils/excerpts.py", "title": "Remediate: excerpts module docstring gives a rationale the import graph no longer supports", "severity": "MINOR", "line": 1, "task_id": "ravel-h6v.43"},
-  {"category": "redundant-code", "file": "src/ravel/cli.py", "title": "Remediate: Halted outcome is escaped twice in ConsoleUI", "severity": "MINOR", "line": null, "task_id": "ravel-h6v.44"},
-  {"category": "naming", "file": "src/ravel/parsers.py", "title": "Remediate: rename operand_limit_error, which covers every expression limit", "severity": "MINOR", "line": null, "task_id": "ravel-h6v.45"}
-]
+[]
