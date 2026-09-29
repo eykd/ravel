@@ -55,14 +55,16 @@ class Operation:
 class Comparison:
     def evaluate(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool: ...
     def check(self, qualities: QualityLookup) -> bool:
-        """``evaluate`` the subject's value; ``False`` (logged) if evaluation raises (RT-10)."""
+        """``evaluate`` the subject's value; ``False`` (nothing logged) if it raises ``EvaluationError`` (RT-10, RT-13)."""
 
     def __call__(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool:
         """Same soft failure as ``check``."""
 
 
 # ravel/exceptions.py
-class EvaluationError(ValueError): ...
+class EvaluationError(ValueError):
+    """A run-time expression failure. Raised (``from`` the cause) when applying an arithmetic
+    operator, setter or comparator raises ``TypeError`` or ``ArithmeticError`` (RT-13)."""
 
 
 class ConstraintError(EvaluationError): ...
@@ -72,8 +74,9 @@ class ConstraintError(EvaluationError): ...
 class InvalidOperationError(EngineError):
     """An operation's expression or constraint failed at run time.
 
-    Wraps ``EvaluationError`` (``ConstraintError``), ``ArithmeticError`` (``ZeroDivisionError``,
-    ``OverflowError``) and ``TypeError`` raised while evaluating an operation (RT-1).
+    Wraps the ``EvaluationError`` (including ``ConstraintError``) raised while evaluating an
+    operation; an operator's ``ZeroDivisionError``/``OverflowError``/``TypeError`` arrive already
+    wrapped in ``EvaluationError`` (RT-1, RT-13). Any other exception propagates unwrapped.
     """
 ```
 
@@ -85,12 +88,20 @@ calls in `tests/test_types.py` (`exp.evaluate()`, `operation.evaluate(None)`) ke
 `predicate(0)` fallback). Its `except TypeError` around the fallback is **deleted**: it's
 unreachable once `Comparison` soft-fails (RT-10).
 
+**Operator failures are `EvaluationError` (RT-13).** `Expression.evaluate`, `Operation.evaluate`
+and `Comparison.evaluate` wrap only the `operator(left, right)` call (not operand evaluation) in
+`try … except (TypeError, ArithmeticError) as error: raise EvaluationError("%r: %s" % (self,
+error)) from error`. A `TypeError` from anywhere else (a term's `evaluate` signature, a
+`QualityLookup.get`) is a bug and propagates unwrapped through `check`, `__call__`, `query` and
+`_apply_operation`.
+
 **Conditions fail soft (RT-2, RT-10).** `Comparison.check(qualities)` and
-`Comparison.__call__(qvalue, *, qualities)` catch `(TypeError, ArithmeticError, EvaluationError)`
-from `evaluate` and return `False`. Nothing is logged and nothing is emitted: "a condition that
+`Comparison.__call__(qvalue, *, qualities)` catch `EvaluationError` from `evaluate` and return
+`False`. Nothing is logged and nothing is emitted: "a condition that
 cannot be evaluated is false" is defined behavior, the same silent `matched = False` that
 `query_predicates` already applies to an unset subject's `TypeError`. `types.py` gains no logger.
-`Comparison.evaluate` itself still raises (the spec-examples runner relies on this; RT-11). This covers every
+`Comparison.evaluate` itself still raises `EvaluationError` (the spec-examples runner relies on
+this; RT-11). This covers every
 condition site: `when:` predicates in both `query_predicates` branches, and `{…}` line prefixes via
 `Text.check` in the engine's text step. (Widens PD-06's unset-only `except TypeError`: a raising
 `when:` would fail every query from that state and strand any save in it.)
@@ -101,7 +112,7 @@ condition site: `when:` predicates in both `query_predicates` branches, and `{�
 old = qualities.get(operation.quality)
 try:
     new = operation.evaluate(old, qualities=qualities)
-except (EvaluationError, ArithmeticError, TypeError) as error:
+except EvaluationError as error:
     raise InvalidOperationError("%r failed: %s" % (operation, error)) from error
 return qualities.set(operation.quality, new), QualityChanged(operation.quality, old, new)
 ```
@@ -134,8 +145,8 @@ Each row runs `OperationParser().parse(src).evaluate(qualities.get(subject), qua
 | X = 5 | `X = 20 max 8` | X = 8 (`=` clamps too) |
 | — | `X -= 3 min -2` | X = -2 |
 | Name = "Hi" | `X = Name max 3` | `ConstraintError` from `Operation.evaluate`; `InvalidOperationError` from the engine |
-| — | `X = 100 / Bonus` | `ZeroDivisionError` from `Operation.evaluate` (unset reads 0); `InvalidOperationError` from the engine, `__cause__` the `ZeroDivisionError` (RT-1) |
-| Name = "a" | `X = Name + 1` | `TypeError` from `Operation.evaluate`; `InvalidOperationError` from the engine (RT-1) |
+| — | `X = 100 / Bonus` | `EvaluationError` (cause `ZeroDivisionError`) from `Operation.evaluate` (unset reads 0); `InvalidOperationError` from the engine, chain `InvalidOperationError` → `EvaluationError` → `ZeroDivisionError` (RT-1, RT-13) |
+| Name = "a" | `X = Name + 1` | `EvaluationError` (cause `TypeError`) from `Operation.evaluate`; `InvalidOperationError` from the engine (RT-1, RT-13) |
 | Has-Key = 5 | `X = Has-Key` | X = 0 (`Has` minus `Key`, both unset; RT-3) |
 | Has-Key = 5 | `X = [Has-Key]` | X = 5 |
 | Name = "Wearing Cloak" | comparison `Name == "Wearing Cloak"` | True |
@@ -157,3 +168,7 @@ Through the engine:
   continues, nothing logged (was: raw `ZeroDivisionError` out of `choose`; RT-10).
 - `X = 100 / Bonus` in a choice's `effect:` → `choose` raises `InvalidOperationError`; a
   `GameSession` holding that game keeps its previous state (RT-1).
+- A top-level `when: X > 10 / Y` (Y unset) guarding a one-rulebook story's only situation →
+  `start` returns `Halted("", True)` with status `HALTED`, not an exception (RT-14).
+- A `QualityLookup` stub whose `get` raises `TypeError` → `Comparison.check` raises `TypeError`
+  and `Operation.evaluate` raises `TypeError` (not `False`, not `InvalidOperationError`; RT-13).

@@ -104,7 +104,7 @@ _GATE: passed before Phase 0; re-checked after Phase 1 (below)._
 | Compiled rulebook: `value` | `types.VALUE` is now a singleton instance, not a class | None: the class form crashed at run time. Equality with `types.VALUE` still holds. |
 | Operation semantics | `min`/`max` now clamp | None: the spec always said so (FR-008). |
 | `ravel.engine` errors | `start`/`choose` can raise the new `InvalidOperationError(EngineError)`, for a `ConstraintError` **and** for a `ZeroDivisionError`/`OverflowError`/`TypeError` from an operation's arithmetic (red-team RT-1) | Let `ConstraintError` escape unwrapped: engine callers would need a second `except`. Let arithmetic errors escape raw (PD-08 as first planned): `X = 100 / Bonus` with `Bonus` unset now divides by zero from ordinary story text, and a raw `ZeroDivisionError` bypasses `GameSession`'s `EngineError` handling. |
-| Condition evaluation failures | A comparison (a `when:` predicate or a `{…}` line prefix) whose evaluation raises `TypeError`, `ArithmeticError` or `EvaluationError` is false, silently: defined behavior ("a condition that cannot be evaluated is false"), with no log call. The catch lives in `Comparison.check`/`__call__`. Today only `query_predicates`' unset-subject branch catches `TypeError`, also silently; a set subject or a `{…}` prefix crashes (red-team RT-2, RT-10; logging revised in red-team outer iteration 2) | (a) Raise a typed `EngineError` instead: every query on that state would raise, so a save sitting in that state would never play again (US4's stateless resume). (b) Log each failure at `WARNING` (red-team pass 1's choice): with no logging configured by the embedding host, Python's last-resort handler prints `WARNING` records to stderr, so the domain core would write to stderr on its own, against the I/O-free engine goal and Principle VII (outward only through plain output values). (c) A new output type for it: the spec fixes the engine at seven output types. |
+| Condition evaluation failures | A comparison (a `when:` predicate or a `{…}` line prefix) whose evaluation raises `EvaluationError` (which wraps an operator's `TypeError`/`ArithmeticError`; RT-13) is false, silently: defined behavior ("a condition that cannot be evaluated is false"), with no log call. The catch lives in `Comparison.check`/`__call__`. Today only `query_predicates`' unset-subject branch catches `TypeError`, also silently; a set subject or a `{…}` prefix crashes (red-team RT-2, RT-10; logging revised in red-team outer iteration 2) | (a) Raise a typed `EngineError` instead: every query on that state would raise, so a save sitting in that state would never play again (US4's stateless resume). (b) Log each failure at `WARNING` (red-team pass 1's choice): with no logging configured by the embedding host, Python's last-resort handler prints `WARNING` records to stderr, so the domain core would write to stderr on its own, against the I/O-free engine goal and Principle VII (outward only through plain output values). (c) A new output type for it: the spec fixes the engine at seven output types. |
 
 Unchanged: `Loader` (`BaseLoader.load`/`get_source`), the compiled rulebook's dict shape, `Source`/
 `Pos`, `start`/`choose`/`present`/`resume` signatures, output and state types, `GameSession`, save
@@ -196,6 +196,7 @@ tests/
 ├── test_compiler_concepts.py    # its bare Environment() (line 29) passes a loader
 ├── test_environment.py      # required loader, cycles
 ├── test_loader.py           # MemoryLoader
+├── helpers.py               # strict_conditions fixture: raising-path conditions for story tests (RT-15)
 ├── spec_examples.py         # new helper: extract_examples / run_example (PD-16)
 ├── test_spec_examples.py    # new (PD-16)
 ├── conftest.py              # Environment() callers pass a loader (the `Environment()` fixture at
@@ -299,13 +300,15 @@ FR-004 makes an unset quality read 0 and lets a string-valued quality appear in 
 literals; references change that, so this pass amends PD-08 at the two existing choke points,
 adding no new per-failure error type:
 
-- **Operations (RT-1).** `_apply_operation` catches `(EvaluationError, ArithmeticError, TypeError)`
-  and raises `InvalidOperationError("%r failed: %s" % (operation, error))`, chaining the cause
+- **Operations (RT-1, narrowed by RT-13).** `_apply_operation` catches `EvaluationError` (which
+  now wraps an operator's `ArithmeticError`/`TypeError`, see RT-13) and raises
+  `InvalidOperationError("%r failed: %s" % (operation, error))`, chaining the cause
   (`Operation` has no source text, so the message uses its attrs `repr`). `ArithmeticError`
   covers `ZeroDivisionError` and `OverflowError` (`1e308 * 10` stays `inf`, which `Qualities.set`
   already rejects with `InvalidQualityValueError`). Tests: US1 acceptance adds `X = 100 / Bonus`
-  with Bonus unset → `InvalidOperationError` whose `__cause__` is a `ZeroDivisionError`, and
-  `X = Name + 1` with `Name = "a"` → `InvalidOperationError` from `TypeError`; a `GameSession`
+  with Bonus unset → `InvalidOperationError` whose `__cause__` is an `EvaluationError` whose
+  `__cause__` is a `ZeroDivisionError`, and `X = Name + 1` with `Name = "a"` →
+  `InvalidOperationError` → `EvaluationError` → `TypeError`; a `GameSession`
   test shows the session's state is untouched after either.
 - **Conditions (RT-2, placed by RT-10).** A comparison is evaluated from three sites, not one:
   `when:` predicates in `query_predicates` (both the set-subject branch and the unset-subject
@@ -313,7 +316,7 @@ adding no new per-failure error type:
   covered only the first; `{X > 10 / Y}Low.` would still raise a raw `ZeroDivisionError` out of
   `choose`. So the soft failure lives in `Comparison` itself, the one type all three sites call:
   `Comparison.check(qualities)` and `Comparison.__call__(qvalue, *, qualities)` catch
-  `(TypeError, ArithmeticError, EvaluationError)` and return `False`, with no log call:
+  `EvaluationError` (RT-13) and return `False`, with no log call:
   "a condition that cannot be evaluated is false" is defined behavior, extending the silent
   `matched = False` that `query_predicates` already applies to an unset subject's `TypeError`
   (`queries.py:30-33`). `types.py` gains no logger and no `logging` import. `Comparison.evaluate`
@@ -327,8 +330,9 @@ adding no new per-failure error type:
   failing `{…}` prefix hides its line). Tests: `when: X > 10 / Y` with X set and Y unset → the rule
   doesn't match and the other rules still do; `when: X > Name` with `Name = "a"` → no match, where
   today it raises; `{Health > 10 / Y}Hidden.` with Y unset → the line isn't shown and play
-  continues; and `Comparison(...).evaluate(...)` on each of those comparisons raises the underlying
-  `ZeroDivisionError`/`TypeError`. No `caplog` assertion: nothing is logged.
+  continues; and `Comparison(...).evaluate(...)` on each of those comparisons raises
+  `EvaluationError` chaining the underlying `ZeroDivisionError`/`TypeError`. No `caplog`
+  assertion: nothing is logged.
 - **Test discipline.** Because `TypeError` is now wrapped, a future bug of the old
   `VALUE`-class kind would surface as `InvalidOperationError`, not as a crash. US1 and US2
   acceptance tests assert computed *values* (and kinds), never just "no exception raised".
@@ -366,8 +370,15 @@ so authors see it through documentation and tooling, not a log line:
 - **Documented semantics.** VM spec §6 and language spec §6.3 each get one sentence: "A condition
   that cannot be evaluated (for example `X > 10 / Y` with `Y` unset, or `X > Name` with `Name` a
   string) is false." Written as defined behavior, next to the existing "an unset quality reads 0".
+  Plus RT-14's dead-end sentence.
+- **Prose only, never a fenced example.** §6 is in the US6 extractor's scope, and RT-11 runs its
+  comparisons on the raising path, so a fenced `X > 10 / Y → false` or a `when:` item holding it
+  would fail a statement that is true by definition. These sentences use inline backticks only;
+  contracts/spec-examples.md says so. The soft behavior is pinned by the RT-2/RT-10/RT-14 tests,
+  not by US6. (Teaching the extractor to accept errors would reopen RT-11's hole.)
 - **Raising path for checking.** `Comparison.evaluate` still raises, so the spec-examples runner
   (RT-11) and unit tests catch a comparison that can't evaluate.
+- **Checked in the test suite.** Shipped stories play on the raising path in tests (RT-15).
 - **Debug trace.** `ravel --debug run` (`cli.main` sets `DEBUG`) already shows `query_predicates`'
   existing `ravel.query` `DEBUG` lines: "Checking query …" before a set subject's predicate and
   "Could not match rule …" for an unset one, so a `when:` that never matches is traceable. A
@@ -381,6 +392,63 @@ RT-10 makes `Comparison.check`/`__call__` return `False` on an evaluation error.
 would then pass a spec comparison example that can't evaluate (`X > "a"` against 0) as "checked
 without raising". contracts/spec-examples.md pins `run_example` to `Comparison.evaluate`, which
 still raises, for both comparison items and comparison result lines.
+
+### Catch only evaluation failures, not programming errors (RT-13)
+
+Catching `TypeError` around a whole `evaluate` call (pass 1's shape) also catches the `TypeError`s
+that mean a *bug*: a term type whose `evaluate` lacks the `qualities` keyword, a mis-threaded
+keyword through `evaluate_term`, a `QualityLookup` whose `get` has the wrong arity. Under RT-10's
+silent `False`, such a bug makes every affected condition quietly false, every rule a non-match
+and the game a dead end (RT-14), and the RT-2 negative tests ("the rule doesn't match") pass
+vacuously. So the catch moves down to the one place a *story* can cause the failure: applying an
+operator to two values.
+
+- `Expression.evaluate` (its `+ - * / // %`), `Operation.evaluate` (its setter, `+=` … `%=`) and
+  `Comparison.evaluate` (its comparator) wrap only the `operator(left, right)` call:
+  `except (TypeError, ArithmeticError) as error: raise EvaluationError("%r: %s" % (self, error))
+  from error`. Evaluating the operands stays outside the `try`.
+- Every catch above that is then `except EvaluationError` only: `Comparison.check`/`__call__`
+  (soft, `False`) and `_apply_operation` (loud, `InvalidOperationError`). `ConstraintError` is
+  already an `EvaluationError`. No new error type: `EvaluationError` is this feature's existing
+  base.
+- A `TypeError` from anything else propagates unwrapped out of `check`, `query` and `choose`.
+  Test: `Comparison.check` with a `QualityLookup` stub whose `get` raises `TypeError` raises
+  `TypeError`; the same stub through `Operation.evaluate` raises `TypeError`, not
+  `InvalidOperationError`.
+- `Comparison.evaluate` raises `EvaluationError` (cause chained), so RT-11's raising path still
+  reports the underlying `ZeroDivisionError`/`TypeError` through `__cause__`.
+
+### Unevaluable conditions can reach a dead end (RT-14)
+
+`_Run.query` halts with `Outcome("", dead_end=True)` when no rule matches. A top-level `when:`
+becomes a common predicate on every rule in its file, so one unevaluable common predicate (`when:
+X > 10 / Y`, Y unset) makes every rule in that file a non-match; if no other file has a match, the
+game emits `Halted("", True)`, the same output as an authored dead end, and the save is `HALTED`
+for good (`resume` restores a halted save as-is). Complementary conditions no longer partition
+either: `X > E` and `X <= E` are both false when `E` can't be evaluated, and a failing
+most-specific rule silently yields to a less specific one. No code change (still no new output
+type), but it's made explicit:
+
+- RT-12's documented-semantics sentence gains: "So `X > E` and `X <= E` can both be false, and a
+  story whose conditions all fail reaches a dead end." (language spec §6.3, VM spec §6).
+- A test in `test_queries.py` or the US1 acceptance file: a one-rulebook story whose top-level
+  `when: X > 10 / Y` guards its only situation → `start` returns `Halted("", True)` and status
+  `HALTED`, not an exception.
+
+### Shipped stories are checked on the raising path (RT-15)
+
+Silent `False` means a broken condition in `examples/cloak`, `examples/taxi` or
+`tests/fixtures/stories/*` changes which situations are offered without failing anything; 001's
+end-to-end test only notices if the ending changes. The runtime stays silent (Principle VII), but
+the test suite doesn't have to be:
+
+- `tests/helpers.py` gains a `strict_conditions` fixture that monkeypatches `Comparison.check` and
+  `Comparison.__call__` to call `evaluate` directly (the raising path, like RT-11). No production
+  code, no logging, no new flag.
+- 001's `tests/acceptance/test_us06_end_to_end.py`, US4's determinism property test and the taxi
+  and fixture-story play tests use it, so any condition in a shipped story that can't evaluate on
+  the paths they play fails the build with the underlying error.
+- The RT-2/RT-10/RT-14 soft-failure tests don't use it; they pin the silent behavior.
 
 ### Kind-sensitive assertions (RT-6)
 

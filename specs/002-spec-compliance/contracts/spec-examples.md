@@ -60,6 +60,12 @@ pass silently. Result lines that end in a comparison use the same raising call.
 4. Everything else (prose, text directives, keys, comments, blank lines) is ignored. A trailing
    ` # comment` on a YAML line is stripped before parsing.
 
+**Unevaluable-condition examples are prose only (RT-12, RT-14).** The v0.2 sentences stating that
+a condition which cannot be evaluated is false (`X > 10 / Y` with `Y` unset) are written with
+inline backticks, never inside a fenced block in a scoped section: on the raising path they would
+fail. The extractor does not grow an "expect an error" form; the soft behavior is pinned by
+`tests/test_types.py`/`tests/test_queries.py` and the US1 acceptance tests instead.
+
 A bare list item with no enclosing `given:`/`effect:`/`when:` key is ignored, because it can't be
 told apart from a text directive. So the v0.2 spec nests §6.2's comparison list under `when:` (a
 one-line edit) instead of the extractor guessing from the section number.

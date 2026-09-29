@@ -65,7 +65,8 @@ clamped result takes the bound's kind when the bound wins.
 
 1. `current = 0 if initial_value is None else initial_value`
 2. `rhs = evaluate_term(expression, qualities=qualities, qvalue=current)`
-3. `result = operator(current, rhs)`
+3. `result = operator(current, rhs)`, with a `TypeError`/`ArithmeticError` from that call
+   re-raised as `EvaluationError` (RT-13)
 4. `return constraint.apply(result) if constraint else result`
 
 `Operation.get_expression` (a dead stub returning `None`) is deleted.
@@ -82,17 +83,18 @@ fallback in `queries.py`) keeps working.
 
 | Error | Module | Base | Raised when |
 |---|---|---|---|
-| `EvaluationError` | `ravel.exceptions` | `ValueError` | base for run-time expression failures this feature defines |
+| `EvaluationError` | `ravel.exceptions` | `ValueError` | base for run-time expression failures; also raised `from` an operator's `TypeError`/`ArithmeticError` in `Expression`/`Operation`/`Comparison.evaluate` (RT-13) |
 | `ConstraintError` | `ravel.exceptions` | `EvaluationError` | a constraint meets a non-numeric result |
-| `InvalidOperationError` | `ravel.engine.errors` | `EngineError` | `_apply_operation` caught an `EvaluationError`, `ArithmeticError` or `TypeError` from an operation (chained as `__cause__`; RT-1) |
+| `InvalidOperationError` | `ravel.engine.errors` | `EngineError` | `_apply_operation` caught an `EvaluationError` from an operation (chained as `__cause__`; RT-1, RT-13). Other exceptions propagate |
 | `OperationParseError` | `ravel.exceptions` | `ParseError` | *existing*; now also for a constraint on a string literal (`X = "a" max 3`) |
 
 `ravel.exceptions` imports `Source` from `syml.basetypes` instead of `ravel.types` so `types.py`
 can import `ConstraintError` without a cycle.
 
 **Condition failures are false (RT-2, RT-10).** `Comparison.check`/`Comparison.__call__` return
-`False`, with no log call, when evaluation raises `TypeError`, `ArithmeticError` or
-`EvaluationError`: a condition that cannot be evaluated is false (defined behavior).
+`False`, with no log call, when evaluation raises `EvaluationError` (an operator's
+`TypeError`/`ArithmeticError` arrives wrapped in one; RT-13): a condition that cannot be evaluated
+is false (defined behavior). Any other exception is a bug and propagates.
 `Comparison.evaluate` still raises. So a failing `when:` predicate is a
 non-match (both `query_predicates` branches) and a failing `{…}` prefix hides its line; nothing is
 raised to the engine. Operations, by contrast, raise `InvalidOperationError`.
