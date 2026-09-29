@@ -14,7 +14,7 @@ import click
 
 from ravel.adapters.save_store import FileSaveStore
 from ravel.adapters.story_source import FileSystemStorySource
-from ravel.app.saves import LoadRefusedError
+from ravel.app.saves import LoadRefusedError, SaveTooLargeError
 from ravel.app.session import DEFAULT_SAVE_NAME, GameSession
 from ravel.engine.outputs import (
     ChoiceOption,
@@ -73,9 +73,15 @@ def handle_exception(exc: BaseException, *, debug: bool) -> None:
     sys.exit(1)
 
 
-def _escape_outcome(outcome: str) -> str:
-    """Escape any non-printable character in ``outcome`` the way ``repr()`` would."""
-    return "".join(character if character.isprintable() else repr(character)[1:-1] for character in outcome)
+def _escape_control_characters(text: str) -> str:
+    """Make every non-printable character in ``text`` visible the way ``repr()`` would (``\\x1b``).
+
+    Newline and tab pass through, so multi-line story text keeps its shape. Story text is
+    untrusted: raw ESC or BEL would otherwise reach the terminal as live escape sequences.
+    """
+    return "".join(
+        character if character in "\n\t" or character.isprintable() else repr(character)[1:-1] for character in text
+    )
 
 
 class ConsoleUI:
@@ -92,8 +98,12 @@ class ConsoleUI:
         self.session = session
         self.verbose = verbose
         self.read_line = read_line
-        self.echo = echo
+        self._raw_echo = echo
         self._offered: tuple[ChoiceOption, ...] = ()
+
+    def _out(self, text: str) -> None:
+        """Echo ``text`` with control characters escaped; the one path to the terminal."""
+        self._raw_echo(_escape_control_characters(text))
 
     def render(self, outputs: Sequence[Output]) -> None:
         """Render ``outputs`` in order, tracking the most recently offered menu."""
@@ -104,42 +114,41 @@ class ConsoleUI:
 
     def _render_one(self, output: Output) -> None:
         if isinstance(output, TextShown):
-            self.echo(textwrap.fill(output.text))
-            self.echo("")
+            self._out(textwrap.fill(output.text))
+            self._out("")
         elif isinstance(output, ChoicesOffered):
             for index, choice in enumerate(output.choices, start=1):
-                self.echo("%d: %s" % (index, choice.label))
+                self._out("%d: %s" % (index, choice.label))
         elif isinstance(output, QualityChanged):
             if self.verbose:
-                self.echo("## %s was %r, now %r" % (output.name, output.old, output.new))
+                self._out("## %s was %r, now %r" % (output.name, output.old, output.new))
         elif isinstance(output, SituationEntered):
             if self.verbose:
-                self.echo("## Entering %s" % output.location)
+                self._out("## Entering %s" % output.location)
         elif isinstance(output, SituationExited):
             if self.verbose:
-                self.echo("## Exiting %s" % output.location)
+                self._out("## Exiting %s" % output.location)
         elif isinstance(output, Halted):
             if output.dead_end:
-                self.echo("*** The story has nowhere left to go. ***")
+                self._out("*** The story has nowhere left to go. ***")
             else:
-                outcome = _escape_outcome(output.outcome)
-                if outcome:
-                    self.echo("*** The End (outcome: %s) ***" % outcome)
+                if output.outcome:
+                    self._out("*** The End (outcome: %s) ***" % output.outcome)
                 else:
-                    self.echo("*** The End ***")
+                    self._out("*** The End ***")
         else:
             # ``Output`` is a closed union and the six branches above cover every other member,
             # so this is always a ``StoryChanged`` -- an ``else`` (not another ``elif``) keeps
             # that exhaustiveness from leaving a permanently-untaken branch for coverage to flag.
             assert isinstance(output, StoryChanged)
-            self.echo("The story has changed since this save; resuming at %s." % self._place_after_resume())
+            self._out("The story has changed since this save; resuming at %s." % self._place_after_resume())
 
     def _place_after_resume(self) -> str:
         stack = self.session.state.stack
         if not stack:
             return "the top level"
         location = stack[-1].location
-        return get_text(self.session.story.situation(location).intro)
+        return str(get_text(self.session.story.situation(location).intro))
 
     def _is_halted(self) -> bool:
         return self.session.state.status is Status.HALTED
@@ -152,7 +161,7 @@ class ConsoleUI:
             try:
                 line = self.read_line(PROMPT)
             except EOFError, KeyboardInterrupt:
-                self.echo("")
+                self._out("")
                 return
             parts = line.strip().split(None, 1)
             word = parts[0] if parts else ""
@@ -178,17 +187,17 @@ class ConsoleUI:
                 continue
             if command == "q":
                 return
-            self.echo("I'm sorry, what?")
+            self._out("I'm sorry, what?")
 
     def _choose(self, number: int) -> bool:
         """Choose option ``number``; returns whether the game is now halted."""
         if not (1 <= number <= len(self._offered)):
-            self.echo("That's not an option.")
+            self._out("That's not an option.")
             return False
         location = self._offered[number - 1].location
         outputs = self.session.choose(location)
-        self.echo("")
-        self.echo(SEPARATOR)
+        self._out("")
+        self._out(SEPARATOR)
         self.render(outputs)
         return self._is_halted()
 
@@ -196,10 +205,10 @@ class ConsoleUI:
         name = filename or DEFAULT_SAVE_NAME
         try:
             path = self.session.save(name)
-        except OSError as error:
-            self.echo("Could not save: %s" % error)
+        except (OSError, SaveTooLargeError) as error:
+            self._out("Could not save: %s" % error)
             return
-        self.echo("Saved to %s." % path)
+        self._out("Saved to %s." % path)
 
     def _load(self, filename: str) -> bool:
         """Load ``filename``; returns whether the game is now halted."""
@@ -207,7 +216,7 @@ class ConsoleUI:
         try:
             outputs = self.session.load(name)
         except LoadRefusedError as error:
-            self.echo("Could not load: %s" % error)
+            self._out("Could not load: %s" % error)
             return False
         self.render(outputs)
         return self._is_halted()
@@ -215,11 +224,11 @@ class ConsoleUI:
     def _show_qualities(self) -> None:
         qualities = self.session.state.qualities.as_dict()
         for name in sorted(qualities):
-            self.echo("%r = %r" % (name, qualities[name]))
+            self._out("%r = %r" % (name, qualities[name]))
 
     def _show_help(self) -> None:
         for line in HELP_TEXT:
-            self.echo(line)
+            self._out(line)
 
 
 @main.command()

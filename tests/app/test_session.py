@@ -9,19 +9,25 @@ import shutil
 from pathlib import Path
 
 import pytest
+from attrs import evolve
 
+from ravel import types
 from ravel.adapters.story_source import FileSystemStorySource
 from ravel.app.saves import (
     NoGameError,
     SaveCorruptError,
     SaveNotFoundError,
+    SaveTooLargeError,
     SaveUnreadableError,
     encode_save,
 )
 from ravel.app.session import DEFAULT_SAVE_NAME, GameSession
-from ravel.engine.errors import NotOfferedError
+from ravel.engine.errors import InvalidOperationError, NotOfferedError
 from ravel.engine.outputs import ChoiceOption, ChoicesOffered, Halted, StoryChanged
 from ravel.engine.state import Status
+from ravel.engine.story import Story
+
+pytestmark = pytest.mark.usefixtures("strict_conditions")
 
 
 class FakeSaveStore:
@@ -152,6 +158,21 @@ class TestSave:
         assert path == "<memory>/mid.json"
         assert store.files["mid.json"] == encode_save(cloak, session.state)
 
+    def test_an_oversize_save_propagates_save_too_large_and_never_touches_the_store(self, cloak):
+        store = FakeSaveStore()
+        session = GameSession(cloak, store)
+        session.new_game()
+        qualities = session.state.qualities
+        for index in range(17):
+            qualities = qualities.set("q%d" % index, "x" * 64_000)
+        state = session.state
+        session._state = evolve(state, qualities=qualities)
+
+        with pytest.raises(SaveTooLargeError):
+            session.save("big.json")
+
+        assert store.files == {}
+
     def test_it_defaults_to_the_default_save_name(self, cloak):
         store = FakeSaveStore()
         session = GameSession(cloak, store)
@@ -275,3 +296,30 @@ class TestLoad:
         assert loaded.state.stack == ()
         # A successful (degraded) load still assigns state -- this is not a refusal.
         assert loaded.state.qualities.get("Location") == "Intro"
+
+
+class TestChooseInvalidOperation:
+    def test_an_invalid_operation_leaves_the_session_state_unchanged(self):
+        rulebook: types.CompiledRulebook = {
+            "metadata": {},
+            "rulebook": {
+                "Situation": {
+                    "rules": [types.Rule("s", [])],
+                    "locations": {
+                        "s": types.Situation(
+                            intro=types.Text("S"),
+                            directives=[types.Operation("X", "=", types.Expression(10, "/", types.QualityRef("Zero")))],
+                        )
+                    },
+                }
+            },
+            "givens": [],
+        }
+        session = GameSession(Story(rulebook=rulebook), FakeSaveStore())
+        session.new_game()
+        state_before = session.state
+
+        with pytest.raises(InvalidOperationError):
+            session.choose("s")
+
+        assert session.state == state_before

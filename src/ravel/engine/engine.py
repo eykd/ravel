@@ -6,7 +6,13 @@ from typing import Any
 from attrs import define, evolve, field
 
 from ravel import queries, types
-from ravel.engine.errors import GameOverError, InvalidStateError, NotOfferedError, NotWaitingError
+from ravel.engine.errors import (
+    GameOverError,
+    InvalidOperationError,
+    InvalidStateError,
+    NotOfferedError,
+    NotWaitingError,
+)
 from ravel.engine.outputs import (
     ChoiceOption,
     ChoicesOffered,
@@ -21,6 +27,7 @@ from ravel.engine.outputs import (
 )
 from ravel.engine.state import ChoiceBlock, Frame, GameState, LocationId, Outcome, Qualities, SavedGame, Status
 from ravel.engine.story import Story
+from ravel.exceptions import EvaluationError
 from ravel.utils.strings import get_text
 
 
@@ -51,11 +58,16 @@ def choice_blocks(situation: types.Situation) -> tuple[ChoiceBlock, ...]:
 def _apply_operation(qualities: Qualities, operation: types.Operation) -> tuple[Qualities, QualityChanged]:
     """Apply ``operation`` to ``qualities``; the one choke point every quality change passes through.
 
-    ``Qualities.set`` validates the result, raising ``InvalidQualityValueError`` for a value outside
-    the storable domain. ``min``/``max`` constraints are not applied (an inherited gap).
+    ``Operation.evaluate`` computes the new value and applies any ``min``/``max`` constraint, clamping
+    the result. An ``EvaluationError`` (including ``ConstraintError``) is re-raised as
+    ``InvalidOperationError``. ``Qualities.set`` then validates the result, raising
+    ``InvalidQualityValueError`` for a value outside the storable domain. These are the two errors raised.
     """
     old = qualities.get(operation.quality)
-    new = operation.evaluate(old, qualities=qualities)
+    try:
+        new = operation.evaluate(old, qualities=qualities)
+    except EvaluationError as error:
+        raise InvalidOperationError("%r failed: %s" % (operation, error)) from error
     return qualities.set(operation.quality, new), QualityChanged(operation.quality, old, new)
 
 

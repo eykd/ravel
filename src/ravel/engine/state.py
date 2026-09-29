@@ -9,8 +9,8 @@ from typing import Final
 from attrs import frozen
 
 from ravel.engine.errors import InvalidQualityValueError
+from ravel.types import MAX_STRING_LENGTH, QualityValue
 
-type QualityValue = int | float | str
 type LocationId = str
 
 QUALITY_TYPES: Final = (int, float, str)
@@ -34,7 +34,23 @@ def _is_storable(value: object) -> bool:
         return value in INT_QUALITY_RANGE
     if isinstance(value, float):
         return math.isfinite(value)
-    return is_surrogate_free(value)
+    return len(value) <= MAX_STRING_LENGTH and is_surrogate_free(value)
+
+
+_PREVIEW_LENGTH: Final = 40
+
+
+def _describe_value(value: object) -> str:
+    """Describe ``value`` in bounded space; never ``repr`` a value of unbounded size."""
+    if isinstance(value, bool):
+        return repr(value)
+    if isinstance(value, int):
+        return "int of %d bits" % value.bit_length()
+    if isinstance(value, str):
+        return "str of length %d starting %r" % (len(value), value[:_PREVIEW_LENGTH])
+    if isinstance(value, float):
+        return repr(value)
+    return "a %s" % type(value).__name__
 
 
 def _validate_quality(name: str, value: object) -> None:
@@ -42,7 +58,9 @@ def _validate_quality(name: str, value: object) -> None:
     if not is_surrogate_free(name):
         raise InvalidQualityValueError("Quality name %r holds a lone surrogate" % name)
     if not _is_storable(value):
-        raise InvalidQualityValueError("Quality %r has an unstorable value %r" % (name, value))
+        raise InvalidQualityValueError(
+            "Quality %r has an unstorable value: %s" % (name[:_PREVIEW_LENGTH], _describe_value(value))
+        )
 
 
 @frozen

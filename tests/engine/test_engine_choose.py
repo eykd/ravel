@@ -6,7 +6,14 @@ import pytest
 
 from ravel import types
 from ravel.engine.engine import choose, start
-from ravel.engine.errors import GameOverError, InvalidStateError, NotOfferedError, NotWaitingError
+from ravel.engine.errors import (
+    EngineError,
+    GameOverError,
+    InvalidOperationError,
+    InvalidStateError,
+    NotOfferedError,
+    NotWaitingError,
+)
 from ravel.engine.outputs import (
     ChoiceOption,
     ChoicesOffered,
@@ -18,7 +25,8 @@ from ravel.engine.outputs import (
 from ravel.engine.state import Frame, GameState, Outcome, Qualities, Status
 from ravel.engine.story import Story
 from ravel.environments import Environment
-from ravel.loaders import FileSystemLoader
+from ravel.exceptions import ConstraintError, EvaluationError
+from ravel.loaders import FileSystemLoader, MemoryLoader
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stories"
 
@@ -249,3 +257,102 @@ def test_choice_block_without_get_choice_raises_invalid_state():
 
     with pytest.raises(InvalidStateError):
         choose(story, waiting(("s",)), "s")
+
+
+# --- Unevaluable operations (RT-1, RT-2) ---------------------------------------------------
+
+
+def test_effect_dividing_by_an_unset_quality_raises_invalid_operation():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.Expression(10, "/", types.QualityRef("Zero")))],
+    )
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        choose(story, waiting(("s",)), "s")
+
+    assert isinstance(excinfo.value, EngineError)
+    assert isinstance(excinfo.value.__cause__, EvaluationError)
+    assert isinstance(excinfo.value.__cause__.__cause__, ZeroDivisionError)
+
+
+def test_effect_adding_a_number_to_a_string_quality_raises_invalid_operation():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.Expression(types.QualityRef("Name"), "+", 1))],
+    )
+    state = waiting(("s",), qualities=Qualities().set("Name", "a"))
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        choose(story, state, "s")
+
+    assert isinstance(excinfo.value.__cause__, EvaluationError)
+    assert isinstance(excinfo.value.__cause__.__cause__, TypeError)
+
+
+def test_effect_reading_a_set_quality_stores_the_computed_value():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.Expression(types.QualityRef("Base"), "+", 1))],
+    )
+    state = waiting(("s",), qualities=Qualities().set("Base", 4))
+
+    step = choose(story, state, "s")
+
+    assert step.state.qualities.get("X") == 5
+
+
+def test_text_prefix_that_cannot_evaluate_hides_its_line_and_play_continues():
+    unevaluable = types.Comparison("Name", "==", types.Expression(1, "/", types.QualityRef("Zero")))
+    story = hand_built_story(
+        [
+            types.Text("hidden", predicate=types.Predicate("p", unevaluable)),
+            types.Text("shown"),
+        ],
+    )
+
+    step = choose(story, waiting(("s",)), "s")
+
+    assert TextShown("hidden", False) not in step.outputs
+    assert TextShown("shown", False) in step.outputs
+
+
+def test_effect_constraint_on_a_string_result_raises_invalid_operation_from_constraint_error():
+    story = hand_built_story(
+        [types.Operation("X", "=", types.QualityRef("Name"), types.Constraint("max", 3))],
+    )
+    state = waiting(("s",), qualities=Qualities().set("Name", "Hi"))
+
+    with pytest.raises(InvalidOperationError) as excinfo:
+        choose(story, state, "s")
+
+    assert isinstance(excinfo.value.__cause__, ConstraintError)
+
+
+def _play_go_choice(*items):
+    """Load an intro whose ``Go`` choice holds ``items`` and return the outputs of choosing it."""
+    body = "".join("      - %s\n" % item for item in items)
+    source = "intro:\n  - Hello[.] there.\n  - choice:\n      - [Go]You go.\n%s" % body
+    story = Story.from_rulebook(Environment(loader=MemoryLoader({"begin": source})).load())
+    state = start(story).state
+    state = choose(story, state, "begin::intro").state
+    return choose(story, state, "begin::intro::go").outputs
+
+
+def test_text_in_a_choice_shows_after_the_chosen_line_and_before_a_later_effect():
+    outputs = _play_go_choice("text: Extra words.", "effect: X += 1")
+    assert outputs[:4] == (
+        SituationEntered("begin::intro::go"),
+        TextShown("You go."),
+        TextShown("Extra words."),
+        QualityChanged("X", None, 1),
+    )
+    assert outputs[4:6] == (SituationExited("begin::intro::go"), SituationExited("begin::intro"))
+
+
+def test_text_in_a_choice_placed_after_an_effect_sees_that_effect():
+    outputs = _play_go_choice("effect: X += 1", "text: {X == 1}After effect.")
+    assert outputs[:4] == (
+        SituationEntered("begin::intro::go"),
+        TextShown("You go."),
+        QualityChanged("X", None, 1),
+        TextShown("After effect."),
+    )
+    assert outputs[4:6] == (SituationExited("begin::intro::go"), SituationExited("begin::intro"))

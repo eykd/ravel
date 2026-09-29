@@ -39,7 +39,7 @@ def get_text(text_or_source):
     elif isinstance(text_or_source, str):
         return text_or_source
     else:
-        raise exceptions.ParseError("No text found, instead: %r" % text_or_source)
+        raise exceptions.ParseError("No text found, instead: %s" % exceptions.bounded_repr(text_or_source))
 
 
 def strip_outer_whitespace(text):

@@ -8,13 +8,11 @@ base_expression_grammar = textwrap.dedent(
     bracketed_quality     = ~'\\[[^\\]]+\\]'
 
     expression            = additive
-    additive              = (multiplicative ws? (add / subtract) ws? additive)
-                            / multiplicative
-    multiplicative        = (divisive ws? multiply ws? multiplicative)
-                            / divisive
-    divisive              = (primary ws? (floor_div / divide / modulus) ws? divisive)
-                            / primary
-    primary               = value / (open_paren ws? additive ws? close_paren)
+    additive              = multiplicative (ws? additive_op ws? multiplicative)*
+    multiplicative        = primary (ws? multiplicative_op ws? primary)*
+    additive_op           = add / subtract
+    multiplicative_op     = multiply / floor_div / divide / modulus
+    primary               = term / (open_paren ws? expression ws? close_paren)
 
 
     open_paren            = "("
@@ -51,24 +49,26 @@ base_expression_grammar = textwrap.dedent(
     ws                    = ~"\\s+"
     end                   = ~"\\s*$"
 
-    value                 = number / string / qvalue / bracketed_quality
+    term                  = number / string / qvalue / quality_ref
+    quality_ref           = bracketed_quality / identifier
+    identifier            = ~"(?!(?:value|min|max)\\b)[^\\W\\d]\\w*"
 
-    qvalue                = "value"
+    qvalue                = ~"value\\b"
 
     number                = float / integer
-    float                 = ~"\\d+\\.\\d*"
-    integer               = ~"\\d+"
+    float                 = ~"-?\\d+\\.\\d*"
+    integer               = ~"-?\\d+"
 
     string                = ('"""
     + '"""'
-    + r"""' ~'([^"])+' '"""
+    + r"""' ~'([^"])*' '"""
     + '"""'
     + r"""')
-                            / ("'''" ~"([^'])+" "'''")
-                            / ("```" ~"([^`])+" "```")
-                            / ('"' ~'([^"])+' '"')
-                            / ("'" ~"([^'])+" "'")
-                            / ("`" ~"([^`])+" "`")
+                            / ("'''" ~"([^'])*" "'''")
+                            / ("```" ~"([^`])*" "```")
+                            / ('"' ~'([^"])*' '"')
+                            / ("'" ~"([^'])*" "'")
+                            / ("`" ~"([^`])*" "`")
 """
 )
 
@@ -104,10 +104,12 @@ intro_text_grammar = textwrap.dedent(
 )
 
 
+# A text line is `cmp_prefix? prose`. PlainTextParser does that split itself, matching cmp_prefix against a
+# bounded window so an over-long predicate never reaches the grammar, then parsing the rest with `prose`.
 plain_text_grammar = (
     textwrap.dedent(
         r"""
-    line        = cmp_prefix? text glue?
+    prose       = text glue?
 
     text        = ~"(?:(?!<>).)*"
     glue        = "<>"

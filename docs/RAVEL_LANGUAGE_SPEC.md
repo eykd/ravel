@@ -1,6 +1,6 @@
 # Ravel Language Specification
 
-**Version**: 0.1 (Draft)
+**Version**: 0.2
 **Status**: Working specification derived from implementation analysis
 
 ---
@@ -89,7 +89,7 @@ By convention, the entry rulebook is named `begin.ravel`. The runtime loads this
 
 ### 3.1 `include`
 
-Imports other rulebook files into the current rulebook. Included files are merged, with rules from later includes taking precedence for same-named locations.
+Imports other rulebook files into the current rulebook. Included files are merged into one rulebook.
 
 ```yaml
 include:
@@ -100,8 +100,10 @@ include:
 ```
 
 - File extension (`.ravel`) is implied
-- Include order matters for rule ordering
-- Circular includes are not permitted
+- Includes are loaded breadth-first from the entry rulebook, and each rulebook loads once
+- Circular includes are allowed: a rulebook that is already loaded is not loaded again
+- Include order does not order rules. Matching rules are ranked by score, then by location name,
+  descending (see 11.4); no include takes precedence over another
 
 ### 3.2 `given`
 
@@ -116,7 +118,7 @@ given:
 ```
 
 - Qualities not in `given` default to `0` when first tested
-- Multiple rulebooks can contribute `given` values (later values override)
+- Multiple rulebooks can contribute `given` values; they apply in load order, so later-loaded values win
 - String values must be quoted
 
 ### 3.3 `when`
@@ -164,7 +166,13 @@ Three naming formats are supported:
 - Quoted names use double quotes
 - Bracketed names use square brackets
 - Names are case-sensitive
-- No reserved words
+- In an expression, an identifier or a `[Bracketed Name]` is a quality reference, and a quoted token is always a string. Quoted names remain valid as subjects (the left-hand quality of a comparison or operation).
+- In an expression, a name with punctuation must be bracketed: `[Has-Key]`. `Has-Key` is `Has` minus `Key`.
+- `value`, `min` and `max` are reserved inside expressions only. There are no reserved words in subject position.
+
+```
+Has-Key = 5 ; X = [Has-Key] → 5
+```
 
 ### 4.2 Quality Values
 
@@ -174,7 +182,10 @@ Qualities can hold:
 |------|----------|
 | Integer | `0`, `1`, `42`, `-5` |
 | Float | `3.14`, `0.5`, `-2.7` |
-| String | `"Intro"`, `"Foyer"`, `'hello'` |
+| String | `"Intro"`, `"Foyer"`, `'hello'`, `""` |
+
+A leading `-` is part of a number literal, never a separate operator: `-5` is the integer negative
+five. The empty string `""` is a valid string literal.
 
 **String Quoting Styles:**
 
@@ -201,29 +212,49 @@ effect:
   - Health -= value / 10    # Reduce Health by 10% of itself
 ```
 
+`value` is `0` for a subject that has never been set, and it works in comparisons as well as
+operations (`Score > value`).
+
+```
+X = 10 ; X += value * 2 → 30
+```
+
 ---
 
 ## 5. Expressions
 
 ### 5.1 Arithmetic Expressions
 
-Expressions support standard arithmetic with proper precedence:
+Expressions support standard arithmetic with two precedence tiers. Operators in the same tier are
+left-associative: they evaluate left to right.
 
-| Operator | Meaning | Precedence |
-|----------|---------|------------|
-| `+` | Addition | Low |
-| `-` | Subtraction | Low |
-| `*` | Multiplication | Medium |
-| `/` | Division | Medium |
-| `//` | Floor Division | Medium |
-| `%` | Modulo | Medium |
-| `()` | Grouping | Highest |
+| Operator | Meaning | Precedence | Associativity |
+|----------|---------|------------|---------------|
+| `+` | Addition | Low | Left |
+| `-` | Subtraction | Low | Left |
+| `*` | Multiplication | High | Left |
+| `/` | Division | High | Left |
+| `//` | Floor Division | High | Left |
+| `%` | Modulo | High | Left |
+| `()` | Grouping | Highest | n/a |
+
+`* / // %` share one tier and bind tighter than `+ -`, which share the other. Whitespace is optional
+around arithmetic operators.
+
+Strings take part only in `+` (concatenation) and `=`. Any other operator with a string operand
+(`"ab" * 3`, `"%5d" % 7`, `Name *= 2`) is an evaluation error: false in a condition, an error in an
+effect. There is no string repetition or `%`-formatting.
 
 **Examples:**
 ```
 5 + 3           → 8
 10 - 4 * 2      → 2  (multiplication first)
+10 - 4 - 2        → 4
+8 / 4 / 2         → 1.0
+2 + 3 * 4         → 14
 (10 - 4) * 2    → 12 (parentheses override)
+10 -4           → 6  (subtraction, not a negative literal)
+10 - -4         → 14
 7 // 2          → 3  (floor division)
 7 % 3           → 1  (modulo)
 ```
@@ -232,8 +263,8 @@ Expressions support standard arithmetic with proper precedence:
 
 Expressions can include:
 
-- **Literals**: `42`, `3.14`, `"string"`
-- **Quality references**: `Score`, `"Wearing Cloak"`, `[Health]`
+- **Literals**: `42`, `3.14`, `"string"` (a quoted token is always a string)
+- **Quality references**: `Score`, `[Wearing Cloak]`, `[Health]` (identifiers and bracketed names)
 - **The value keyword**: `value`
 - **Nested expressions**: `(Score + 5) * 2`
 
@@ -259,13 +290,16 @@ Expressions can include:
 Quality comparator Expression
 ```
 
+Whitespace is required around the comparator; it is optional around arithmetic operators in the expression.
+
 **Examples:**
 ```yaml
-- Location = "Foyer"
-- "Wearing Cloak" >= 1
-- Health > 0
-- Score <= 100
-- Visited != 0
+when:
+  - Location = "Foyer"
+  - "Wearing Cloak" >= 1
+  - Health > 0
+  - Score <= 100
+  - Visited != 0
 ```
 
 ### 6.3 Predicates in Rules
@@ -284,6 +318,8 @@ look-around:
 - All predicates in a rule must be TRUE for the rule to match (AND logic)
 - Missing qualities are treated as `0`
 - More predicates = higher specificity score (used for ordering)
+
+A condition that cannot be evaluated (for example `X > 10 / Y` with `Y` unset, or `X > Name` with `Name` a string) is false. So `X > E` and `X <= E` can both be false, and a story whose conditions all fail reaches a dead end.
 
 ---
 
@@ -307,6 +343,8 @@ look-around:
 Quality operator Expression [constraint]
 ```
 
+Whitespace is required around the setter; it is optional around arithmetic operators in the expression.
+
 **Examples:**
 ```yaml
 effect:
@@ -325,12 +363,22 @@ effect:
   - Health -= 10 min 0       # Cannot go below 0
   - Score += 100 max 1000    # Cannot exceed 1000
   - Reputation += 5 min 0    # Clamp at 0
+  - Debt += 1 max -5         # Bounds may be negative
 ```
 
 **Syntax:**
 ```
 Quality operator Expression min N
 Quality operator Expression max N
+```
+
+Each operation takes at most one constraint. The bound `N` is a number literal and may be negative. The
+constraint applies to the result of `=` as well as the compound operators, and in `given` as well as in
+`effect`. A string result is an error, and the clamped value takes the bound's kind (integer or float).
+
+```
+X = 5 ; X -= 10 min 0   → 0
+X = 5 ; X += 10 max 8   → 8
 ```
 
 ---
@@ -361,6 +409,11 @@ The first list item can declare a concept type. Currently supported:
 | `Situation` | Standard narrative situation (default) |
 
 Custom concepts can be registered via the compiler's handler system.
+
+**Detection rule.** The first list item is a concept line if a `when:` item follows it, or if it exactly
+names a registered concept (for example a bare `Situation`). Otherwise it is the rule's intro text and the
+rule is a `Situation`. Trade-off: a one-word intro line that equals a registered concept name is read as
+the concept, not as text.
 
 ### 8.3 Location Names
 
@@ -395,6 +448,8 @@ Simple narrative text:
 - The rain pours down outside.
 ```
 
+A rule's first line uses intro syntax only (no `{cond}` or `<>`).
+
 #### Intro Text (Bracket Syntax)
 
 The first text element in a situation uses special bracket syntax for variant forms:
@@ -410,7 +465,7 @@ This produces two forms:
 **Examples:**
 ```yaml
 - You enter the bar[.]  # Intro: "You enter the bar."
-                        # Tail: "You enter the bar."
+                        # Tail: "You enter the bar"
 
 - The room is dark[!], almost pitch black.
                         # Intro: "The room is dark!"
@@ -438,7 +493,7 @@ Text with a predicate prefix—only displayed if condition is true:
 
 #### Sticky Text (Glue)
 
-The `<>` marker at the end of text indicates it should "glue" to the next text element (no line break):
+The `<>` marker at the end of text indicates it should "glue" to the next text element (no line break). `<>` is only allowed at the end of a line; a `<>` anywhere else in the line (for example `a <> b`) is a parse error:
 
 ```yaml
 - You see a door<>
@@ -464,8 +519,8 @@ Choices present options to the player within a situation:
     - [Choice Text]Description after choosing
     - text: (optional additional text)
     - effect:
-        - operation1
-        - operation2
+        - Gold -= 5
+        - Location = "Bar"
 ```
 
 **Choice Text**: The bracketed text `[...]` appears as the selectable option.
@@ -473,6 +528,10 @@ Choices present options to the player within a situation:
 **Post-Choice Text**: Text after the bracket is displayed when the choice is selected.
 
 **Effects**: Quality modifications that occur when this choice is selected.
+
+The bracketed line must be the choice's first item. The items after the bracketed line run in the
+order written; a `text:` line may carry a `{...}` condition, and one placed after an `effect:` sees
+that effect.
 
 #### Multiple Choices
 
@@ -492,6 +551,8 @@ Multiple `choice:` blocks in sequence create a choice menu:
 - choice:
     - [Stay here]You decide to remain.
 ```
+
+Sibling choices in one menu (adjacent `choice:` blocks) must have distinct labels after slugification (`[Go]` and `[Go!]` both become `go`, and two empty `[]` labels collide too); otherwise the compiler raises a `ParseError` naming both labels and the shared slug, since both entries would lead to the same body. A `choice:` block in a separate menu (split from the first by a non-choice directive such as an `effect:`) may reuse a label: the later block with that label reuses the same slug and its body overrides the earlier one's.
 
 ### 9.3 Effect Directives
 
@@ -538,17 +599,22 @@ quoted_quality  = ~'"[^"]+"'
 bracketed_quality = ~'\[[^\]]+\]'
 
 # Values
-value           = number / string / quality_ref / "value"
+term            = number / string / qvalue / quality_ref
+quality_ref     = bracketed_quality / identifier
+identifier      = ~'(?!(?:value|min|max)\b)[^\W\d]\w*'
+qvalue          = ~'value\b'
 number          = float / integer
 integer         = ~'-?[0-9]+'
-float           = ~'-?[0-9]+\.[0-9]+'
+float           = ~'-?[0-9]+\.[0-9]*'
 string          = '"' ~'[^"]*' '"' / "'" ~"[^']*" "'"
 
 # Expressions
 expression      = additive
-additive        = multiplicative (('+' / '-') multiplicative)*
-multiplicative  = primary (('*' / '/' / '//' / '%') primary)*
-primary         = value / '(' expression ')'
+additive          = multiplicative (ws? additive_op ws? multiplicative)*
+multiplicative    = primary (ws? multiplicative_op ws? primary)*
+additive_op       = '+' / '-'
+multiplicative_op = '*' / '//' / '/' / '%'
+primary           = term / ('(' ws? expression ws? ')')
 
 # Comparisons
 comparison      = quality comparator expression
@@ -557,7 +623,7 @@ comparator      = '>=' / '>' / '<=' / '<' / '!=' / '==' / '='
 # Operations
 operation       = quality setter expression constraint?
 setter          = '+=' / '-=' / '*=' / '//=' / '/=' / '%=' / '='
-constraint      = ('min' / 'max') number
+constraint      = ('min' / 'max') ws number
 
 # Text
 intro_text      = head ('[' suffix ']' tail)?
@@ -671,80 +737,260 @@ The classic IF demonstration game, implemented in Ravel:
 ```yaml
 include:
   - foyer
-  - cloakroom
-  - bar-dark
-  - bar-light
 
 given:
   - Location = "Intro"
   - "Wearing Cloak" = 1
-  - Fumbled = 0
 
 when:
   - Location = "Intro"
 
 intro:
-  - Hurrying through the rainswept November night[…], you're glad to see
-    the bright lights of the Opera House.
 
-  - {"Wearing Cloak" == 0}The rain drenches you. Boy, you sure do wish
-    you'd worn your opera cloak.
+  - Hurrying through the rainswept November night[…], you're glad to see the bright
+    lights of the Opera House. It's surprising that there aren't more people about
+    but, hey, what do you expect in a cheap demo game…?
+
+  - {"Wearing Cloak" == 0}The rain drenches you. Boy, you sure do wish you'd
+    worn your opera cloak.
 
   - choice:
-      - [Press onward!]You press onward to the entrance.
+
+      - [Press onward!]You press onward, until you reach the double doors and let
+        yourself in.
+
       - effect:
           - Location = "Foyer"
 ```
 
 ### foyer.ravel
 ```yaml
+include:
+  - cloakroom
+  - bar-dark
+  - bar-light
+
 when:
   - Location = "Foyer"
 
+
 foyer:
-  - You are standing in a spacious hall[.], splendidly decorated in red
-    and gold, with glittering chandeliers overhead.
 
-  - choice:
-      - [Go to the cloakroom]You head toward the small room off the hall.
-      - effect:
-          - Location = "Cloakroom"
+  - You stand in a spacious hall[.], with glittering chandeliers overhead,
+    splendidly decorated in red and gold. The hall, that is. The hall is
+    splendidly decorated.
 
-  - choice:
-      - [Go to the bar]The neon sign beckons.
-      - effect:
-          - Location = "Bar"
+  - {"Wearing Cloak" >= 1}Your cloak drips readily on the thick red carpet.
+
+
+outside:
+
+  - [Outside, the rain pours down, and lightning flashes.]You look out at the
+    drenching rain. Lightning flashes, thunder rolls. Better stay inside.
+
+
+cloakroom:
+
+  - [A cloak room lies just off the main hall.]
+  - {"Wearing Cloak" >= 1}Dripping from the rain, you enter the cloak room.
+  - {"Wearing Cloak" == 0}You enter the cloak room.
+
+  - effect:
+      - Location = "Cloakroom"
+
+
+bar:
+
+  - [A little further down the hall, a neon sign advertises the bar.]
+  - {"Wearing Cloak" >= 1}Dripping from the rain, you wander over to the bar.
+  - {"Wearing Cloak" == 0}You wander over to the bar.
+
+  - effect:
+      - Location = "Bar"
 ```
 
 ### cloakroom.ravel
 ```yaml
+include:
+  - foyer
+
+given:
+  - Cloakroom = 0
+
 when:
   - Location = "Cloakroom"
 
 look:
-  - [The cloakroom is small.]The walls are lined with hooks.
-  - {"Wearing Cloak" == 0}Your velvet cloak hangs on a brass hook.
+
+  - [The cloak room is small.]The walls of this small room were clearly once
+    lined with hooks, though now only one remains.
+
+  - {"Wearing Cloak" == 0}Your velvet cloak hangs from that single hook,
+    dripping on the carpet.
+
+  - effect: Cloakroom += 1
+
+
+the-hook:
+
+  - when:
+      - Cloakroom >= 2
+      - "Wearing Cloak" = 1
+
+  - There's a brass hook on the wall.[] Useful for hanging things on it.
+
+  - {"Wearing Cloak" == 0}Your velvet cloak hangs from that single hook,
+    dripping on the carpet.
+
+  - effect: Cloakroom += 1
+
 
 hang-up-cloak:
-  - when:
-      - "Wearing Cloak" >= 1
-  - [Hang up your cloak.]You hang your cloak on the hook.
-  - effect:
-      - "Wearing Cloak" = 0
 
-return-to-foyer:
-  - [Return to the foyer]You step back into the main hall.
+  - when:
+      - Cloakroom >= 3
+      - "Wearing Cloak" >= 1
+
+  - [Hang up your cloak.]You hang the dripping velvet cloak on the small brass
+    hook.
+
+  - effect: "Wearing Cloak" = 0
+
+
+put-on-cloak:
+
+  - when:
+      - Cloakroom >= 2
+      - "Wearing Cloak" == 0
+
+  - [Put on your cloak.]You take the dripping velvet cloak from the small brass
+    hook and put it on.
+
+  - effect: "Wearing Cloak" = 1
+
+
+look-at-cloak:
+
+  - when:
+      - "Wearing Cloak" == 0
+
+  - Your cloak hangs from a brass hook.[] A handsome cloak, of velvet trimmed
+    with satin, and slightly spattered with raindrops. Its blackness is so deep
+    that it almost seems to suck light from the room.
+
+
+
+leave:
+
+  - [The warm glow of the Foyer beckons you out.]You leave the cloakroom.
+
   - effect:
       - Location = "Foyer"
 ```
 
----
+### bar-dark.ravel
+```yaml
+include:
+  - foyer
+
+given:
+  - Fumbled = 0
+  - Bar = 0
+
+when:
+  - Location = "Bar"
+  - "Wearing Cloak" >= 1
+
+
+look-in-dark:
+
+  - It is pitch dark[…], and you can't see a thing. It would be easy to trip
+    over something.
+
+  - effect: Bar += 1
+
+
+fumble-around:
+
+  - when:
+      - Bar >= 2
+
+  - [Fumble around for a light switch.]You fumble around in the dark, but to no avail.
+
+  - effect: Fumbled = 1
+
+
+leave:
+
+  - [The bright opulence of the Foyer beckons you.]You leave the darkened Bar.
+
+  - effect:
+      - Location = "Foyer"
+```
+
+### bar-light.ravel
+```yaml
+include:
+  - foyer
+
+given:
+  - Fumbled = 0
+  - Bar = 0
+
+when:
+  - Location = "Bar"
+  - "Wearing Cloak" = 0
+
+
+look:
+
+  - The bar, much rougher than you'd have guessed after the opulence of
+    the foyer, is completely empty. Sawdust covers the floor.
+
+  - effect: Bar += 1
+
+
+look-at-message:
+  - when:
+      - Bar >= 2
+      - Fumbled = 0
+
+  - There seems to be some sort of message scrawled in the sawdust on the
+    floor.[] The message, neatly marked in the sawdust, reads…
+
+  - **You have won**
+
+  - end: won
+
+
+look-at-scrambled-message:
+  - when:
+      - Bar >= 2
+      - Fumbled >= 1
+
+  - There seems to have been some sort of message scrawled in the sawdust on
+    the floor.[] Unfortunately, some fool has scrambled it up, probably by
+    fumbling around in the dark. You can still make out a few letters…
+
+  - **Y… …ve …n**
+
+  - end: lost
+
+
+leave:
+
+  - [The opulence of the Foyer beckons you.]You leave the Bar.
+
+  - effect:
+      - Location = "Foyer"
+```
+
 
 ## 13. Appendices
 
 ### A. Reserved Words
 
-The following are reserved in expression contexts:
+The following are reserved inside expressions only (no reserved words in subject position):
 - `value` - Current quality value
 - `min` - Constraint keyword
 - `max` - Constraint keyword
@@ -788,12 +1034,38 @@ story/
 | State model | Sequential with jumps | Quality-based matching |
 | Use case | Linear branching | Quality-based narratives |
 
+### E. Limits
+
+The engine refuses hostile or runaway input at fixed caps. Each cap fails with a typed error rather than
+exhausting memory or the interpreter stack.
+
+| Limit | Value | Error |
+|-------|-------|-------|
+| Operands in one expression chain (`a + b + c ...`) | 100 | `ParseError` at compile time |
+| Text length of one expression (checked before parsing; the prose of a text line is exempt, but its `{…}` predicate prefix is not: the prefix is read only from the line's first 65,538 characters, the cap plus its two braces, so a line that starts with `{` and closes no predicate inside that window is refused, and a shorter such line is plain prose) | 65,536 characters | `ParseError` at compile time |
+| Parenthesis nesting in one expression | 20 | `ParseError` at compile time |
+| Total expression tree depth | 200 | `ParseError` at compile time |
+| Digits in an integer literal | 4300 (Python's `sys.get_int_max_str_digits()` default) | `ParseError` at compile time |
+| Indentation nesting in one rulebook source (checked before parsing, on the lines syml lexes: split on `\n` after normalising `\r\n` and `\r`, indented by spaces only, `#`/`//` comments skipped at column 0 only; each inline `-` list marker and an inline key after one counts as a level, so `- - - x` is three) | 128 levels | `ParseError` at load time |
+| Inline `- ` list markers on one physical line (checked with the nesting scan, before parsing; each marker costs syml about twice the stack of an indentation level, so it is capped apart from the 128-level total; `MAX_INLINE_LIST_MARKERS`) | 64 markers | `ParseError` at load time |
+| Choice block nesting (guards rulebook data that bypassed the text loader; a text rulebook hits the 128-level indentation cap first) | 200 | `ParseError` at compile time |
+| String length (a quality's value, and the result of any `+` or `+=`) | 65,536 characters | `EvaluationError` |
+| Integer quality range | -2^63 to 2^63 - 1 | `InvalidQualityValueError` on store |
+| Save file size (applies on save and on load) | 1 MiB | `SaveTooLargeError` on save (nothing is written); `SaveCorruptError` on load |
+| Rulebook source size (any loader's source, shipped or custom, checked in `Environment.compile_rulebook`; `FileSystemLoader` also reads a file at most this many bytes plus one) | 1 MiB (1,048,576 bytes; `MAX_RULEBOOK_BYTES`) | `RulebookTooLargeError` (a `ParseError`) at load time |
+
+The string cap is checked on the combined length before two strings are concatenated, so the oversize
+result is never built. An `EvaluationError` in a `when:` predicate makes that predicate false; in an
+`effect:` or `given:` it surfaces as the engine's `InvalidOperationError`. A string longer than the cap is
+also unstorable, so `InvalidQualityValueError` guards storage as a second check.
+
 ---
 
 ## 14. Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.2 | 2026-09-28 | Applied rulings R1–R8; added precedence and whitespace rules; fixed rule-ordering documentation; resynchronized §12 Cloak listing with examples/cloak files. |
 | 0.1 | 2025 | Initial specification draft |
 
 ---

@@ -1,3 +1,4 @@
+import heapq
 import itertools as it
 from collections import defaultdict
 from collections.abc import Mapping
@@ -10,7 +11,7 @@ from . import (
     effects,
     situations,  # noqa
 )
-from .rulesets import compile_ruleset
+from .rulesets import compile_ruleset, predicate_sort_key
 
 
 def get_next(seq):
@@ -42,6 +43,10 @@ def compile_givens(environment, data):
 
 
 def compile_about(data):
+    if not isinstance(data, Mapping):
+        raise exceptions.ParseError(
+            "`about` must be a mapping of names to text, not: %s" % exceptions.bounded_repr(data)
+        )
     return {get_text(key): get_text(value) for key, value in data.items()}
 
 
@@ -51,6 +56,11 @@ def compile_preamble(environment, rulebook):
     common_predicates = []
     metadata = {}
 
+    if not isinstance(rulebook, Mapping):
+        raise exceptions.ParseError(
+            "A rulebook must be a mapping of rule names to rules, not: %s" % exceptions.bounded_repr(rulebook)
+        )
+
     rule = None
     rulesets = iter(rulebook.items())
     while True:
@@ -58,7 +68,9 @@ def compile_preamble(environment, rulebook):
         try:
             rule = next(rulesets)
         except StopIteration as e:
-            raise exceptions.MissingBaggageError("No baggage found after rule: %r" % (last_rule,)) from e
+            raise exceptions.MissingBaggageError(
+                "No baggage found after rule: %s" % exceptions.bounded_repr(last_rule)
+            ) from e
         else:
             key_name = get_text(rule[0])
 
@@ -84,13 +96,27 @@ def compile_preamble(environment, rulebook):
     }
 
 
+def rule_sort_key(rule):
+    """The one total order for compiled rules: name, then predicates (safe for mixed-type operands)."""
+    return (rule.name, [predicate_sort_key(p) for p in rule.predicates])
+
+
 def compile_rulebook(environment, rulebook, prefix=""):
     """Compile a rulebook declaration"""
     rules = defaultdict(lambda: {"rules": [], "locations": {}})
 
     preamble = compile_preamble(environment, rulebook)
 
+    # The file's top-level `when:` predicates are compiled and sorted once, then shared by reference
+    # with every rule that adds none of its own (parsing them per rule made load cost K x M).
+    common_predicates = compile_ruleset(environment, "", "", preamble["common_predicates"])
+
     for rule_name, data in preamble["rulesets"]:
+        if not isinstance(data, list) or not data:
+            raise exceptions.ParseError(
+                "Rule %s must be a non-empty list of directives, not: %s"
+                % (exceptions.bounded_repr(rule_name), exceptions.bounded_repr(data))
+            )
         if is_when(data[0]):
             concept = "Situation"
             ruleset_predicates = get_list_of_sources(get_next(data[0].values()))
@@ -99,6 +125,10 @@ def compile_rulebook(environment, rulebook, prefix=""):
             concept = data[0]
             ruleset_predicates = get_list_of_sources(get_next(data[1].values()))
             baggage_data = data[2:]
+        elif is_text(data[0]) and concepts.is_registered(get_text(data[0])):
+            concept = data[0]
+            ruleset_predicates = []
+            baggage_data = data[1:]
         else:
             concept = "Situation"
             ruleset_predicates = []
@@ -107,21 +137,19 @@ def compile_rulebook(environment, rulebook, prefix=""):
         rule_name = prefix + get_text(rule_name)
         concept = get_text(concept)
 
-        rules[concept]["rules"].append(
-            types.Rule(
-                rule_name,
-                compile_ruleset(
-                    environment,
-                    concept,
-                    rule_name,
-                    preamble["common_predicates"] + ruleset_predicates,
-                ),
-            )
+        own_predicates = compile_ruleset(environment, concept, rule_name, ruleset_predicates)
+        # Merging two sorted runs equals sorting their concatenation, common predicates first on ties.
+        predicates = (
+            list(heapq.merge(common_predicates, own_predicates, key=predicate_sort_key))
+            if own_predicates
+            else common_predicates
         )
+
+        rules[concept]["rules"].append(types.Rule(rule_name, predicates))
         rules[concept]["locations"].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
 
     for ruleset in rules.values():
-        ruleset["rules"].sort()
+        ruleset["rules"].sort(key=rule_sort_key)
 
     return {
         "rulebook": dict(rules),

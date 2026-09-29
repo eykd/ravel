@@ -30,8 +30,13 @@ def _compile_directive_bodies(environment, concept, parent_rule, first_text, the
     subsituations = []
     if the_rest:
         last_directive = None
+        menu = {}
         for item in the_rest:
             for directive, situations in compile_directive(environment, concept, parent_rule, item, depth=depth):
+                if isinstance(directive, types.Choice):
+                    _register_menu_entry(environment, menu, directive, situations)
+                else:
+                    menu = {}
                 if not isinstance(last_directive, types.Choice) and isinstance(directive, types.Choice):
                     directives.append(types.BeginChoices())
                 if isinstance(last_directive, types.Choice) and not isinstance(directive, types.Choice):
@@ -44,10 +49,30 @@ def _compile_directive_bodies(environment, concept, parent_rule, first_text, the
     return list(it.chain([first_text], directives)), subsituations
 
 
+def _register_menu_entry(environment, menu, choice, situations):
+    """Record a choice in its menu (a run of adjacent choices), rejecting a slug shared with a sibling.
+
+    Two sibling entries with one location would lead to the same body, and the merge would silently
+    drop the first one's text and effects. Choices in separate menus may share a slug (001 design).
+    """
+    label = get_text(situations[choice.choice].intro)
+    if choice.choice in menu:
+        slug = choice.choice.rsplit(environment.location_separator, 1)[-1]
+        raise exceptions.ParseError(
+            "Sibling choices %s and %s in one menu both slugify to %s"
+            % (
+                exceptions.bounded_repr(menu[choice.choice]),
+                exceptions.bounded_repr(label),
+                exceptions.bounded_repr(slug),
+            )
+        )
+    menu[choice.choice] = label
+
+
 def compile_directive(environment, concept, parent_rule, raw_directive, depth=0):
     if isinstance(raw_directive, Mapping):
         if len(raw_directive) != 1:
-            raise exceptions.ParseError("Too many directives in %s" % raw_directive)
+            raise exceptions.ParseError("Too many directives in %s" % exceptions.bounded_repr(raw_directive))
         key, directive = list(raw_directive.items())[0]
         if get_text(key) == "choice":
             return [compile_choice(environment, concept, parent_rule, directive, depth=depth)]
@@ -59,25 +84,31 @@ def compile_directive(environment, concept, parent_rule, raw_directive, depth=0)
             elif isinstance(directive, Sequence):
                 return effects.compile_effects(environment, concept, parent_rule, directive)
             else:
-                raise exceptions.ParseError("Unrecognized effect type: %r" % directive)
+                raise exceptions.ParseError("Unrecognized effect type: %s" % exceptions.bounded_repr(directive))
         elif get_text(key) == "end":
             return [compile_end(environment, concept, parent_rule, directive)]
         else:
-            raise exceptions.ParseError("Unknown directive %s in %r" % (get_text(key), raw_directive))
+            raise exceptions.ParseError(
+                "Unknown directive %s in %s"
+                % (exceptions.printable(get_text(key)), exceptions.bounded_repr(raw_directive))
+            )
     else:
         return [text.compile_text(environment, concept, parent_rule, raw_directive)]
 
 
 def compile_end(environment, concept, parent_rule, directive):
     if not is_text(directive):
-        raise exceptions.ParseError("end takes an inline outcome label, not a block: %r" % directive)
+        raise exceptions.ParseError(
+            "end takes an inline outcome label, not a block: %s" % exceptions.bounded_repr(directive)
+        )
     return types.End(get_text(directive).strip()), {}
 
 
 def compile_choice(environment, concept, parent_rule, directives, depth=0):
     if depth > MAX_CHOICE_NESTING_DEPTH:
         raise exceptions.ParseError(
-            "Choice nesting exceeds the maximum supported depth (%d) at %r" % (MAX_CHOICE_NESTING_DEPTH, parent_rule)
+            "Choice nesting exceeds the maximum supported depth (%d) at %s"
+            % (MAX_CHOICE_NESTING_DEPTH, exceptions.bounded_repr(parent_rule))
         )
     logger.debug("Compiling choice for %s:%s:\n%r", concept, parent_rule, directives)
     if is_text(directives):
@@ -99,4 +130,4 @@ def compile_choice(environment, concept, parent_rule, directives, depth=0):
             },
         )
     except Exception as e:
-        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, e.args[0])) from e
+        raise exceptions.ParseError("%s: %s" % (e.__class__.__name__, exceptions.printable(e.args[0]))) from e

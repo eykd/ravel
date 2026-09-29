@@ -30,9 +30,12 @@ uv run pytest
   deliberately; the codebase uses it throughout for error messages.
 - Type check: `uv run mypy` (config in `pyproject.toml`). Clean, and enforced as a `local`
   pre-commit hook — not `mirrors-mypy`, which runs in an isolated venv where `attr` and `click`
-  become missing-stub errors. Typing is still partial: most function bodies are unannotated, so
-  mypy skips them unless `check_untyped_defs` is turned on (no per-module override sets it; the
-  `[tool.mypy]` table in `pyproject.toml` is the only config).
+  become missing-stub errors. Typing is partial: a `[[tool.mypy.overrides]]` block makes
+  `ravel.engine.*`, `ravel.app.*`, `ravel.adapters.*`, `ravel.cli`, `ravel.types` and
+  `ravel.queries` strict (`check_untyped_defs`, `disallow_untyped_defs`, `disallow_incomplete_defs`,
+  `disallow_any_generics`, `warn_return_any`, `strict_equality`; deliberately not
+  `disallow_untyped_calls`, since adapters call unannotated `Environment`/compiler functions).
+  Everywhere else most function bodies are unannotated, so mypy skips them.
 - Run a story: `uv run ravel run examples/cloak` (console script `ravel = ravel.cli:main`;
   `--verbose`/`--debug` are group-level flags, before the subcommand).
 - CI: `.github/workflows/main.yml` runs pytest with branch coverage, `ruff check`,
@@ -56,9 +59,10 @@ The pipeline is: `.ravel` source → `Environment` → `Loader` → compiler →
 `ravel.engine` (`start`/`choose`/`present`/`resume`) → `ravel.app.GameSession` → an adapter
 (`ravel.cli.ConsoleUI`, or any other caller of `GameSession`).
 
-**Loading and merging** (`environments.py`, `loaders.py`). `Environment.load()` starts at the
-`begin` rulebook and walks `include:` breadth-first, caching each compiled rulebook and
-invalidating it on file mtime. Rule names are namespaced as `filename::rulename` via
+**Loading and merging** (`environments.py`, `loaders.py`). `Environment` requires a loader
+(e.g., `FileSystemLoader` for files, `MemoryLoader` for in-memory sources); its `load()` method
+starts at the `begin` rulebook and walks `include:` breadth-first, caching each compiled rulebook
+and invalidating it on file mtime. Rule names are namespaced as `filename::rulename` via
 `location_separator`. All loaded rulebooks merge into one master dict keyed by concept, each
 holding `{"rules": [...], "locations": {...}}`, plus flattened `metadata` and `givens`.
 
@@ -97,9 +101,9 @@ prefixes. Change the grammar and the parser node visitor in `parsers.py` togethe
 
 ## Language reference
 
-`docs/RAVEL_LANGUAGE_SPEC.md` documents the authoring language and is kept in sync with what the
-compiler accepts. `docs/RAVEL_VM_SPEC.md` predates the pure `ravel.engine` rewrite and describes a
-different, instruction-set VM design; it now carries implemented/deferred annotations pointing at
-the real engine and `specs/001-reentrant-vm/contracts/` — read the annotations, not the
-instruction-set body, for current behavior. Both files are tracked by git. `examples/cloak/` is
-the fullest worked example; `tests/conftest.py` loads it as a fixture.
+**Version 0.2.** `docs/RAVEL_LANGUAGE_SPEC.md` is v0.2 and kept in sync with what the compiler
+accepts; its fenced examples in §4–§7, §9, and §11.4 run as tests via `tests/test_spec_examples.py`.
+`docs/RAVEL_VM_SPEC.md` is v0.2 and describes the shipped pure `ravel.engine`, its ports (`StorySource`,
+`SaveStore`), and host recipes (Realtime, Async, HATEOAS); the old instruction-set design appears
+only in Appendix A as history. Both files are tracked by git. `examples/cloak/` is the fullest
+worked example; `tests/conftest.py` loads it as a fixture.

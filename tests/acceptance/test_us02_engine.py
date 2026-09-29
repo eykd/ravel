@@ -27,7 +27,7 @@ from ravel.engine.story import Story
 from ravel.environments import Environment
 from ravel.loaders import FileSystemLoader
 
-pytestmark = pytest.mark.acceptance
+pytestmark = [pytest.mark.acceptance, pytest.mark.usefixtures("strict_conditions")]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CLOAK_PATH = REPO_ROOT / "examples" / "cloak"

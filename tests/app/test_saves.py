@@ -8,6 +8,7 @@ shape-checks bytes, never checking whether any saved ``location`` exists in a st
 import json
 
 import pytest
+from attrs import evolve
 
 from ravel import types
 from ravel.app.saves import (
@@ -17,6 +18,8 @@ from ravel.app.saves import (
     SAVE_MAGIC,
     LoadRefusedError,
     SaveCorruptError,
+    SaveTooLargeError,
+    SessionError,
     UnsupportedSaveVersionError,
     decode_save,
     encode_save,
@@ -310,6 +313,44 @@ class TestDecodeSaveErrors:
         with pytest.raises(SaveCorruptError, match="extra"):
             decode_save(_canonical(doc))
 
+    def test_step4_bounds_a_huge_unexpected_key(self):
+        doc = self._good_doc()
+        doc["x" * 500_000] = 1
+        with pytest.raises(SaveCorruptError, match="top level") as info:
+            decode_save(_canonical(doc))
+        assert len(str(info.value)) < 300
+
+    def test_step4_lists_few_unexpected_keys_and_counts_the_rest(self):
+        doc = self._good_doc()
+        for i in range(60_000):
+            doc["k%05d" % i] = 1
+        with pytest.raises(SaveCorruptError, match="top level") as info:
+            decode_save(_canonical(doc))
+        message = str(info.value)
+        assert len(message) < 300
+        assert "'k00000'" in message
+        assert "and 59995 more" in message
+
+    def test_step4_bounds_many_unexpected_keys_in_a_nested_anchor(self):
+        doc = self._good_doc()
+        for i in range(1_000):
+            doc["state"]["stack"][0]["anchor"]["k%d" % i] = 1
+        with pytest.raises(SaveCorruptError, match=r"state\.stack\[0\]\.anchor") as info:
+            decode_save(_canonical(doc))
+        assert len(str(info.value)) < 300
+        assert "and 995 more" in str(info.value)
+
+    def test_step4_bounds_missing_keys_too(self):
+        # Exactly MAX_LISTED_KEYS + 1 required keys can't be missing in the real format, so
+        # exercise the helper's missing-branch through _check_keys directly.
+        from ravel.app.saves import _check_keys
+
+        required = {"m%d" % i for i in range(20)} | {"m" * 500_000}
+        with pytest.raises(SaveCorruptError, match="lbl") as info:
+            _check_keys({}, required, "lbl")
+        assert len(str(info.value)) < 300
+        assert "and 16 more" in str(info.value)
+
     def test_step4_rejects_a_missing_state_field(self):
         doc = self._good_doc()
         del doc["state"]["stack"]
@@ -345,6 +386,41 @@ class TestDecodeSaveErrors:
         )
         with pytest.raises(SaveCorruptError, match="not a valid quality name"):
             decode_save(data)
+
+    def test_a_huge_duplicate_key_gives_a_bounded_message(self):
+        key = "k" * 500_000
+        data = ('{"format":"ravel-save","%s":1,"%s":2}' % (key, key)).encode()
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(data)
+        assert len(str(excinfo.value)) < 200
+
+    def test_a_huge_quality_name_gives_a_bounded_message(self):
+        doc = self._good_doc()
+        doc["state"]["qualities"] = {"q" * 500_000: [1]}
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(_canonical(doc))
+        assert len(str(excinfo.value)) < 200
+
+    def test_a_huge_stack_location_gives_a_bounded_message(self):
+        doc = self._good_doc()
+        doc["state"]["stack"].append({"location": "L" * 500_000, "anchor": {"choices": ["x"], "ordinal": 0}})
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(_canonical(doc))
+        assert len(str(excinfo.value)) < 200
+
+    def test_a_huge_format_version_gives_a_bounded_message(self):
+        doc = self._good_doc()
+        doc["format_version"] = 10**4000
+        with pytest.raises(UnsupportedSaveVersionError) as excinfo:
+            decode_save(_canonical(doc))
+        assert len(str(excinfo.value)) < 200
+
+    def test_control_characters_in_a_saved_quality_name_are_escaped(self):
+        doc = self._good_doc()
+        doc["state"]["qualities"] = {"a\x1b[31mb": [1]}
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(_canonical(doc))
+        assert "\x1b" not in str(excinfo.value)
 
     def test_step4_rejects_an_invalid_status(self):
         doc = self._good_doc()
@@ -533,3 +609,66 @@ def test_decode_save_never_calls_choice_blocks_or_touches_a_story(monkeypatch):
     }
     saved = decode_save(_canonical(good))
     assert isinstance(saved, SavedGame)
+
+
+def _state_with_string_qualities(cloak, count, size, name="q"):
+    state = start(cloak).state
+    qualities = state.qualities
+    text = "x" * size
+    for index in range(count):
+        qualities = qualities.set("%s%d" % (name, index), text)
+    return evolve(state, qualities=qualities)
+
+
+def _state_of_size(cloak, target):
+    """A state whose encoding is exactly ``target`` bytes (strings are capped at 65,536 chars each)."""
+    state = _state_with_string_qualities(cloak, 16, 65_000, name="fill")
+    qualities = state.qualities.set("pad", "")
+    state = evolve(state, qualities=qualities)
+    remaining = target - len(encode_save(cloak, state))
+    qualities = qualities.set("pad", "x" * remaining)
+    return evolve(state, qualities=qualities), qualities
+
+
+class TestSaveSizeCap:
+    def test_it_raises_save_too_large_when_the_encoding_exceeds_the_cap(self, cloak):
+        # 17 x 64000 = ~1.09 MB of string content: the lower-bound precheck trips.
+        state = _state_with_string_qualities(cloak, 17, 64_000)
+
+        with pytest.raises(SaveTooLargeError, match="too large"):
+            encode_save(cloak, state)
+
+    def test_it_raises_when_only_json_escaping_pushes_it_over_the_cap(self, cloak):
+        # Control characters escape to 6 bytes each; the raw length stays under the cap.
+        state = start(cloak).state
+        qualities = state.qualities.set("q", "\x01" * 60_000).set("r", "\x01" * 60_000).set("s", "\x01" * 60_000)
+        state = evolve(state, qualities=qualities)
+        assert MAX_SAVE_BYTES > 3 * 60_000
+
+        with pytest.raises(SaveTooLargeError):
+            encode_save(cloak, state)
+
+    def test_save_too_large_is_a_session_error_but_not_a_load_refusal(self):
+        assert issubclass(SaveTooLargeError, SessionError)
+        assert not issubclass(SaveTooLargeError, LoadRefusedError)
+
+    def test_a_save_just_under_the_cap_round_trips(self, cloak):
+        state = _state_with_string_qualities(cloak, 15, 60_000)
+        data = encode_save(cloak, state)
+        assert MAX_SAVE_BYTES - 200_000 < len(data) <= MAX_SAVE_BYTES
+
+        assert decode_save(data).qualities == state.qualities
+
+    def test_a_save_exactly_at_the_cap_round_trips(self, cloak):
+        state, padded = _state_of_size(cloak, MAX_SAVE_BYTES)
+
+        data = encode_save(cloak, state)
+
+        assert len(data) == MAX_SAVE_BYTES
+        assert decode_save(data).qualities == padded
+
+    def test_one_byte_over_the_cap_is_refused(self, cloak):
+        state, _ = _state_of_size(cloak, MAX_SAVE_BYTES + 1)
+
+        with pytest.raises(SaveTooLargeError):
+            encode_save(cloak, state)

@@ -30,10 +30,15 @@ from ravel.engine.state import (
     is_surrogate_free,
 )
 from ravel.engine.story import Story
+from ravel.utils.excerpts import bounded_repr, printable
 
 SAVE_FORMAT: Final = "ravel-save"
 SAVE_FORMAT_VERSION: Final = 1
 MAX_SAVE_BYTES: Final = 1_048_576  # 1 MiB
+_MAX_SAVE_DESCRIPTION: Final = (
+    "%d MiB" % (MAX_SAVE_BYTES // 1_048_576) if MAX_SAVE_BYTES % 1_048_576 == 0 else "%d bytes" % MAX_SAVE_BYTES
+)
+MAX_LISTED_KEYS: Final = 5  # keys named in a key-mismatch error before "and N more"
 SAVE_MAGIC: Final = b'{"format":"ravel-save"'  # every canonical v1 save starts with this
 
 
@@ -43,6 +48,10 @@ class SessionError(Exception):
 
 class NoGameError(SessionError):
     """No game has been started or loaded yet."""
+
+
+class SaveTooLargeError(SessionError):
+    """The encoded save would exceed ``MAX_SAVE_BYTES``; raised before anything is written."""
 
 
 class LoadRefusedError(SessionError):
@@ -65,7 +74,9 @@ class UnsupportedSaveVersionError(LoadRefusedError):
     """The save names a ``format_version`` this ravel cannot read."""
 
     def __init__(self, version: object) -> None:
-        super().__init__("unsupported save format version %r (this ravel reads %d)" % (version, SAVE_FORMAT_VERSION))
+        super().__init__(
+            "unsupported save format version %s (this ravel reads %d)" % (bounded_repr(version), SAVE_FORMAT_VERSION)
+        )
         self.version = version
 
 
@@ -86,7 +97,7 @@ def _anchor_for(story: Story, frame: Frame, *, is_top: bool) -> Anchor:
         if block.get_choice_ip == get_choice_ip:
             ordinal = sum(1 for earlier in blocks[:index] if earlier.choices == block.choices)
             return Anchor(choices=block.choices, ordinal=ordinal)
-    raise InvalidStateError("%r has no choice block at ip %d" % (frame.location, get_choice_ip))
+    raise InvalidStateError("%s has no choice block at ip %d" % (bounded_repr(frame.location), get_choice_ip))
 
 
 def _saved_frame(story: Story, frame: Frame, *, is_top: bool) -> SavedFrame:
@@ -106,13 +117,34 @@ def _frame_doc(frame: SavedFrame) -> dict[str, object]:
     }
 
 
+def _too_large() -> SaveTooLargeError:
+    return SaveTooLargeError("save is too large to write (over %s)" % _MAX_SAVE_DESCRIPTION)
+
+
+def _check_quality_size(qualities: Qualities) -> None:
+    """Refuse early when the qualities alone must exceed the cap.
+
+    Every character of a name or string value takes at least one UTF-8 byte in the encoding, so
+    this lower bound needs no big allocation: it stops a story whose strings are each within
+    their own cap from making ``json.dumps`` build a multi-gigabyte string before the final check.
+    """
+    total = 0
+    for name, value in qualities.as_dict().items():
+        total += len(name) + (len(value) if isinstance(value, str) else 0)
+        if total > MAX_SAVE_BYTES:
+            raise _too_large()
+
+
 def encode_save(story: Story, state: GameState) -> bytes:
     """Encode ``state`` (waiting or halted) as canonical save bytes.
 
-    Raises ``InvalidStateError`` for a ``RUNNING`` state (never happens via the engine).
+    Raises ``InvalidStateError`` for a ``RUNNING`` state (never happens via the engine), and
+    ``SaveTooLargeError`` if the encoding would exceed ``MAX_SAVE_BYTES`` (the cap ``decode_save``
+    enforces on load), so a store never receives a save that could not be loaded back.
     """
     if state.status is Status.RUNNING:
         raise InvalidStateError("cannot save a running state")
+    _check_quality_size(state.qualities)
     last = len(state.stack) - 1
     saved_stack = [_saved_frame(story, frame, is_top=(index == last)) for index, frame in enumerate(state.stack)]
     doc = {
@@ -126,7 +158,10 @@ def encode_save(story: Story, state: GameState) -> bytes:
         },
     }
     text = json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
-    return (text + "\n").encode("utf-8")
+    data = (text + "\n").encode("utf-8")
+    if len(data) > MAX_SAVE_BYTES:
+        raise _too_large()
+    return data
 
 
 # --- decoding -----------------------------------------------------------------------------------
@@ -141,7 +176,7 @@ def _reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in seen:
-            raise SaveCorruptError("duplicate key %r" % key)
+            raise SaveCorruptError("duplicate key %s" % bounded_repr(key))
         seen.add(key)
         result[key] = value
     return result
@@ -154,7 +189,17 @@ def _parse_json(data: bytes) -> object:
     except SaveCorruptError:
         raise
     except (UnicodeDecodeError, ValueError, RecursionError) as error:
-        raise SaveCorruptError("not valid JSON: %s" % error) from error
+        raise SaveCorruptError("not valid JSON: %s" % printable(error)) from error
+
+
+def _list_keys(keys: set[str]) -> str:
+    """Name at most ``MAX_LISTED_KEYS`` of ``keys`` (sorted), each bounded, then ``and N more``."""
+    shown = sorted(keys)[:MAX_LISTED_KEYS]
+    text = ", ".join(bounded_repr(key) for key in shown)
+    hidden = len(keys) - len(shown)
+    if hidden:
+        text += " and %d more" % hidden
+    return text
 
 
 def _check_keys(obj: Mapping[str, object], required: set[str], label: str) -> None:
@@ -165,9 +210,9 @@ def _check_keys(obj: Mapping[str, object], required: set[str], label: str) -> No
     extra = keys - required
     problems = []
     if missing:
-        problems.append("missing %s" % ", ".join(sorted(repr(key) for key in missing)))
+        problems.append("missing %s" % _list_keys(missing))
     if extra:
-        problems.append("unexpected %s" % ", ".join(sorted(repr(key) for key in extra)))
+        problems.append("unexpected %s" % _list_keys(extra))
     raise SaveCorruptError("%s: %s" % (label, "; ".join(problems)))
 
 
@@ -178,15 +223,15 @@ def _decode_qualities(raw: object) -> Qualities:
     for name, value in raw.items():
         # ``name`` is always ``str``: JSON object keys can only ever be strings.
         if not is_surrogate_free(name):
-            raise SaveCorruptError("state.qualities: %r is not a valid quality name" % (name,))
+            raise SaveCorruptError("state.qualities: %s is not a valid quality name" % bounded_repr(name))
         if isinstance(value, bool) or not isinstance(value, (int, float, str)):
-            raise SaveCorruptError("state.qualities[%r]: must be an int, float, or string" % name)
+            raise SaveCorruptError("state.qualities[%s]: must be an int, float, or string" % bounded_repr(name))
         if isinstance(value, int) and value not in INT_QUALITY_RANGE:
-            raise SaveCorruptError("state.qualities[%r]: int is out of the signed 64-bit range" % name)
+            raise SaveCorruptError("state.qualities[%s]: int is out of the signed 64-bit range" % bounded_repr(name))
         if isinstance(value, float) and not math.isfinite(value):
-            raise SaveCorruptError("state.qualities[%r]: float must be finite" % name)
+            raise SaveCorruptError("state.qualities[%s]: float must be finite" % bounded_repr(name))
         if isinstance(value, str) and not is_surrogate_free(value):
-            raise SaveCorruptError("state.qualities[%r]: string contains a lone surrogate" % name)
+            raise SaveCorruptError("state.qualities[%s]: string contains a lone surrogate" % bounded_repr(name))
         items[name] = value
     return Qualities.from_mapping(items)
 
@@ -252,13 +297,13 @@ def _check_stack_consistency(stack: tuple[SavedFrame, ...]) -> None:
         parent, child = stack[i], stack[i + 1]
         if child.location not in parent.anchor.choices:
             raise SaveCorruptError(
-                "stack[%d]: %r is not one of the parent frame's offered choices" % (i + 1, child.location)
+                "stack[%d]: %s is not one of the parent frame's offered choices" % (i + 1, bounded_repr(child.location))
             )
 
 
 def _decode_save(data: bytes) -> SavedGame:
     if len(data) > MAX_SAVE_BYTES:
-        raise SaveCorruptError("save file too large (over 1 MiB)")
+        raise SaveCorruptError("save file too large (over %s)" % _MAX_SAVE_DESCRIPTION)
 
     doc = _parse_json(data)
     if not isinstance(doc, dict):
@@ -304,4 +349,4 @@ def decode_save(data: bytes) -> SavedGame:
     except LoadRefusedError:
         raise
     except Exception as error:
-        raise SaveCorruptError("unexpected error decoding save: %s" % error) from error
+        raise SaveCorruptError("unexpected error decoding save: %s" % printable(error)) from error

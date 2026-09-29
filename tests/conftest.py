@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 
 from ravel.environments import Environment
-from ravel.loaders import FileSystemLoader
+from ravel.loaders import FileSystemLoader, MemoryLoader
+
+from .helpers import strict_conditions as _strict_conditions
 
 PATH = Path(__file__).resolve().parent
 
@@ -15,7 +17,7 @@ def examples_path():
 
 @pytest.fixture
 def env():
-    return Environment()
+    return Environment(loader=MemoryLoader({}))
 
 
 @pytest.fixture
@@ -23,3 +25,9 @@ def cloak_env(examples_path):
     return Environment(
         loader=FileSystemLoader(base_path=examples_path / "cloak"),
     )
+
+
+@pytest.fixture
+def strict_conditions():
+    with _strict_conditions():
+        yield

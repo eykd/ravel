@@ -34,7 +34,7 @@ ALLOWED_STDLIB = frozenset(
     }
 )
 ALLOWED_THIRD_PARTY = frozenset({"attrs", "attr"})
-ALLOWED_RAVEL = ("ravel.types", "ravel.queries", "ravel.utils", "ravel.engine")
+ALLOWED_RAVEL = ("ravel.types", "ravel.queries", "ravel.utils", "ravel.engine", "ravel.exceptions")
 
 #: Swallowing these (or everything) hides engine bugs as silent misbehavior (D14).
 FORBIDDEN_HANDLERS = frozenset({"IndexError"})

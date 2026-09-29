@@ -5,6 +5,7 @@ import syml
 
 from ravel import exceptions, types
 from ravel.compiler import rulebooks
+from ravel.compiler.rulesets import predicate_sort_key
 from ravel.utils.strings import get_text_source
 
 
@@ -119,6 +120,71 @@ class TestCompileRulebook:
         prefix = "prefix-"
         result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml), prefix)
         assert "prefix-intro" in result["rulebook"]["Situation"]["locations"]
+
+    def test_it_should_compile_each_common_predicate_once_regardless_of_rule_count(self, env, monkeypatch):
+        from ravel.compiler import predicates
+
+        calls = []
+        real = predicates.compile_predicate
+
+        def counting(environment, target):
+            calls.append(target)
+            return real(environment, target)
+
+        monkeypatch.setattr(predicates, "compile_predicate", counting)
+        rulebook_syml = textwrap.dedent(
+            """
+            when:
+              - Alpha == 1
+              - Beta == 2
+
+            first:
+              - Some text.
+
+            second:
+              - when:
+                  - Gamma == 3
+
+              - Some text.
+
+            third:
+              - Some text.
+        """
+        )
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml))
+        compiled = {rule.name: rule.predicates for rule in result["rulebook"]["Situation"]["rules"]}
+
+        # Two common predicates plus the one rule-local predicate; three rules do not multiply the commons.
+        assert len(calls) == 3
+        assert len(compiled["first"]) == 2
+        assert len(compiled["second"]) == 3
+        # Rules that add no predicates share the one pre-sorted sequence.
+        assert compiled["first"] is compiled["third"]
+
+    def test_it_should_merge_mixed_type_common_and_own_predicates_in_key_order(self, env):
+        rulebook_syml = textwrap.dedent(
+            """
+            when:
+              - x > 1
+              - x > threshold
+
+            first:
+              - when:
+                  - x > "a"
+                  - x > 0.5
+              - Some text.
+        """
+        )
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml))
+        (rule,) = result["rulebook"]["Situation"]["rules"]
+
+        assert rule.predicates == sorted(rule.predicates, key=predicate_sort_key)
+        assert [p.predicate.expression for p in rule.predicates] == [
+            0.5,
+            1,
+            "a",
+            types.QualityRef("threshold"),
+        ]
 
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
         bad_rulebook_syml = textwrap.dedent(
@@ -384,3 +450,54 @@ class TestMissingBaggage:
             rulebooks.compile_preamble(env, rulebook)
 
         assert "No baggage found after rule" in excinfo.value.args[0]
+
+
+class TestBareConceptLine:
+    def test_it_should_compile_a_bare_registered_concept_line_as_that_concept(self, env):
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                declared:
+                  - Situation
+                  - You are here[.], somewhere.
+                """
+            )
+        )
+
+        result = rulebooks.compile_rulebook(env, rulebook)
+
+        assert result["rulebook"]["Situation"]["rules"] == [types.Rule("declared", [])]
+        assert result["rulebook"]["Situation"]["locations"]["declared"].intro == types.Text(
+            text="You are here.", sticky=False, predicate=None
+        )
+
+    def test_it_should_treat_an_unregistered_first_line_as_situation_intro_text(self, env):
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                lonely:
+                  - Hello
+                  - There you are.
+                """
+            )
+        )
+
+        result = rulebooks.compile_rulebook(env, rulebook)
+
+        assert list(result["rulebook"]) == ["Situation"]
+        assert result["rulebook"]["Situation"]["locations"]["lonely"].intro == types.Text(
+            text="Hello", sticky=False, predicate=None
+        )
+
+    def test_it_should_complain_when_a_bare_registered_concept_has_no_baggage(self, env):
+        rulebook = syml.loads(
+            textwrap.dedent(
+                """
+                lonely:
+                  - Situation
+                """
+            )
+        )
+
+        with pytest.raises(exceptions.MissingBaggageError):
+            rulebooks.compile_rulebook(env, rulebook)

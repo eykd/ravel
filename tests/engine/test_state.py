@@ -15,6 +15,7 @@ from ravel.engine.state import (
     Qualities,
     Status,
 )
+from ravel.types import MAX_STRING_LENGTH
 
 INT_MIN = -(2**63)
 INT_MAX = 2**63 - 1
@@ -122,6 +123,11 @@ class TestQualitiesSet:
         with pytest.raises(InvalidQualityValueError):
             Qualities().set("q", value)
 
+    def test_it_stores_a_string_at_the_length_cap_and_rejects_one_over(self):
+        assert Qualities().set("q", "a" * MAX_STRING_LENGTH).get("q") == "a" * MAX_STRING_LENGTH
+        with pytest.raises(InvalidQualityValueError):
+            Qualities().set("q", "a" * (MAX_STRING_LENGTH + 1))
+
     def test_it_rejects_a_name_with_a_lone_surrogate(self):
         with pytest.raises(InvalidQualityValueError):
             Qualities().set("bad\udc80", 1)
@@ -208,3 +214,16 @@ class TestGameState:
         state = make_waiting_state()
         with pytest.raises(attrs.exceptions.FrozenInstanceError):
             state.status = Status.HALTED  # type: ignore[misc]
+
+
+class TestUnstorableValueMessage:
+    def test_it_describes_an_oversize_string_without_embedding_it(self):
+        with pytest.raises(InvalidQualityValueError) as excinfo:
+            Qualities().set("q", "a" * (MAX_STRING_LENGTH + 1))
+        assert len(str(excinfo.value)) < 200
+
+    @pytest.mark.parametrize("value", [True, float("nan"), None, [1]], ids=["bool", "float", "none", "list"])
+    def test_it_keeps_the_message_short_for_other_types(self, value):
+        with pytest.raises(InvalidQualityValueError) as excinfo:
+            Qualities().set("q" * 1000, value)
+        assert len(str(excinfo.value)) < 200
