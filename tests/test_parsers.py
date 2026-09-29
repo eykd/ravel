@@ -13,6 +13,19 @@ class TestIntroTextParser:
     def parser(self):
         return parsers.IntroTextParser()
 
+    @pytest.mark.parametrize("text", ["Price: 5 [approx", "\x1b[2J", "[x"])
+    def test_it_should_raise_parse_error_for_an_unclosed_bracket(self, parser, text):
+        with pytest.raises(exceptions.ParseError, match="Invalid intro text") as excinfo:
+            parser.parse(text)
+
+        assert isinstance(excinfo.value.__cause__, exceptions.ParsimoniousParseError)
+
+    def test_it_should_bound_the_invalid_intro_text_message(self, parser):
+        with pytest.raises(exceptions.ParseError) as excinfo:
+            parser.parse("[" * 900_000)
+
+        assert len(str(excinfo.value)) < 512
+
     def test_it_should_parse_intro_text_with_an_empty_suffix_and_a_tail(self, parser):
         result = parser.parse('"A wager!"[] I returned.')
         expected = [types.Text('"A wager!"'), types.Text('"A wager!" I returned.')]

@@ -172,6 +172,18 @@ class TestSourceNestingDepth:
             MemoryStorySource({"begin": _nested_choice_source(300)}).load()
 
     @pytest.mark.parametrize(
+        "source",
+        [
+            "foo:\n    - Price: 5 [approx\n",
+            "foo:\n    - Intro.\n    - choice: [x\n        - Hi.\n",
+        ],
+        ids=["intro-line", "choice-label"],
+    )
+    def test_it_should_raise_parse_error_for_an_unclosed_bracket_via_memory_source(self, source):
+        with pytest.raises(exceptions.ParseError, match="Invalid intro text"):
+            MemoryStorySource({"begin": source}).load()
+
+    @pytest.mark.parametrize(
         ("source", "syml_error", "message"),
         [
             ("r:\n\t- hi\n", syml.exceptions.TabIndentationError, "begin:2:0: A tab character"),

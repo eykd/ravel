@@ -149,6 +149,15 @@ class ComparisonParser(BaseExpressionParser):
 class IntroTextParser(BaseParser):
     grammar = Grammar(grammars.intro_text_grammar)
 
+    def parse(self, text, pos=0):
+        """Parse intro text, reporting malformed text (such as an unclosed ``[``) as a ParseError."""
+        try:
+            return super().parse(text, pos=pos)
+        except exceptions.ParsimoniousParseError as e:
+            raise exceptions.ParseError(
+                "Invalid intro text %s: %s" % (exceptions.bounded_repr(text), exceptions.printable(e))
+            ) from e
+
     def visit_head(self, node, children):
         return node.text
 
