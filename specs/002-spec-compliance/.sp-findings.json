@@ -1,10 +1,34 @@
 [
   {
-    "category": "recursion-depth",
-    "file": "src/ravel/environments.py",
-    "title": "Remediate: one-line list-marker chains within the 128 nesting cap overflow syml to the RecursionError backstop",
+    "category": "layer-boundary",
+    "file": "src/ravel/loaders.py",
+    "title": "Remediate: rulebook byte cap enforced only in shipped loaders, bypassed by custom Loader",
+    "severity": "MAJOR",
+    "line": 14,
+    "task_id": "ravel-h6v.35"
+  },
+  {
+    "category": "duplicated-source-of-truth",
+    "file": "src/ravel/parsers.py",
+    "title": "Remediate: paren-depth gate hand-transcribes grammar token regexes",
+    "severity": "MAJOR",
+    "line": 29,
+    "task_id": "ravel-h6v.36"
+  },
+  {
+    "category": "doc-drift",
+    "file": "docs/RAVEL_VM_SPEC.md",
+    "title": "Remediate: VM spec limit passages contradict the enforced caps",
+    "severity": "MAJOR",
+    "line": 229,
+    "task_id": "ravel-h6v.37"
+  },
+  {
+    "category": "duplicated-source-of-truth",
+    "file": "src/ravel/parsers.py",
+    "title": "Remediate: linked limit literals duplicated instead of derived",
     "severity": "MINOR",
-    "line": 45,
-    "task_id": "ravel-h6v.34"
+    "line": 27,
+    "task_id": "ravel-h6v.38"
   }
 ]
