@@ -49,3 +49,13 @@ class FileSystemLoader(BaseLoader):
         is_up_to_date = self.get_up_to_date_checker(filepath)
 
         return source, is_up_to_date
+
+
+class MemoryLoader(BaseLoader):
+    """Serve rulebooks from an in-memory mapping of name to source text."""
+
+    def __init__(self, sources: dict[str, str]) -> None:
+        self.sources = dict(sources)
+
+    def get_source(self, environment, name):
+        raise NotImplementedError()

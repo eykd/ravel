@@ -6,6 +6,8 @@ from unittest.mock import Mock, patch
 import pytest
 
 from ravel import exceptions, loaders
+from ravel.environments import Environment
+from ravel.types import Rule
 
 
 @pytest.fixture
@@ -121,3 +123,38 @@ class TestLoad:
         assert result == "compiled"
 
         env.compile_rulebook.assert_called_once_with("test!", "test", checker)
+
+
+class TestMemoryLoader:
+    def test_it_should_serve_rulebooks_from_the_mapping(self):
+        env = Environment(loader=loaders.MemoryLoader({"begin": "intro:\n  - Hi[.] there.\n"}))
+        assert env.load()["rulebook"]["Situation"]["rules"] == [Rule("begin::intro", [])]
+
+    def test_it_should_raise_when_the_rulebook_is_missing(self):
+        env = Environment(loader=loaders.MemoryLoader({}))
+        with pytest.raises(exceptions.RulebookNotFound, match="begin"):
+            env.load()
+
+    def test_get_source_should_return_source_and_an_always_true_checker(self):
+        loader = loaders.MemoryLoader({"begin": "text"})
+        source, is_up_to_date = loader.get_source(Mock(), "begin")
+        assert source == "text"
+        assert is_up_to_date() is True
+
+    def test_it_should_copy_the_mapping_at_construction(self):
+        sources = {"begin": "intro:\n  - Hi[.] there.\n"}
+        loader = loaders.MemoryLoader(sources)
+        sources["begin"] = "other:\n  - Bye[.] now.\n"
+        assert loader.get_source(Mock(), "begin")[0] == "intro:\n  - Hi[.] there.\n"
+
+    def test_it_should_follow_includes_between_in_memory_rulebooks(self):
+        env = Environment(
+            loader=loaders.MemoryLoader(
+                {
+                    "begin": "include:\n  - other\n\nintro:\n  - Hi[.] there.\n",
+                    "other": "outro:\n  - Bye[.] now.\n",
+                }
+            )
+        )
+        names = {rule.name for rule in env.load()["rulebook"]["Situation"]["rules"]}
+        assert names == {"begin::intro", "other::outro"}
