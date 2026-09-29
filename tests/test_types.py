@@ -156,6 +156,42 @@ class TestOperation:
         assert result == expected
 
 
+class TestOperationEvaluationContext:
+    def test_it_should_bind_value_to_the_subject_quality(self):
+        operation = types.Operation("X", "+=", types.Expression(types.VALUE, "*", 2))
+        assert operation.evaluate(10) == 30
+
+    def test_it_should_bind_value_to_zero_for_an_unset_subject(self):
+        operation = types.Operation("X", "+=", types.Expression(types.VALUE, "+", 1))
+        assert operation.evaluate(None) == 1
+
+    def test_it_should_read_other_qualities(self):
+        expression = types.Expression(types.QualityRef("Health"), "+", types.QualityRef("Bonus"))
+        operation = types.Operation("X", "=", expression)
+        assert operation.evaluate(None, qualities={"Health": 7, "Bonus": 3}) == 10
+
+    def test_it_should_true_divide_to_a_float(self):
+        operation = types.Operation("Health", "-=", types.Expression(types.VALUE, "/", 10))
+        result = operation.evaluate(50)
+        assert result == 45.0
+        assert isinstance(result, float)
+
+    def test_it_should_raise_evaluation_error_on_a_type_mismatch(self):
+        with pytest.raises(exceptions.EvaluationError) as excinfo:
+            types.Operation("X", "+=", 1).evaluate("a")
+        assert isinstance(excinfo.value.__cause__, TypeError)
+
+    def test_it_should_not_wrap_a_failing_quality_lookup(self):
+        class BadLookup:
+            def get(self, name, /):
+                raise TypeError("bad lookup")
+
+        operation = types.Operation("X", "=", types.QualityRef("Health"))
+        with pytest.raises(TypeError) as excinfo:
+            operation.evaluate(None, qualities=BadLookup())
+        assert not isinstance(excinfo.value, exceptions.EvaluationError)
+
+
 class TestOperationExpression:
     def test_it_should_have_no_standalone_expression(self):
         operation = types.Operation(quality="Foo", operator="+=", expression=1)
