@@ -78,6 +78,10 @@ class Constraint:
     kind: Any = attr.ib()
     value: Any = attr.ib()
 
+    def apply(self, result: Any) -> Any:
+        """Clamp ``result`` to this constraint's bound."""
+        raise NotImplementedError
+
 
 @attr.s(slots=True)
 class Effect:

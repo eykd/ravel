@@ -259,3 +259,31 @@ class TestExpressionEvaluationFailures:
         with pytest.raises(TypeError) as excinfo:
             types.Expression(BadTerm(), "+", 1).evaluate()
         assert not isinstance(excinfo.value, exceptions.EvaluationError)
+
+
+class TestConstraintApply:
+    def test_min_raises_low_values_to_the_bound(self):
+        assert types.Constraint("min", 0).apply(-5) == 0
+
+    def test_max_lowers_high_values_to_the_bound(self):
+        assert types.Constraint("max", 8).apply(15) == 8
+
+    def test_max_leaves_values_under_the_bound_alone(self):
+        assert types.Constraint("max", 8).apply(6) == 6
+
+    def test_bound_kind_wins_when_the_bound_is_used(self):
+        result = types.Constraint("min", 0.0).apply(-5)
+        assert result == 0.0
+        assert type(result) is float
+
+    def test_float_result_is_kept_when_within_bound(self):
+        result = types.Constraint("min", 0).apply(3.5)
+        assert result == 3.5
+        assert type(result) is float
+
+    def test_it_should_reject_a_string_result(self):
+        with pytest.raises(exceptions.ConstraintError):
+            types.Constraint("max", 3).apply("Hi")
+
+    def test_constraint_error_is_an_evaluation_error(self):
+        assert issubclass(exceptions.ConstraintError, exceptions.EvaluationError)

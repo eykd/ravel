@@ -39,3 +39,7 @@ def raise_parse_error(position, error_type=ParseError):
 
 class EvaluationError(ValueError):
     """An expression operator failed on its operands (type mismatch or arithmetic error)."""
+
+
+class ConstraintError(EvaluationError):
+    """A constraint could not be applied to its operand (for example, a string bound to a number)."""
