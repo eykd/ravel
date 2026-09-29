@@ -18,6 +18,13 @@ MAX_EXPRESSION_OPERANDS: Final = 100
 MAX_EXPRESSION_DEPTH: Final = 200
 MAX_PAREN_DEPTH: Final = 20
 
+# The caps above run in the visitor, after Parsimonious has built the whole packrat parse tree, so they
+# bound evaluator recursion but not parser CPU or memory (a 200 KB chain cost seconds and hundreds of MB
+# before rejection). Refuse over-long expression text before parsing at all. 64 KiB comfortably admits a
+# full operand chain of 100 operands with 100-character quality names (about 10 KB) and matches the
+# string-length cap. Only expression parsers are gated; long prose lines are legitimate and cheap.
+MAX_EXPRESSION_LENGTH: Final = 65_536
+
 
 class BaseParser(NodeVisitor):
     def reduce_children(self, children):
@@ -37,11 +44,16 @@ class BaseParser(NodeVisitor):
 class BaseExpressionParser(BaseParser):
     unwrapped_exceptions = (exceptions.ParseError,)
     operand_limit_error: type[exceptions.ParseError] = exceptions.ParseError
+    max_length: int | None = MAX_EXPRESSION_LENGTH
     visit_setter = BaseParser.get_text
     visit_simple_quality = BaseParser.get_text
 
     def parse(self, text, pos=0):
-        """Parse text, refusing over-deep parenthesis nesting before the grammar can recurse through it."""
+        """Parse text, refusing over-long text or over-deep parentheses before the grammar can build a tree."""
+        if self.max_length is not None and len(text) > self.max_length:
+            raise self.operand_limit_error(
+                "Expression is %d characters long; the maximum supported is %d" % (len(text), self.max_length)
+            )
         depth = deepest = 0
         for char in text:
             if char == "(":
@@ -156,6 +168,7 @@ class IntroTextParser(BaseParser):
 
 
 class PlainTextParser(ComparisonParser):
+    max_length = None  # prose lines are not expressions; only the {...} predicate is
     grammar = Grammar(grammars.plain_text_grammar)
 
     def visit_text(self, node, children):

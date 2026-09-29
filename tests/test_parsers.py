@@ -367,6 +367,55 @@ class TestExpressionOperandLimit:
         assert parsers.OperationParser().parse(text).evaluate(0) == parsers.MAX_EXPRESSION_OPERANDS
 
 
+class TestExpressionLengthLimit:
+    """Over-long expression text is refused before Parsimonious builds a parse tree for it."""
+
+    @staticmethod
+    def _padded(prefix, length):
+        return prefix + " " * (length - len(prefix) - 1) + "1"
+
+    def test_an_operation_at_the_limit_parses(self):
+        text = self._padded("X = ", parsers.MAX_EXPRESSION_LENGTH)
+
+        assert len(text) == parsers.MAX_EXPRESSION_LENGTH
+        assert parsers.OperationParser().parse(text).evaluate(0) == 1
+
+    def test_a_comparison_at_the_limit_parses(self):
+        text = self._padded("X == ", parsers.MAX_EXPRESSION_LENGTH)
+
+        assert parsers.ComparisonParser().parse(text) is not None
+
+    def test_a_full_chain_with_long_quality_names_fits_under_the_limit(self):
+        name = "q" * 100
+        text = "X = " + "+".join([name] * parsers.MAX_EXPRESSION_OPERANDS)
+
+        assert len(text) < parsers.MAX_EXPRESSION_LENGTH
+        assert parsers.OperationParser().parse(text).quality == "X"
+
+    @pytest.mark.parametrize(
+        ("parser", "error", "prefix"),
+        [
+            (parsers.OperationParser, exceptions.OperationParseError, "X = "),
+            (parsers.ComparisonParser, exceptions.ComparisonParseError, "X == "),
+        ],
+    )
+    def test_text_over_the_limit_is_rejected_without_reaching_parsimonious(self, monkeypatch, parser, error, prefix):
+        def boom(*args, **kwargs):
+            raise AssertionError("parsimonious was reached")
+
+        monkeypatch.setattr(parsers.NodeVisitor, "parse", boom)
+        text = prefix + "+".join(["x"] * 200_000)
+
+        with pytest.raises(error, match=str(parsers.MAX_EXPRESSION_LENGTH)):
+            parser().parse(text)
+
+    def test_a_long_plain_text_line_still_parses(self):
+        text = "word " * 40_000
+
+        assert len(text) > parsers.MAX_EXPRESSION_LENGTH
+        assert parsers.PlainTextParser().parse(text).text.startswith("word")
+
+
 class TestExpressionDepthLimit:
     """Parentheses let capped chains nest; total depth and paren nesting are capped too."""
 
