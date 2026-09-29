@@ -74,7 +74,6 @@ def _forbid(name: str) -> Any:
     return forbidden
 
 
-@pytest.mark.xfail(strict=True, reason="US4 not yet implemented; remove when this scenario passes")
 def test_us4_as1_in_memory_mapping_compiles_and_plays_with_zero_filesystem_access(tmp_path: Path) -> None:
     """US4-AS1: a mapping of rulebook names to source strings compiles and plays with no filesystem access."""
     from ravel.adapters.story_source import MemoryStorySource  # type: ignore[attr-defined]  # noqa: PLC0415
@@ -95,6 +94,8 @@ def test_us4_as1_in_memory_mapping_compiles_and_plays_with_zero_filesystem_acces
         session.new_game()
         menu = session.menu()
         session.choose(menu[0].location)
+        assert session.state.offered == ("begin::start::go",)
+        session.choose("begin::start::go")
         state = session.state
 
     assert len(menu) == 1
