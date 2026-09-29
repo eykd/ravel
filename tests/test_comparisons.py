@@ -1,8 +1,9 @@
 import itertools as it
 
 import pytest
+from parsimonious import Grammar
 
-from ravel import exceptions, parsers, types
+from ravel import exceptions, grammars, parsers, types
 
 
 class TestComparison:
@@ -186,3 +187,21 @@ class TestComparisonThreadsQualities:
     def test_text_check_forwards_qualities(self):
         text = types.Text("hi", predicate=types.Comparison("Health", "<", types.QualityRef("Max")))
         assert text.check({"Health": 7, "Max": 10}) is True
+
+
+class TestComparisonParserQualityReferences:
+    @pytest.fixture
+    def parser(self):
+        return parsers.ComparisonParser()
+
+    def test_a_quoted_string_on_the_right_stays_a_string(self, parser):
+        assert parser.parse('Name == "Wearing Cloak"') == types.Comparison("Name", "==", "Wearing Cloak")
+
+    def test_a_bracketed_name_on_the_right_is_a_quality_reference(self, parser):
+        assert parser.parse("X == [Y]") == types.Comparison("X", "==", types.QualityRef("Y"))
+
+    def test_a_quoted_subject_is_kept(self, parser):
+        assert parser.parse('"Wearing Cloak" >= 1') == types.Comparison("Wearing Cloak", ">=", 1)
+
+    def test_the_grammar_is_built_from_the_shared_comparison_grammar(self):
+        assert str(parsers.ComparisonParser.grammar) == str(Grammar(grammars.comparison_grammar))

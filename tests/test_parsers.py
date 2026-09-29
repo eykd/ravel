@@ -243,3 +243,43 @@ class TestOperationsParser:
 class TestComparisonParserSignedNumbers:
     def test_comparison_against_a_negative_number_parses(self):
         assert parsers.ComparisonParser().parse("Health > -1") == types.Comparison("Health", ">", -1)
+
+
+class TestOperationParserQualityReferences:
+    @pytest.fixture
+    def parser(self):
+        return parsers.OperationParser()
+
+    @pytest.mark.parametrize(
+        ("text", "rhs"),
+        [
+            ("X = [Health] + Bonus", types.Expression(types.QualityRef("Health"), "+", types.QualityRef("Bonus"))),
+            ("X = Health + 1", types.Expression(types.QualityRef("Health"), "+", 1)),
+            ("X = values", types.QualityRef("values")),
+            ("X = maxHealth", types.QualityRef("maxHealth")),
+            ("X = Été + 1", types.Expression(types.QualityRef("Été"), "+", 1)),
+            ("X = Has-Key", types.Expression(types.QualityRef("Has"), "-", types.QualityRef("Key"))),
+            ("X = [Has-Key]", types.QualityRef("Has-Key")),
+        ],
+    )
+    def test_identifiers_and_bracketed_names_parse_as_quality_references(self, parser, text, rhs):
+        assert parser.parse(text) == types.Operation("X", "=", rhs, None)
+
+    def test_a_quality_reference_may_take_a_constraint(self, parser):
+        result = parser.parse("X = Health max 3")
+        assert result == types.Operation("X", "=", types.QualityRef("Health"), types.Constraint("max", 3))
+
+    @pytest.mark.parametrize("subject", ["Has-Key", "value", "Wearing Cloak", "Has Key"])
+    def test_subjects_keep_their_names(self, parser, subject):
+        text = {
+            "Has-Key": "Has-Key = 5",
+            "value": "value = 3",
+            "Wearing Cloak": '"Wearing Cloak" = 0',
+            "Has Key": "[Has Key] = 1",
+        }[subject]
+        assert parser.parse(text).quality == subject
+
+    @pytest.mark.parametrize("text", ["X = min + 1", "X = max", "X = -Health"])
+    def test_reserved_words_and_unary_minus_on_names_are_rejected(self, parser, text):
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            parser.parse(text)
