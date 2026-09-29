@@ -38,12 +38,30 @@ def _is_storable(value: object) -> bool:
     return len(value) <= MAX_STRING_LENGTH and is_surrogate_free(value)
 
 
+_PREVIEW_LENGTH: Final = 40
+
+
+def _describe_value(value: object) -> str:
+    """Describe ``value`` in bounded space; never ``repr`` a value of unbounded size."""
+    if isinstance(value, bool):
+        return repr(value)
+    if isinstance(value, int):
+        return "int of %d bits" % value.bit_length()
+    if isinstance(value, str):
+        return "str of length %d starting %r" % (len(value), value[:_PREVIEW_LENGTH])
+    if isinstance(value, float):
+        return repr(value)
+    return "a %s" % type(value).__name__
+
+
 def _validate_quality(name: str, value: object) -> None:
     """Raise ``InvalidQualityValueError`` unless ``name`` and ``value`` are storable."""
     if not is_surrogate_free(name):
         raise InvalidQualityValueError("Quality name %r holds a lone surrogate" % name)
     if not _is_storable(value):
-        raise InvalidQualityValueError("Quality %r has an unstorable value %r" % (name, value))
+        raise InvalidQualityValueError(
+            "Quality %r has an unstorable value: %s" % (name[:_PREVIEW_LENGTH], _describe_value(value))
+        )
 
 
 @frozen

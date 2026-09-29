@@ -6,7 +6,7 @@ import pytest
 
 from ravel import types
 from ravel.engine.engine import start
-from ravel.engine.errors import InvalidOperationError
+from ravel.engine.errors import InvalidOperationError, InvalidQualityValueError
 from ravel.engine.outputs import ChoiceOption, ChoicesOffered, QualityChanged
 from ravel.engine.state import Status
 from ravel.engine.story import Story
@@ -110,3 +110,17 @@ def test_given_with_a_max_constraint_is_clamped_in_the_emitted_change():
 
     changes = [output for output in step.outputs if isinstance(output, QualityChanged)]
     assert changes == [QualityChanged("Gold", None, 20)]
+
+
+def test_given_computing_an_oversize_int_raises_a_typed_error_with_a_short_message():
+    big = 10**3999
+    rulebook: types.CompiledRulebook = {
+        "metadata": {},
+        "rulebook": {"Situation": {"rules": [], "locations": {}}},
+        "givens": [types.Operation("Y", "=", types.Expression(big, "*", big))],
+    }
+
+    with pytest.raises(InvalidQualityValueError) as excinfo:
+        start(Story(rulebook=rulebook))
+
+    assert len(str(excinfo.value)) < 200

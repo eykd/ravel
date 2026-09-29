@@ -214,3 +214,16 @@ class TestGameState:
         state = make_waiting_state()
         with pytest.raises(attrs.exceptions.FrozenInstanceError):
             state.status = Status.HALTED  # type: ignore[misc]
+
+
+class TestUnstorableValueMessage:
+    def test_it_describes_an_oversize_string_without_embedding_it(self):
+        with pytest.raises(InvalidQualityValueError) as excinfo:
+            Qualities().set("q", "a" * (MAX_STRING_LENGTH + 1))
+        assert len(str(excinfo.value)) < 200
+
+    @pytest.mark.parametrize("value", [True, float("nan"), None, [1]], ids=["bool", "float", "none", "list"])
+    def test_it_keeps_the_message_short_for_other_types(self, value):
+        with pytest.raises(InvalidQualityValueError) as excinfo:
+            Qualities().set("q" * 1000, value)
+        assert len(str(excinfo.value)) < 200
