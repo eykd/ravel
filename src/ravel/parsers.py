@@ -10,6 +10,13 @@ from ravel import exceptions, grammars, types
 # (a multiplicative chain is one additive operand), so the worst-case depth is about twice the cap.
 MAX_EXPRESSION_OPERANDS: Final = 100
 
+# Parentheses let capped chains nest, so the operand cap alone does not bound tree depth. Cap the total
+# depth of an expression tree (the worst accepted shape, a full additive chain whose operand is a full
+# multiplicative chain, is about 200 deep and evaluates fine) and cap parenthesis nesting before
+# Parsimonious recurses through it, which would overflow the stack from a few hundred levels.
+MAX_EXPRESSION_DEPTH: Final = 200
+MAX_PAREN_DEPTH: Final = 20
+
 
 class BaseParser(NodeVisitor):
     def reduce_children(self, children):
@@ -31,6 +38,22 @@ class BaseExpressionParser(BaseParser):
     operand_limit_error: type[exceptions.ParseError] = exceptions.ParseError
     visit_setter = BaseParser.get_text
     visit_simple_quality = BaseParser.get_text
+
+    def parse(self, text, pos=0):
+        """Parse text, refusing over-deep parenthesis nesting before the grammar can recurse through it."""
+        depth = deepest = 0
+        for char in text:
+            if char == "(":
+                depth += 1
+                deepest = max(deepest, depth)
+            elif char == ")":
+                depth = max(depth - 1, 0)
+        if deepest > MAX_PAREN_DEPTH:
+            raise self.operand_limit_error(
+                "Expression nests parentheses %d deep; the maximum supported is %d" % (deepest, MAX_PAREN_DEPTH)
+            )
+        self._depths: dict[int, int] = {}
+        return super().parse(text, pos=pos)
 
     def visit_quoted_quality(self, node, children):
         return node.text[1:-1]
@@ -68,8 +91,15 @@ class BaseExpressionParser(BaseParser):
                 "Expression has %d operands; the maximum supported is %d" % (len(rest) + 1, MAX_EXPRESSION_OPERANDS)
             )
         result = first
+        depth = self._depths.get(id(first), 0)
         for operator, operand in rest:
             result = types.Expression(result, operator, operand)
+            depth = 1 + max(depth, self._depths.get(id(operand), 0))
+        if depth > MAX_EXPRESSION_DEPTH:
+            raise self.operand_limit_error(
+                "Expression is nested %d deep; the maximum supported is %d" % (depth, MAX_EXPRESSION_DEPTH)
+            )
+        self._depths[id(result)] = depth
         return result
 
     visit_additive = visit_multiplicative = _fold_left

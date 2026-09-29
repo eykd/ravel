@@ -365,3 +365,44 @@ class TestExpressionOperandLimit:
         text = "X = " + "+".join([term] * parsers.MAX_EXPRESSION_OPERANDS)
 
         assert parsers.OperationParser().parse(text).evaluate(0) == parsers.MAX_EXPRESSION_OPERANDS
+
+
+class TestExpressionDepthLimit:
+    """Parentheses let capped chains nest; total depth and paren nesting are capped too."""
+
+    @staticmethod
+    def _wrapped(levels):
+        """A full chain wrapped in parentheses `levels` times, each wrap extended by a full chain."""
+        text = "+".join(["1"] * parsers.MAX_EXPRESSION_OPERANDS)
+        for _ in range(levels):
+            text = "(" + text + ")" + "+1" * (parsers.MAX_EXPRESSION_OPERANDS - 1)
+        return text
+
+    def test_parentheses_over_the_limit_raise_a_typed_error(self):
+        text = "X = " + "(" * (parsers.MAX_PAREN_DEPTH + 1) + "1" + ")" * (parsers.MAX_PAREN_DEPTH + 1)
+
+        with pytest.raises(exceptions.OperationParseError, match=str(parsers.MAX_PAREN_DEPTH)):
+            parsers.OperationParser().parse(text)
+
+    def test_comparison_parentheses_over_the_limit_raise_a_typed_error(self):
+        text = "X == " + "(" * 300 + "1" + ")" * 300
+
+        with pytest.raises(exceptions.ComparisonParseError):
+            parsers.ComparisonParser().parse(text)
+
+    def test_parentheses_at_the_limit_parse(self):
+        n = parsers.MAX_PAREN_DEPTH
+        assert parsers.OperationParser().parse("X = " + "(" * n + "1" + ")" * n).evaluate(0) == 1
+
+    def test_unbalanced_closers_do_not_count_as_nesting(self):
+        with pytest.raises(exceptions.ParseError):
+            parsers.OperationParser().parse("X = 1" + ")" * 50)
+
+    def test_nested_chains_over_the_depth_limit_raise_a_typed_error(self):
+        with pytest.raises(exceptions.OperationParseError, match=str(parsers.MAX_EXPRESSION_DEPTH)):
+            parsers.OperationParser().parse("X = " + self._wrapped(3))
+
+    def test_the_deepest_accepted_expression_evaluates_without_recursion_error(self):
+        operation = parsers.OperationParser().parse("X = " + self._wrapped(1))
+
+        assert operation.evaluate(0) == 2 * parsers.MAX_EXPRESSION_OPERANDS - 1

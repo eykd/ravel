@@ -100,7 +100,38 @@ def test_memory_source_rejects_an_over_limit_when_predicate_at_load():
 
 def test_memory_source_rejects_an_over_limit_effect_at_load():
     chain = "+".join(["1"] * (MAX_EXPRESSION_OPERANDS + 1))
-    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - effect: X = %s\n  - Ready.\n" % chain
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - Ready.\n  - effect: X = %s\n" % chain
 
     with pytest.raises(ParseError):
         MemoryStorySource({"begin": src}).load()
+
+
+def _nested(depth):
+    return "(" * depth + "1" + ")" * depth
+
+
+def test_memory_source_rejects_deep_parentheses_in_an_effect_at_load():
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - Ready.\n  - effect: X = %s\n" % _nested(300)
+
+    with pytest.raises(ParseError):
+        MemoryStorySource({"begin": src}).load()
+
+
+def test_memory_source_rejects_deep_parentheses_in_a_when_predicate_at_load():
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == %s\n  - Ready.\n" % _nested(300)
+
+    with pytest.raises(ParseError):
+        MemoryStorySource({"begin": src}).load()
+
+
+def test_memory_source_rejects_deep_parentheses_in_a_text_prefix_at_load():
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - Ready.\n  - {X == %s}More.\n" % _nested(300)
+
+    with pytest.raises(ParseError):
+        MemoryStorySource({"begin": src}).load()
+
+
+def test_memory_source_accepts_modest_parenthesis_nesting():
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - Ready.\n  - effect: X = %s\n" % _nested(5)
+
+    assert isinstance(MemoryStorySource({"begin": src}).load(), Story)
