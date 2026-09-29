@@ -2,7 +2,7 @@ import itertools as it
 
 import pytest
 
-from ravel import parsers, types
+from ravel import exceptions, parsers, types
 
 
 class TestIntroTextParser:
@@ -314,3 +314,21 @@ class TestValueKeyword:
     def test_value_keyword_is_distinct_from_quality_references(self):
         result = parsers.OperationParser().parse("X = value + Value")
         assert result.expression == types.Expression(types.VALUE, "+", types.QualityRef("Value"))
+
+
+class TestOperationParserConstraintRules:
+    """A constraint clamps a numeric result: one per operation, bound a number literal, never on a string."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            'X = "a" max 3',
+            "X += 1 min 0 max 8",
+            "X += 1 max value",
+        ],
+    )
+    def test_an_invalid_constraint_is_an_operation_parse_error_naming_the_operation(self, text):
+        with pytest.raises(exceptions.OperationParseError) as excinfo:
+            parsers.OperationParser().parse(text)
+
+        assert text in str(excinfo.value)
