@@ -6,6 +6,7 @@ from typing import Any, Final, Protocol, TypedDict
 import attr
 from syml.basetypes import Pos, Source  # noqa
 
+from ravel.exceptions import EvaluationError
 from ravel.utils.data import evaluate_term
 
 # Mirrors ravel.engine.state.QualityValue (importing it here would be circular).
@@ -90,10 +91,12 @@ class Expression:
         return self._operators[self.operator]
 
     def evaluate(self, **kwargs: Any) -> Any:
-        return self.get_operator()(
-            evaluate_term(self.term1, **kwargs),
-            evaluate_term(self.term2, **kwargs),
-        )
+        left = evaluate_term(self.term1, **kwargs)
+        right = evaluate_term(self.term2, **kwargs)
+        try:
+            return self.get_operator()(left, right)
+        except (TypeError, ArithmeticError) as error:
+            raise EvaluationError("%r: %s" % (self, error)) from error
 
 
 @attr.s(slots=True)

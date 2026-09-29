@@ -1,7 +1,6 @@
 from parsimonious.exceptions import ParseError as ParsimoniousParseError  # noqa: F401
 from parsimonious.exceptions import VisitationError  # noqa: F401
-
-from .types import Source
+from syml.basetypes import Source
 
 
 class ParseError(ValueError):
@@ -39,4 +38,4 @@ def raise_parse_error(position, error_type=ParseError):
 
 
 class EvaluationError(ValueError):
-    pass
+    """An expression operator failed on its operands (type mismatch or arithmetic error)."""
