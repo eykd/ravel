@@ -1,3 +1,4 @@
+import re
 import sys
 from typing import Final
 
@@ -24,6 +25,14 @@ MAX_PAREN_DEPTH: Final = 20
 # full operand chain of 100 operands with 100-character quality names (about 10 KB) and matches the
 # string-length cap. Only expression parsers are gated; long prose lines are legitimate and cheap.
 MAX_EXPRESSION_LENGTH: Final = 65_536
+
+# What the paren gate steps over, transcribed from the grammar: the leading quality (bracketed, quoted, or a
+# bare run of non-space characters, in that order), and inside the expression a string literal (triple form
+# first, all three quote characters, no quote character inside) or a bracketed quality name.
+_LEADING_QUALITY: Final = re.compile(r'\s*(?:\[[^\]]+\]|"[^"]+"|[^\s]+)')
+_STRING_OR_BRACKET: Final = re.compile(
+    r"""\"\"\"[^"]*\"\"\"|\'\'\'[^']*\'\'\'|```[^`]*```|"[^"]*"|'[^']*'|`[^`]*`|\[[^\]]+\]"""
+)
 
 
 class BaseParser(NodeVisitor):
@@ -58,15 +67,31 @@ class BaseExpressionParser(BaseParser):
         self._depths: dict[int, int] = {}
         return super().parse(text, pos=pos)
 
-    def _check_paren_depth(self, text):
-        """Refuse text whose parentheses nest deeper than Parsimonious can safely recurse."""
+    def _check_paren_depth(self, text, start=0, closer=None):
+        """Refuse text whose parentheses nest deeper than Parsimonious can safely recurse.
+
+        Tokenises like the grammar: the leading quality, string literals and bracketed quality names hold no
+        structural parentheses, so they are stepped over. With ``closer``, counting stops at the first such
+        character outside those tokens (a text line's ``}``), leaving the prose after a prefix uncounted.
+        """
+        leading = _LEADING_QUALITY.match(text, start)
+        i = leading.end() if leading else start
         depth = deepest = 0
-        for char in text:
+        while i < len(text):
+            char = text[i]
+            if char == closer:
+                break
             if char == "(":
                 depth += 1
                 deepest = max(deepest, depth)
             elif char == ")":
                 depth = max(depth - 1, 0)
+            elif char in "\"'`[":
+                token = _STRING_OR_BRACKET.match(text, i)
+                if token:
+                    i = token.end()
+                    continue
+            i += 1
         if deepest > MAX_PAREN_DEPTH:
             raise self.operand_limit_error(
                 "Expression nests parentheses %d deep; the maximum supported is %d" % (deepest, MAX_PAREN_DEPTH)
@@ -199,7 +224,7 @@ class PlainTextParser(ComparisonParser):
         prose = line
         if line.startswith("{"):
             window = line[: MAX_EXPRESSION_LENGTH + 2]
-            self._check_paren_depth(window)
+            self._check_paren_depth(window, start=1, closer="}")
             self._depths = {}
             try:
                 prefix = self.grammar["cmp_prefix"].match(window)

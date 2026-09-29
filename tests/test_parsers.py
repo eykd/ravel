@@ -583,3 +583,143 @@ class TestOversizedIntegerLiterals:
     def test_comparison_literal_over_the_int_limit_raises_a_typed_error(self):
         with pytest.raises(exceptions.ComparisonParseError, match="too many digits"):
             parsers.ComparisonParser().parse("X == " + self.DIGITS)
+
+
+class TestParenGateTokenisesLikeTheGrammar:
+    """The paren pre-check counts structural parentheses only: not those in strings, bracketed names or prose."""
+
+    OVER = parsers.MAX_PAREN_DEPTH + 1
+    OPEN = "(" * OVER
+
+    def test_an_operation_string_literal_holding_many_parentheses_compiles(self):
+        operation = parsers.OperationParser().parse('x = "%s "' % self.OPEN)
+
+        assert operation.expression == self.OPEN + " "
+
+    def test_a_comparison_string_literal_holding_many_parentheses_parses(self):
+        comparison = parsers.ComparisonParser().parse('x == "%s "' % self.OPEN)
+
+        assert comparison.expression == self.OPEN + " "
+
+    @pytest.mark.parametrize("quote", ['"', "'", "`", '"""', "'''", "```"])
+    def test_every_string_quote_form_hides_parentheses(self, quote):
+        parsers.OperationParser().parse("x = %s%s%s" % (quote, self.OPEN, quote))
+
+    def test_a_bracketed_quality_name_holding_many_parentheses_parses(self):
+        parsers.OperationParser().parse("[a%s] = [b%s] + 1" % (self.OPEN, self.OPEN))
+
+    def test_prose_after_a_predicate_prefix_is_not_counted(self):
+        result = parsers.PlainTextParser().parse("{x == 0} " + self.OPEN + " and more")
+
+        assert result.text == " " + self.OPEN + " and more"
+        assert result.predicate is not None
+
+    def test_a_closing_brace_inside_a_string_does_not_end_the_prefix_window(self):
+        with pytest.raises(exceptions.ComparisonParseError, match="nests parentheses"):
+            parsers.PlainTextParser().parse('{x == "}" + ' + self.OPEN + "1" + ")" * self.OVER + "} prose")
+
+    def test_real_nesting_inside_a_predicate_prefix_is_still_refused(self):
+        with pytest.raises(exceptions.ComparisonParseError, match="nests parentheses"):
+            parsers.PlainTextParser().parse("{x == " + self.OPEN + "1" + ")" * self.OVER + "} prose")
+
+    def test_an_unclosed_prefix_counts_to_the_end_of_the_window(self):
+        with pytest.raises(exceptions.ComparisonParseError, match="nests parentheses"):
+            parsers.PlainTextParser().parse("{x == " + self.OPEN)
+
+    def test_an_unterminated_quote_is_not_a_string_so_real_nesting_after_it_is_refused(self):
+        with pytest.raises(exceptions.OperationParseError, match="nests parentheses"):
+            parsers.OperationParser().parse("it's = 1 + " + self.OPEN + "1" + ")" * self.OVER)
+
+    def test_a_unbalanced_open_bracket_is_not_a_bracketed_name(self):
+        with pytest.raises(exceptions.OperationParseError, match="nests parentheses"):
+            parsers.OperationParser().parse("x = [ + " + self.OPEN + "1" + ")" * self.OVER)
+
+    @pytest.mark.parametrize("text", ["", "   "])
+    def test_text_without_a_leading_quality_has_nothing_to_count(self, text):
+        parsers.OperationParser()._check_paren_depth(text)
+
+
+_OPERATORS = st.sampled_from(["+", "-", "*", "/", "//", "%"])
+_STRING_SPECS = st.sampled_from(['"', "'", "`", '"""', "'''", "```"])
+
+
+@st.composite
+def _strings(draw):
+    quote = draw(_STRING_SPECS)
+    body = draw(st.text(alphabet="()[]{}x 1+", max_size=45))
+    return quote + body + quote
+
+
+@st.composite
+def _atoms(draw):
+    return draw(
+        st.one_of(
+            st.integers(0, 999).map(str),
+            st.sampled_from(["a", "b_2", "value"]),
+            _strings(),
+            st.text(alphabet="ab (", min_size=1, max_size=8).map(lambda t: "[" + t.strip("[]").replace("]", "") + "z]"),
+        )
+    )
+
+
+@st.composite
+def _chains(draw, room):
+    """A chain of operands whose real parenthesis nesting is at most `room`."""
+    operands = []
+    for _ in range(draw(st.integers(1, 4))):
+        if room > 0 and draw(st.booleans()):
+            operands.append("(" + draw(_chains(room - 1)) + ")")
+        else:
+            operands.append(draw(_atoms()))
+    text = operands[0]
+    for operand in operands[1:]:
+        text += draw(_OPERATORS) + operand
+    return text
+
+
+def _wrapped(draw, levels, room):
+    core = draw(_chains(room))
+    return "(" * levels + core + ")" * levels
+
+
+@st.composite
+def _within_caps(draw):
+    levels = draw(st.integers(0, parsers.MAX_PAREN_DEPTH))
+    return _wrapped(draw, levels, parsers.MAX_PAREN_DEPTH - levels)
+
+
+@st.composite
+def _over_cap(draw):
+    levels = draw(st.integers(parsers.MAX_PAREN_DEPTH + 1, parsers.MAX_PAREN_DEPTH + 30))
+    return _wrapped(draw, levels, 0)
+
+
+class TestParenGateDifferential:
+    """Differential: the gate never rejects what the grammar plus the depth caps accept, and never admits over-cap."""
+
+    @given(_within_caps())
+    def test_the_gate_never_rejects_an_operation_within_the_caps(self, expr):
+        assert parsers.OperationParser().parse("x = " + expr) is not None
+
+    @given(_within_caps())
+    def test_the_gate_never_rejects_a_comparison_within_the_caps(self, expr):
+        assert parsers.ComparisonParser().parse("x == " + expr) is not None
+
+    @given(_within_caps(), st.text(alphabet="(){ab <", max_size=60))
+    def test_the_gate_never_rejects_a_text_line_within_the_caps(self, expr, prose):
+        try:
+            result = parsers.PlainTextParser().parse("{x == " + expr + "}" + prose)
+        except exceptions.ParseError as e:
+            assert "<>" in str(e)  # only malformed glue in the prose may refuse it
+        else:
+            assert result.predicate is not None
+
+    @given(_over_cap(), st.sampled_from(["operation", "comparison", "text"]))
+    def test_real_nesting_over_the_cap_is_refused_however_strings_are_sprinkled(self, expr, kind):
+        with pytest.raises(exceptions.ParseError, match="nests parentheses"):
+            if kind == "operation":
+                parsers.OperationParser().parse("x = " + expr)
+            elif kind == "comparison":
+                parsers.ComparisonParser().parse("x == " + expr)
+            else:
+                parsers.PlainTextParser().parse("{x == " + expr + "} prose")
