@@ -2,6 +2,8 @@ from unittest.mock import patch
 
 import pytest
 import syml
+from hypothesis import given
+from hypothesis import strategies as st
 
 from ravel import environments, exceptions, loaders
 from ravel.adapters.story_source import MemoryStorySource
@@ -146,20 +148,103 @@ class TestIncludeOrder:
         assert state.qualities.get("Mood") == 2
 
 
-def _nested_choice_source(depth):
+def _nested_choice_source(depth, separator=""):
     lines = ["rule:"]
     column = 2
     for _ in range(depth):
         lines.append(" " * column + "- choice:")
         column += 4
-        lines.append(" " * column + "- Intro.")
+        lines.append(" " * column + "- Intro.%sz" % separator)
     return "\n".join(lines) + "\n"
+
+
+# Every code point str.splitlines() or str.isspace() treats specially that syml does not: syml breaks
+# lines on \n only (after normalising \r\n and \r) and indents with spaces only.
+NON_SYML_LINE_BREAKS = ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"]
+NON_SYML_INDENT_WHITESPACE = [
+    "\t",
+    "\xa0",
+    "\u1680",
+    *(chr(code) for code in range(0x2000, 0x200B)),
+    "\u202f",
+    "\u205f",
+    "\u3000",
+]
+NON_SYML_SEPARATORS = NON_SYML_LINE_BREAKS + NON_SYML_INDENT_WHITESPACE
+NON_SYML_SEPARATORS_EXCEPT_TAB = [c for c in NON_SYML_SEPARATORS if c != "\t"]
+
+
+def _syml_data_depth(source):
+    """Return the nesting depth of syml's parsed data for ``source``, walked iteratively."""
+    deepest = 0
+    pending = [(syml.parsers.parse(source).as_data(), 1)]
+    while pending:
+        node, depth = pending.pop()
+        if isinstance(node, dict):
+            children = list(node.values())
+        elif isinstance(node, list):
+            children = node
+        else:
+            continue
+        deepest = max(deepest, depth)
+        pending.extend((child, depth + 1) for child in children)
+    return deepest
 
 
 class TestSourceNestingDepth:
     def test_it_should_count_indentation_levels_ignoring_blanks_and_comments(self):
-        source = "a:\n\n  # comment\n  - b:\n      - c\n  - d\n"
+        source = "a:\n\n# comment\n  - b:\n//  comment\n      - c\n  - d\n"
         assert environments._source_nesting_depth(source) == 3
+
+    @pytest.mark.parametrize("marker", ["#", "//"])
+    def test_it_should_count_an_indented_comment_marker_as_content(self, marker):
+        # syml only treats # and // as comments at column 0; indented, they are text at that column.
+        source = "a:\n  - b\n    %s not a comment\n" % marker
+        assert environments._source_nesting_depth(source) == 3
+
+    # A tab in leading whitespace is a syml TabIndentationError instead (see the syntax-error test below).
+    @pytest.mark.parametrize("separator", NON_SYML_SEPARATORS_EXCEPT_TAB, ids=lambda c: "U+%04X" % ord(c))
+    def test_it_should_not_count_non_space_whitespace_as_indentation(self, separator):
+        source = "a:\n  - b\n  %s- c\n" % separator
+        assert environments._source_nesting_depth(source) == 2
+
+    @pytest.mark.parametrize("separator", NON_SYML_SEPARATORS, ids=lambda c: "U+%04X" % ord(c))
+    def test_it_should_agree_with_syml_when_a_label_holds_a_non_syml_separator(self, separator):
+        clean = _nested_choice_source(20)
+        injected = _nested_choice_source(20, separator)
+
+        assert environments._source_nesting_depth(injected) == environments._source_nesting_depth(clean)
+        assert _syml_data_depth(injected) == _syml_data_depth(clean)
+
+    @pytest.mark.parametrize("line_ending", ["\r\n", "\r"], ids=["CRLF", "CR"])
+    def test_it_should_break_lines_on_carriage_returns_like_syml(self, line_ending):
+        source = _nested_choice_source(20).replace("\n", line_ending)
+        assert environments._source_nesting_depth(source) == environments._source_nesting_depth(
+            _nested_choice_source(20)
+        )
+
+    def test_it_should_ignore_a_leading_byte_order_mark_like_syml(self):
+        source = "\ufeff" + _nested_choice_source(3)
+        assert environments._source_nesting_depth(source) == environments._source_nesting_depth(
+            _nested_choice_source(3)
+        )
+
+    @given(
+        depth=st.integers(min_value=1, max_value=12),
+        separators=st.lists(st.sampled_from(NON_SYML_SEPARATORS), min_size=1, max_size=4),
+    )
+    def test_a_non_syml_separator_in_labels_never_lowers_the_depth(self, depth, separators):
+        injected = _nested_choice_source(depth, "".join(separators))
+        assert environments._source_nesting_depth(injected) == environments._source_nesting_depth(
+            _nested_choice_source(depth)
+        )
+
+    @pytest.mark.parametrize("separator", NON_SYML_LINE_BREAKS, ids=lambda c: "U+%04X" % ord(c))
+    def test_it_should_refuse_190_nested_choices_with_a_separator_in_each_label(self, separator):
+        # ravel-h6v.30: a separator per label used to reset the scanner, so 190 nested choices
+        # (~380 real indentation levels) loaded past the 128-level cap.
+        with pytest.raises(exceptions.ParseError, match="'begin'.*maximum supported is 128"):
+            MemoryStorySource({"begin": _nested_choice_source(190, separator)}).load()
 
     def test_it_should_raise_parse_error_naming_the_rulebook_for_deep_nesting(self, env):
         source = _nested_choice_source(1000)

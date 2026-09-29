@@ -15,16 +15,26 @@ from ravel.compiler import rulebooks
 # did not come through this text path.
 MAX_SOURCE_NESTING_DEPTH: Final = 128
 
+# The scan must see exactly the lines syml lexes, or it drifts from the parser it guards (ravel-h6v.30):
+# str.splitlines() also breaks on \x0b \x0c \x1c-\x1e \x85 \u2028 \u2029, and str.lstrip() eats every
+# Unicode space, so one such character per label used to reset the scan. It therefore reuses syml's own
+# pre-processing (BOM strip, \r\n / \r -> \n, tab-indentation check), blank test, and grammar rules for
+# comments (column 0 only) and indentation (spaces only).
+_SYML_COMMENT: Final = syml.parsers.SymlParser.grammar["comment"].re
+_SYML_INDENT: Final = syml.parsers.SymlParser.grammar["indent"].re
 
-def _source_nesting_depth(source: str) -> int:
-    """Return the deepest indentation nesting in ``source`` without parsing it."""
+
+def _source_nesting_depth(source: str, filename: str = "") -> int:
+    """Return the deepest indentation nesting in ``source`` without parsing it.
+
+    Raises ``syml.exceptions.TabIndentationError`` for a tab in leading whitespace, as syml would.
+    """
     stack: list[int] = []
     deepest = 0
-    for line in source.splitlines():
-        stripped = line.lstrip()
-        if not stripped or stripped.startswith("#"):
+    for line in syml.preprocess.preprocess(source, filename=filename or None).normalized.split("\n"):
+        if syml.preprocess.is_blank(line) or _SYML_COMMENT.match(line):
             continue
-        indent = len(line) - len(stripped)
+        indent = _SYML_INDENT.match(line).end()
         while stack and stack[-1] > indent:
             stack.pop()
         if not stack or stack[-1] < indent:
@@ -94,13 +104,13 @@ class Environment:
 
     def compile_rulebook(self, source, name="", is_up_to_date=default_is_up_to_date):
         label = name or "<rulebook>"
-        depth = _source_nesting_depth(source)
-        if depth > MAX_SOURCE_NESTING_DEPTH:
-            raise exceptions.ParseError(
-                "Rulebook %s nests %d indentation levels deep; the maximum supported is %d"
-                % (exceptions.bounded_repr(label), depth, MAX_SOURCE_NESTING_DEPTH)
-            )
         try:
+            depth = _source_nesting_depth(source, name)
+            if depth > MAX_SOURCE_NESTING_DEPTH:
+                raise exceptions.ParseError(
+                    "Rulebook %s nests %d indentation levels deep; the maximum supported is %d"
+                    % (exceptions.bounded_repr(label), depth, MAX_SOURCE_NESTING_DEPTH)
+                )
             data = syml.parsers.parse(source, filename=name).as_source()
         except RecursionError as error:
             raise exceptions.ParseError(
