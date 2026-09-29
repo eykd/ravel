@@ -104,6 +104,8 @@ class Environment:
             data = syml.parsers.parse(source, filename=name).as_source()
         except RecursionError as error:
             raise exceptions.ParseError("Rulebook %r is nested too deeply to parse" % label) from error
+        except syml.exceptions.ParseError as error:
+            raise exceptions.ParseError(str(error)) from error
 
         prefix = name + self.location_separator if name else ""
         rulebook = rulebooks.compile_rulebook(self, data, prefix)

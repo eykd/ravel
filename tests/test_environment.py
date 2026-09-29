@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+import syml
 
 from ravel import environments, exceptions, loaders
 from ravel.adapters.story_source import MemoryStorySource
@@ -169,6 +170,20 @@ class TestSourceNestingDepth:
     def test_it_should_raise_parse_error_from_environment_load_via_memory_source(self):
         with pytest.raises(exceptions.ParseError, match="'begin'"):
             MemoryStorySource({"begin": _nested_choice_source(300)}).load()
+
+    @pytest.mark.parametrize(
+        ("source", "syml_error", "message"),
+        [
+            ("r:\n\t- hi\n", syml.exceptions.TabIndentationError, "begin:2:0: A tab character"),
+            ("a: 1\na: 2\n", syml.exceptions.DuplicateKeyError, "begin:2:0: Duplicate key 'a'"),
+            ("a:\n  b\n c\n", syml.exceptions.OutOfContextNodeError, "begin:3:1: Line 3"),
+        ],
+    )
+    def test_it_should_wrap_syml_syntax_errors_as_parse_error(self, source, syml_error, message):
+        with pytest.raises(exceptions.ParseError, match=message) as excinfo:
+            MemoryStorySource({"begin": source}).load()
+
+        assert isinstance(excinfo.value.__cause__, syml_error)
 
     def test_it_should_accept_nesting_at_the_limit(self, env):
         source = "a:\n" + "".join(" " * (i + 1) + "b:\n" for i in range(environments.MAX_SOURCE_NESTING_DEPTH - 1))
