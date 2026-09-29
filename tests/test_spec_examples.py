@@ -1,6 +1,8 @@
 """Unit tests for the spec-example extractor (specs/002-spec-compliance/contracts/spec-examples.md)."""
 
-from tests.spec_examples import SpecExample, extract_examples
+import pytest
+
+from tests.spec_examples import SpecExample, extract_examples, run_example
 
 
 def fenced(*lines: str, info: str = "") -> str:
@@ -118,3 +120,10 @@ def test_line_number_counts_from_top_of_document() -> None:
     markdown = doc("## 7. Effects", "effect:", "  - Health = 10")
 
     assert [e.line for e in extract_examples(markdown)] == [7]
+
+
+def test_run_example_wrong_result_raises_naming_example_and_expected_vs_got() -> None:
+    example = SpecExample(section="5", line=1, text="1 + 1 → 3", kind="result")
+
+    with pytest.raises(AssertionError, match=r"(?s)1 \+ 1 → 3.*expected 3, got 2"):
+        run_example(example)
