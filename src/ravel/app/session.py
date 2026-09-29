@@ -65,7 +65,10 @@ class GameSession:
         return step.outputs
 
     def save(self, name: str = DEFAULT_SAVE_NAME) -> str:
-        """Write the current state to ``name``; raises ``NoGameError`` if no game has started."""
+        """Write the current state to ``name``; raises ``NoGameError`` if no game has started.
+
+        ``SaveTooLargeError`` from ``encode_save`` propagates unchanged, before the store is touched.
+        """
         data = encode_save(self._story, self.state)
         return self._saves.write(name, data)
 

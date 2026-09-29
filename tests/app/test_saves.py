@@ -8,6 +8,7 @@ shape-checks bytes, never checking whether any saved ``location`` exists in a st
 import json
 
 import pytest
+from attrs import evolve
 
 from ravel import types
 from ravel.app.saves import (
@@ -17,6 +18,8 @@ from ravel.app.saves import (
     SAVE_MAGIC,
     LoadRefusedError,
     SaveCorruptError,
+    SaveTooLargeError,
+    SessionError,
     UnsupportedSaveVersionError,
     decode_save,
     encode_save,
@@ -568,3 +571,66 @@ def test_decode_save_never_calls_choice_blocks_or_touches_a_story(monkeypatch):
     }
     saved = decode_save(_canonical(good))
     assert isinstance(saved, SavedGame)
+
+
+def _state_with_string_qualities(cloak, count, size, name="q"):
+    state = start(cloak).state
+    qualities = state.qualities
+    text = "x" * size
+    for index in range(count):
+        qualities = qualities.set("%s%d" % (name, index), text)
+    return evolve(state, qualities=qualities)
+
+
+def _state_of_size(cloak, target):
+    """A state whose encoding is exactly ``target`` bytes (strings are capped at 65,536 chars each)."""
+    state = _state_with_string_qualities(cloak, 16, 65_000, name="fill")
+    qualities = state.qualities.set("pad", "")
+    state = evolve(state, qualities=qualities)
+    remaining = target - len(encode_save(cloak, state))
+    qualities = qualities.set("pad", "x" * remaining)
+    return evolve(state, qualities=qualities), qualities
+
+
+class TestSaveSizeCap:
+    def test_it_raises_save_too_large_when_the_encoding_exceeds_the_cap(self, cloak):
+        # 17 x 64000 = ~1.09 MB of string content: the lower-bound precheck trips.
+        state = _state_with_string_qualities(cloak, 17, 64_000)
+
+        with pytest.raises(SaveTooLargeError, match="too large"):
+            encode_save(cloak, state)
+
+    def test_it_raises_when_only_json_escaping_pushes_it_over_the_cap(self, cloak):
+        # Control characters escape to 6 bytes each; the raw length stays under the cap.
+        state = start(cloak).state
+        qualities = state.qualities.set("q", "\x01" * 60_000).set("r", "\x01" * 60_000).set("s", "\x01" * 60_000)
+        state = evolve(state, qualities=qualities)
+        assert MAX_SAVE_BYTES > 3 * 60_000
+
+        with pytest.raises(SaveTooLargeError):
+            encode_save(cloak, state)
+
+    def test_save_too_large_is_a_session_error_but_not_a_load_refusal(self):
+        assert issubclass(SaveTooLargeError, SessionError)
+        assert not issubclass(SaveTooLargeError, LoadRefusedError)
+
+    def test_a_save_just_under_the_cap_round_trips(self, cloak):
+        state = _state_with_string_qualities(cloak, 15, 60_000)
+        data = encode_save(cloak, state)
+        assert MAX_SAVE_BYTES - 200_000 < len(data) <= MAX_SAVE_BYTES
+
+        assert decode_save(data).qualities == state.qualities
+
+    def test_a_save_exactly_at_the_cap_round_trips(self, cloak):
+        state, padded = _state_of_size(cloak, MAX_SAVE_BYTES)
+
+        data = encode_save(cloak, state)
+
+        assert len(data) == MAX_SAVE_BYTES
+        assert decode_save(data).qualities == padded
+
+    def test_one_byte_over_the_cap_is_refused(self, cloak):
+        state, _ = _state_of_size(cloak, MAX_SAVE_BYTES + 1)
+
+        with pytest.raises(SaveTooLargeError):
+            encode_save(cloak, state)

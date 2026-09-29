@@ -14,7 +14,7 @@ import click
 
 from ravel.adapters.save_store import FileSaveStore
 from ravel.adapters.story_source import FileSystemStorySource
-from ravel.app.saves import LoadRefusedError
+from ravel.app.saves import LoadRefusedError, SaveTooLargeError
 from ravel.app.session import DEFAULT_SAVE_NAME, GameSession
 from ravel.engine.outputs import (
     ChoiceOption,
@@ -206,7 +206,7 @@ class ConsoleUI:
         name = filename or DEFAULT_SAVE_NAME
         try:
             path = self.session.save(name)
-        except OSError as error:
+        except (OSError, SaveTooLargeError) as error:
             self._out("Could not save: %s" % error)
             return
         self._out("Saved to %s." % path)

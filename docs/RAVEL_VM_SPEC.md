@@ -258,6 +258,8 @@ The code is `ravel.app.saves`; the full contract is `specs/001-reentrant-vm/cont
 - Saves carry no story identity and no `ip`. Each saved frame is `{"location", "anchor"}`, where the
   `Anchor` names the choice block the frame waits at by its choice targets and an `ordinal` among
   blocks with the same targets. That lets a save survive an edit to the story.
+- **`encode_save(story, state)`** enforces the same 1 MiB `MAX_SAVE_BYTES` cap on save: an encoding over it raises
+  `SaveTooLargeError` (a `SessionError`) before any store write, so a save that could not be loaded back is never written.
 - **`decode_save(data)`** is story-free. It checks size (`MAX_SAVE_BYTES`, 1 MiB), JSON validity
   (no duplicate keys, no `NaN`/`Infinity`), exact key sets, value types, the storable quality
   domain, and that each child frame is one of its parent anchor's choices. It returns a

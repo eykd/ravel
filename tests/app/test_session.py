@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from attrs import evolve
 
 from ravel import types
 from ravel.adapters.story_source import FileSystemStorySource
@@ -16,6 +17,7 @@ from ravel.app.saves import (
     NoGameError,
     SaveCorruptError,
     SaveNotFoundError,
+    SaveTooLargeError,
     SaveUnreadableError,
     encode_save,
 )
@@ -155,6 +157,21 @@ class TestSave:
 
         assert path == "<memory>/mid.json"
         assert store.files["mid.json"] == encode_save(cloak, session.state)
+
+    def test_an_oversize_save_propagates_save_too_large_and_never_touches_the_store(self, cloak):
+        store = FakeSaveStore()
+        session = GameSession(cloak, store)
+        session.new_game()
+        qualities = session.state.qualities
+        for index in range(17):
+            qualities = qualities.set("q%d" % index, "x" * 64_000)
+        state = session.state
+        session._state = evolve(state, qualities=qualities)
+
+        with pytest.raises(SaveTooLargeError):
+            session.save("big.json")
+
+        assert store.files == {}
 
     def test_it_defaults_to_the_default_save_name(self, cloak):
         store = FakeSaveStore()

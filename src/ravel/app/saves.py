@@ -46,6 +46,10 @@ class NoGameError(SessionError):
     """No game has been started or loaded yet."""
 
 
+class SaveTooLargeError(SessionError):
+    """The encoded save would exceed ``MAX_SAVE_BYTES``; raised before anything is written."""
+
+
 class LoadRefusedError(SessionError):
     """Base class for every reason ``decode_save`` (or a session's ``load``) refuses a save."""
 
@@ -109,13 +113,34 @@ def _frame_doc(frame: SavedFrame) -> dict[str, object]:
     }
 
 
+def _too_large() -> SaveTooLargeError:
+    return SaveTooLargeError("save is too large to write (over 1 MiB)")
+
+
+def _check_quality_size(qualities: Qualities) -> None:
+    """Refuse early when the qualities alone must exceed the cap.
+
+    Every character of a name or string value takes at least one UTF-8 byte in the encoding, so
+    this lower bound needs no big allocation: it stops a story whose strings are each within
+    their own cap from making ``json.dumps`` build a multi-gigabyte string before the final check.
+    """
+    total = 0
+    for name, value in qualities.as_dict().items():
+        total += len(name) + (len(value) if isinstance(value, str) else 0)
+        if total > MAX_SAVE_BYTES:
+            raise _too_large()
+
+
 def encode_save(story: Story, state: GameState) -> bytes:
     """Encode ``state`` (waiting or halted) as canonical save bytes.
 
-    Raises ``InvalidStateError`` for a ``RUNNING`` state (never happens via the engine).
+    Raises ``InvalidStateError`` for a ``RUNNING`` state (never happens via the engine), and
+    ``SaveTooLargeError`` if the encoding would exceed ``MAX_SAVE_BYTES`` (the cap ``decode_save``
+    enforces on load), so a store never receives a save that could not be loaded back.
     """
     if state.status is Status.RUNNING:
         raise InvalidStateError("cannot save a running state")
+    _check_quality_size(state.qualities)
     last = len(state.stack) - 1
     saved_stack = [_saved_frame(story, frame, is_top=(index == last)) for index, frame in enumerate(state.stack)]
     doc = {
@@ -129,7 +154,10 @@ def encode_save(story: Story, state: GameState) -> bytes:
         },
     }
     text = json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
-    return (text + "\n").encode("utf-8")
+    data = (text + "\n").encode("utf-8")
+    if len(data) > MAX_SAVE_BYTES:
+        raise _too_large()
+    return data
 
 
 # --- decoding -----------------------------------------------------------------------------------

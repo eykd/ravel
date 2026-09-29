@@ -7,6 +7,7 @@ import pytest
 from click.testing import CliRunner
 
 from ravel import cli, types
+from ravel.app.saves import SaveTooLargeError
 from ravel.engine.engine import choose
 from ravel.engine.outputs import (
     ChoiceOption,
@@ -72,12 +73,16 @@ class _StubSession:
     can't reach through a real story: an empty-outcome halt, ``StoryChanged`` at both stack
     depths, an already-halted startup, and a ``load`` that immediately halts."""
 
-    def __init__(self, *, status=Status.WAITING, stack=(), qualities=None, load_outputs=()):
+    def __init__(self, *, status=Status.WAITING, stack=(), qualities=None, load_outputs=(), save_error=None):
         self.state = SimpleNamespace(
             status=status, stack=stack, qualities=SimpleNamespace(as_dict=lambda: qualities or {})
         )
         self.story = SimpleNamespace(situation=lambda location: SimpleNamespace(intro="intro:%s" % location))
         self._load_outputs = load_outputs
+        self._save_error = save_error
+
+    def save(self, name):
+        raise self._save_error
 
     def load(self, name):
         self.state = SimpleNamespace(status=Status.HALTED, stack=(), qualities=self.state.qualities)
@@ -174,6 +179,17 @@ class TestConsoleUI:
         ui.loop()
 
         read_line.assert_not_called()
+
+    def test_save_command_reports_an_oversize_save_and_keeps_the_prompt_loop_running(self):
+        lines = []
+        answers = iter(["save big.json", "q"])
+        session = _StubSession(save_error=SaveTooLargeError("save is too large to write (over 1 MiB)"))
+        ui = cli.ConsoleUI(session, read_line=lambda prompt: next(answers), echo=lines.append)
+
+        ui.loop()
+
+        assert "Could not save: save is too large to write (over 1 MiB)" in lines
+        assert not any(line.startswith("Saved to") for line in lines)
 
     def test_load_command_that_halts_ends_the_loop_without_reprompting(self):
         lines = []
