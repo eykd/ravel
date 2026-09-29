@@ -14,7 +14,6 @@ SPEC = ROOT / "docs" / "RAVEL_LANGUAGE_SPEC.md"
 SCOPED_SECTIONS = ("4", "5", "6", "7", "9", "11.4")
 
 
-@pytest.mark.xfail(strict=True, reason="US6 not yet implemented; remove when this scenario passes")
 def test_us06_as1_every_scoped_spec_example_runs_and_passes() -> None:
     """US6-AS1: every example in sections 4-7, 9 and 11.4 is exercised and passes."""
     from tests.spec_examples import extract_examples, run_example
