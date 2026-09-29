@@ -1,7 +1,34 @@
 [
-  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: brackets or unquoted names end the predicate prefix scan early, bypassing the length cap", "severity": "MAJOR", "line": 180, "task_id": "ravel-h6v.21"},
-  {"category": "security", "file": "src/ravel/compiler/rulebooks.py", "title": "Remediate: malformed rulebook shapes raise raw AttributeError TypeError KeyError from Environment.load", "severity": "MINOR", "line": 56, "task_id": "ravel-h6v.22"},
-  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: unclosed bracket in intro text raises raw parsimonious IncompleteParseError", "severity": "MINOR", "line": 145, "task_id": "ravel-h6v.23"},
-  {"category": "security", "file": "src/ravel/app/saves.py", "title": "Remediate: save decode errors echo unbounded save-supplied keys names and locations", "severity": "MINOR", "line": 144, "task_id": "ravel-h6v.24"},
-  {"category": "security", "file": "src/ravel/cli.py", "title": "Remediate: console adapter echoes story control characters and terminal escapes unfiltered", "severity": "MINOR", "line": 107, "task_id": "ravel-h6v.25"}
+  {
+    "category": "save-format",
+    "file": "src/ravel/app/saves.py",
+    "title": "Remediate: encode_save writes saves larger than the 1 MiB cap that decode_save then refuses",
+    "severity": "MAJOR",
+    "line": 112,
+    "task_id": "ravel-h6v.26"
+  },
+  {
+    "category": "information-leak",
+    "file": "src/ravel/app/saves.py",
+    "title": "Remediate: save decode errors list unexpected keys unbounded in _check_keys",
+    "severity": "MINOR",
+    "line": 163,
+    "task_id": "ravel-h6v.27"
+  },
+  {
+    "category": "untyped-exception",
+    "file": "src/ravel/parsers.py",
+    "title": "Remediate: mid-line <> glue in a text line raises raw parsimonious IncompleteParseError",
+    "severity": "MINOR",
+    "line": 216,
+    "task_id": "ravel-h6v.28"
+  },
+  {
+    "category": "untyped-exception",
+    "file": "src/ravel/compiler/rulesets.py",
+    "title": "Remediate: predicate sorting raises raw TypeError when one quality has mixed-type comparison values",
+    "severity": "MINOR",
+    "line": 6,
+    "task_id": "ravel-h6v.29"
+  }
 ]
