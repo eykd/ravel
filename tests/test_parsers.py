@@ -406,3 +406,15 @@ class TestExpressionDepthLimit:
         operation = parsers.OperationParser().parse("X = " + self._wrapped(1))
 
         assert operation.evaluate(0) == 2 * parsers.MAX_EXPRESSION_OPERANDS - 1
+
+
+class TestOversizedIntegerLiterals:
+    DIGITS = "9" * 5000
+
+    def test_operation_literal_over_the_int_limit_raises_a_typed_error(self):
+        with pytest.raises(exceptions.OperationParseError, match="too many digits"):
+            parsers.OperationParser().parse("X = " + self.DIGITS)
+
+    def test_comparison_literal_over_the_int_limit_raises_a_typed_error(self):
+        with pytest.raises(exceptions.ComparisonParseError, match="too many digits"):
+            parsers.ComparisonParser().parse("X == " + self.DIGITS)

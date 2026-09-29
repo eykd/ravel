@@ -1,3 +1,4 @@
+import sys
 from typing import Final
 
 from parsimonious import Grammar, NodeVisitor
@@ -72,7 +73,13 @@ class BaseExpressionParser(BaseParser):
         return float(node.text)
 
     def visit_integer(self, node, children):
-        return int(node.text)
+        try:
+            return int(node.text)
+        except ValueError as e:
+            raise self.operand_limit_error(
+                "Integer literal has too many digits (%d); the maximum supported is %d"
+                % (len(node.text.lstrip("-")), sys.get_int_max_str_digits())
+            ) from e
 
     def visit_string(self, node, children):
         return node.children[0].children[1].text

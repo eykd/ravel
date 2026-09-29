@@ -135,3 +135,17 @@ def test_memory_source_accepts_modest_parenthesis_nesting():
     src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - Ready.\n  - effect: X = %s\n" % _nested(5)
 
     assert isinstance(MemoryStorySource({"begin": src}).load(), Story)
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["  - effect: X = %s\n", "  - when:\n      - X == %s\n"],
+    ids=["effect", "comparison"],
+)
+def test_memory_source_rejects_an_oversized_integer_literal_at_load(line):
+    prefix = "given:\n  - X = 0\n\nstart:\n"
+    body = line % ("9" * 5000)
+    src = prefix + ("  - Ready.\n" + body if "effect" in line else body + "  - Ready.\n")
+
+    with pytest.raises(ParseError):
+        MemoryStorySource({"begin": src}).load()
