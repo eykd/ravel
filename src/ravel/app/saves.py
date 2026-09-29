@@ -30,6 +30,7 @@ from ravel.engine.state import (
     is_surrogate_free,
 )
 from ravel.engine.story import Story
+from ravel.utils.excerpts import bounded_repr
 
 SAVE_FORMAT: Final = "ravel-save"
 SAVE_FORMAT_VERSION: Final = 1
@@ -65,7 +66,9 @@ class UnsupportedSaveVersionError(LoadRefusedError):
     """The save names a ``format_version`` this ravel cannot read."""
 
     def __init__(self, version: object) -> None:
-        super().__init__("unsupported save format version %r (this ravel reads %d)" % (version, SAVE_FORMAT_VERSION))
+        super().__init__(
+            "unsupported save format version %s (this ravel reads %d)" % (bounded_repr(version), SAVE_FORMAT_VERSION)
+        )
         self.version = version
 
 
@@ -86,7 +89,7 @@ def _anchor_for(story: Story, frame: Frame, *, is_top: bool) -> Anchor:
         if block.get_choice_ip == get_choice_ip:
             ordinal = sum(1 for earlier in blocks[:index] if earlier.choices == block.choices)
             return Anchor(choices=block.choices, ordinal=ordinal)
-    raise InvalidStateError("%r has no choice block at ip %d" % (frame.location, get_choice_ip))
+    raise InvalidStateError("%s has no choice block at ip %d" % (bounded_repr(frame.location), get_choice_ip))
 
 
 def _saved_frame(story: Story, frame: Frame, *, is_top: bool) -> SavedFrame:
@@ -141,7 +144,7 @@ def _reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in seen:
-            raise SaveCorruptError("duplicate key %r" % key)
+            raise SaveCorruptError("duplicate key %s" % bounded_repr(key))
         seen.add(key)
         result[key] = value
     return result
@@ -178,15 +181,15 @@ def _decode_qualities(raw: object) -> Qualities:
     for name, value in raw.items():
         # ``name`` is always ``str``: JSON object keys can only ever be strings.
         if not is_surrogate_free(name):
-            raise SaveCorruptError("state.qualities: %r is not a valid quality name" % (name,))
+            raise SaveCorruptError("state.qualities: %s is not a valid quality name" % bounded_repr(name))
         if isinstance(value, bool) or not isinstance(value, (int, float, str)):
-            raise SaveCorruptError("state.qualities[%r]: must be an int, float, or string" % name)
+            raise SaveCorruptError("state.qualities[%s]: must be an int, float, or string" % bounded_repr(name))
         if isinstance(value, int) and value not in INT_QUALITY_RANGE:
-            raise SaveCorruptError("state.qualities[%r]: int is out of the signed 64-bit range" % name)
+            raise SaveCorruptError("state.qualities[%s]: int is out of the signed 64-bit range" % bounded_repr(name))
         if isinstance(value, float) and not math.isfinite(value):
-            raise SaveCorruptError("state.qualities[%r]: float must be finite" % name)
+            raise SaveCorruptError("state.qualities[%s]: float must be finite" % bounded_repr(name))
         if isinstance(value, str) and not is_surrogate_free(value):
-            raise SaveCorruptError("state.qualities[%r]: string contains a lone surrogate" % name)
+            raise SaveCorruptError("state.qualities[%s]: string contains a lone surrogate" % bounded_repr(name))
         items[name] = value
     return Qualities.from_mapping(items)
 
@@ -252,7 +255,7 @@ def _check_stack_consistency(stack: tuple[SavedFrame, ...]) -> None:
         parent, child = stack[i], stack[i + 1]
         if child.location not in parent.anchor.choices:
             raise SaveCorruptError(
-                "stack[%d]: %r is not one of the parent frame's offered choices" % (i + 1, child.location)
+                "stack[%d]: %s is not one of the parent frame's offered choices" % (i + 1, bounded_repr(child.location))
             )
 
 

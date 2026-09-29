@@ -346,6 +346,41 @@ class TestDecodeSaveErrors:
         with pytest.raises(SaveCorruptError, match="not a valid quality name"):
             decode_save(data)
 
+    def test_a_huge_duplicate_key_gives_a_bounded_message(self):
+        key = "k" * 500_000
+        data = ('{"format":"ravel-save","%s":1,"%s":2}' % (key, key)).encode()
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(data)
+        assert len(str(excinfo.value)) < 200
+
+    def test_a_huge_quality_name_gives_a_bounded_message(self):
+        doc = self._good_doc()
+        doc["state"]["qualities"] = {"q" * 500_000: [1]}
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(_canonical(doc))
+        assert len(str(excinfo.value)) < 200
+
+    def test_a_huge_stack_location_gives_a_bounded_message(self):
+        doc = self._good_doc()
+        doc["state"]["stack"].append({"location": "L" * 500_000, "anchor": {"choices": ["x"], "ordinal": 0}})
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(_canonical(doc))
+        assert len(str(excinfo.value)) < 200
+
+    def test_a_huge_format_version_gives_a_bounded_message(self):
+        doc = self._good_doc()
+        doc["format_version"] = 10**4000
+        with pytest.raises(UnsupportedSaveVersionError) as excinfo:
+            decode_save(_canonical(doc))
+        assert len(str(excinfo.value)) < 200
+
+    def test_control_characters_in_a_saved_quality_name_are_escaped(self):
+        doc = self._good_doc()
+        doc["state"]["qualities"] = {"a\x1b[31mb": [1]}
+        with pytest.raises(SaveCorruptError) as excinfo:
+            decode_save(_canonical(doc))
+        assert "\x1b" not in str(excinfo.value)
+
     def test_step4_rejects_an_invalid_status(self):
         doc = self._good_doc()
         doc["state"]["status"] = "running"

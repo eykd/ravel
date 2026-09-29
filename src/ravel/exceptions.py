@@ -4,28 +4,7 @@ from parsimonious.exceptions import ParseError as ParsimoniousParseError  # noqa
 from parsimonious.exceptions import VisitationError  # noqa: F401
 from syml.basetypes import Source
 
-MAX_EXCERPT_LENGTH = 80
-ELLIPSIS = "\u2026"
-
-
-def printable(text, limit=MAX_EXCERPT_LENGTH):
-    """Render ``text`` as a bounded, printable-escaped excerpt safe to put in a message.
-
-    Text longer than ``limit`` code points is cut and marked with an ellipsis; non-printable
-    characters (control characters, ANSI escapes, lone surrogates) are backslash-escaped. Short
-    printable text comes back unchanged.
-    """
-    text = str(text)
-    if len(text) > limit:
-        text = text[:limit] + ELLIPSIS
-    if text.isprintable():
-        return text
-    return "".join(char if char.isprintable() else char.encode("unicode_escape").decode("ascii") for char in text)
-
-
-def bounded_repr(value, limit=MAX_EXCERPT_LENGTH):
-    """Return ``repr(value)`` as a bounded, printable-escaped excerpt (see ``printable``)."""
-    return printable(repr(value), limit)
+from ravel.utils.excerpts import ELLIPSIS, MAX_EXCERPT_LENGTH, bounded_repr, printable  # noqa: F401
 
 
 class ParseError(ValueError):
