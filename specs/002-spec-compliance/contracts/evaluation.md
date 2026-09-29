@@ -87,8 +87,10 @@ unreachable once `Comparison` soft-fails (RT-10).
 
 **Conditions fail soft (RT-2, RT-10).** `Comparison.check(qualities)` and
 `Comparison.__call__(qvalue, *, qualities)` catch `(TypeError, ArithmeticError, EvaluationError)`
-from `evaluate`, log `"%r failed: %s" % (comparison, error)` at `WARNING` on the `ravel.query`
-logger, and return `False`. `Comparison.evaluate` itself still raises. This covers every
+from `evaluate` and return `False`. Nothing is logged and nothing is emitted: "a condition that
+cannot be evaluated is false" is defined behavior, the same silent `matched = False` that
+`query_predicates` already applies to an unset subject's `TypeError`. `types.py` gains no logger.
+`Comparison.evaluate` itself still raises (the spec-examples runner relies on this; RT-11). This covers every
 condition site: `when:` predicates in both `query_predicates` branches, and `{…}` line prefixes via
 `Text.check` in the engine's text step. (Widens PD-06's unset-only `except TypeError`: a raising
 `when:` would fail every query from that state and strand any save in it.)
@@ -149,9 +151,9 @@ Through the engine:
 - `when: X > Y` with X = 2 and Y = 1 → the rule matches in `query`; with Y = 3 it doesn't.
 - `{Health < [Max]}Low.` shows `Low.` when Health = 7 and Max = 10.
 - `when: X > 10 / Y` with X = 2 and Y unset → the rule doesn't match (the `ZeroDivisionError` is a
-  non-match, logged at `WARNING`), and other matching rules are still offered (RT-2).
+  non-match, nothing logged), and other matching rules are still offered (RT-2).
 - `when: X > Name` with X = 2 and Name = "a" → no match (was: `TypeError` out of `query`; RT-2).
 - `{Health > 10 / Y}Hidden.` with Health = 7 and Y unset → no `TextShown` for the line, play
-  continues, one `WARNING` logged (was: raw `ZeroDivisionError` out of `choose`; RT-10).
+  continues, nothing logged (was: raw `ZeroDivisionError` out of `choose`; RT-10).
 - `X = 100 / Bonus` in a choice's `effect:` → `choose` raises `InvalidOperationError`; a
   `GameSession` holding that game keeps its previous state (RT-1).

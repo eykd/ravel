@@ -104,7 +104,7 @@ _GATE: passed before Phase 0; re-checked after Phase 1 (below)._
 | Compiled rulebook: `value` | `types.VALUE` is now a singleton instance, not a class | None: the class form crashed at run time. Equality with `types.VALUE` still holds. |
 | Operation semantics | `min`/`max` now clamp | None: the spec always said so (FR-008). |
 | `ravel.engine` errors | `start`/`choose` can raise the new `InvalidOperationError(EngineError)`, for a `ConstraintError` **and** for a `ZeroDivisionError`/`OverflowError`/`TypeError` from an operation's arithmetic (red-team RT-1) | Let `ConstraintError` escape unwrapped: engine callers would need a second `except`. Let arithmetic errors escape raw (PD-08 as first planned): `X = 100 / Bonus` with `Bonus` unset now divides by zero from ordinary story text, and a raw `ZeroDivisionError` bypasses `GameSession`'s `EngineError` handling. |
-| Condition evaluation failures | A comparison (a `when:` predicate or a `{…}` line prefix) whose evaluation raises `TypeError`, `ArithmeticError` or `EvaluationError` is false, logged at `WARNING`; the catch lives in `Comparison.check`/`__call__`. Today only `query_predicates`' unset-subject branch catches `TypeError`; a set subject or a `{…}` prefix crashes (red-team RT-2, RT-10) | Raise a typed `EngineError` instead: every query on that state would raise, so a save sitting in that state could never be played again (US4's stateless resume). |
+| Condition evaluation failures | A comparison (a `when:` predicate or a `{…}` line prefix) whose evaluation raises `TypeError`, `ArithmeticError` or `EvaluationError` is false, silently: defined behavior ("a condition that cannot be evaluated is false"), with no log call. The catch lives in `Comparison.check`/`__call__`. Today only `query_predicates`' unset-subject branch catches `TypeError`, also silently; a set subject or a `{…}` prefix crashes (red-team RT-2, RT-10; logging revised in red-team outer iteration 2) | (a) Raise a typed `EngineError` instead: every query on that state would raise, so a save sitting in that state would never play again (US4's stateless resume). (b) Log each failure at `WARNING` (red-team pass 1's choice): with no logging configured by the embedding host, Python's last-resort handler prints `WARNING` records to stderr, so the domain core would write to stderr on its own, against the I/O-free engine goal and Principle VII (outward only through plain output values). (c) A new output type for it: the spec fixes the engine at seven output types. |
 
 Unchanged: `Loader` (`BaseLoader.load`/`get_source`), the compiled rulebook's dict shape, `Source`/
 `Pos`, `start`/`choose`/`present`/`resume` signatures, output and state types, `GameSession`, save
@@ -295,8 +295,8 @@ whole suite, not just the parser tests.
 
 FR-004 makes an unset quality read 0 and lets a string-valued quality appear in arithmetic. So
 `X = 100 / Bonus` (Bonus unset) divides by zero, and `X = Name + 1` (Name a string) raises
-`TypeError`, from text an author writes routinely. PD-08 deferred these while divisors could only
-be literals; references change that, so this pass amends PD-08 at the two existing choke points,
+`TypeError`, from text an author writes routinely. PD-08 deferred these while divisors were only
+literals; references change that, so this pass amends PD-08 at the two existing choke points,
 adding no new per-failure error type:
 
 - **Operations (RT-1).** `_apply_operation` catches `(EvaluationError, ArithmeticError, TypeError)`
@@ -313,9 +313,12 @@ adding no new per-failure error type:
   covered only the first; `{X > 10 / Y}Low.` would still raise a raw `ZeroDivisionError` out of
   `choose`. So the soft failure lives in `Comparison` itself, the one type all three sites call:
   `Comparison.check(qualities)` and `Comparison.__call__(qvalue, *, qualities)` catch
-  `(TypeError, ArithmeticError, EvaluationError)`, log the comparison and the error at `WARNING` on
-  the `ravel.query` logger, and return `False`. `Comparison.evaluate` still raises, so unit tests
-  can see the underlying error. `query_predicates`' existing `except TypeError` becomes
+  `(TypeError, ArithmeticError, EvaluationError)` and return `False`, with no log call:
+  "a condition that cannot be evaluated is false" is defined behavior, extending the silent
+  `matched = False` that `query_predicates` already applies to an unset subject's `TypeError`
+  (`queries.py:30-33`). `types.py` gains no logger and no `logging` import. `Comparison.evaluate`
+  still raises, so unit tests and the US6 spec-examples runner (RT-11) can see the underlying
+  error. `query_predicates`' existing `except TypeError` becomes
   unreachable and is **deleted** (leaving it would break the 100% branch gate). This widens
   PD-06's fallback on purpose: a raising `when:` predicate is evaluated on every query, so raising
   would make every `present`/`choose` from that state fail and strand any save sitting in it, and
@@ -324,7 +327,8 @@ adding no new per-failure error type:
   failing `{…}` prefix hides its line). Tests: `when: X > 10 / Y` with X set and Y unset → the rule
   doesn't match and the other rules still do; `when: X > Name` with `Name = "a"` → no match, where
   today it raises; `{Health > 10 / Y}Hidden.` with Y unset → the line isn't shown and play
-  continues; `caplog` sees one `WARNING` per failing evaluation.
+  continues; and `Comparison(...).evaluate(...)` on each of those comparisons raises the underlying
+  `ZeroDivisionError`/`TypeError`. No `caplog` assertion: nothing is logged.
 - **Test discipline.** Because `TypeError` is now wrapped, a future bug of the old
   `VALUE`-class kind would surface as `InvalidOperationError`, not as a crash. US1 and US2
   acceptance tests assert computed *values* (and kinds), never just "no exception raised".
@@ -355,12 +359,21 @@ position (`Line 4, Column 8` in the probe).
 
 ### Soft-failing conditions stay visible to authors (RT-12)
 
-RT-10 turns a broken condition into a quiet `False`. The only signal is the `WARNING` on
-`ravel.query`, and a failing `when:` logs on every query, every turn. VM spec §6 and language spec
-§6.3 each get one sentence: a condition that can't be evaluated is false and logs a warning. The
-`ravel run` console adapter already configures logging at `WARNING` by default (`cli.main`), so
-authors see these on stderr with no flag; no dedup or rate limit is added (log volume is the
-host's policy). Low; docs only.
+RT-10 turns a broken condition into a quiet `False`. Red-team outer iteration 2 removed the
+`WARNING` log pass 1 planned (see the Principle VI table: the core must not reach stderr by itself),
+so authors see it through documentation and tooling, not a log line:
+
+- **Documented semantics.** VM spec §6 and language spec §6.3 each get one sentence: "A condition
+  that cannot be evaluated (for example `X > 10 / Y` with `Y` unset, or `X > Name` with `Name` a
+  string) is false." Written as defined behavior, next to the existing "an unset quality reads 0".
+- **Raising path for checking.** `Comparison.evaluate` still raises, so the spec-examples runner
+  (RT-11) and unit tests catch a comparison that can't evaluate.
+- **Debug trace.** `ravel --debug run` (`cli.main` sets `DEBUG`) already shows `query_predicates`'
+  existing `ravel.query` `DEBUG` lines: "Checking query …" before a set subject's predicate and
+  "Could not match rule …" for an unset one, so a `when:` that never matches is traceable. A
+  failing `{…}` prefix leaves no trace beyond the missing line. No new logging is added.
+
+Low; docs only.
 
 ### Spec examples must use the raising path (RT-11)
 

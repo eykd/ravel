@@ -186,6 +186,12 @@ repo). Their results are quoted where they settle a question.
   `ArithmeticError` and `EvaluationError` as false, logged at `WARNING`, covering both
   `query_predicates` branches and `{…}` prefixes; the `except TypeError` here is deleted as
   unreachable. No save can be stranded by a raising condition (plan.md RT-2, RT-10).
+  **Amended by red-team outer iteration 2 (2026-09-28)**: the `WARNING` log is dropped. With no
+  logging configured by an embedding host, Python's last-resort handler prints `WARNING` records to
+  stderr, so the domain core would do I/O on its own (Principle VII). `Comparison.check`/`__call__`
+  return `False` with no log call, the same silent treatment the existing `except TypeError` gives,
+  and "a condition that cannot be evaluated is false" is documented as defined behavior (plan.md
+  RT-12). `Comparison.evaluate` still raises (RT-11). No new output type: the spec fixes seven.
 
 ### PD-07. `value` outside an operation or comparison (deferred item 5)
 

@@ -91,8 +91,9 @@ fallback in `queries.py`) keeps working.
 can import `ConstraintError` without a cycle.
 
 **Condition failures are false (RT-2, RT-10).** `Comparison.check`/`Comparison.__call__` return
-`False`, logging at `WARNING`, when evaluation raises `TypeError`, `ArithmeticError` or
-`EvaluationError`; `Comparison.evaluate` still raises. So a failing `when:` predicate is a
+`False`, with no log call, when evaluation raises `TypeError`, `ArithmeticError` or
+`EvaluationError`: a condition that cannot be evaluated is false (defined behavior).
+`Comparison.evaluate` still raises. So a failing `when:` predicate is a
 non-match (both `query_predicates` branches) and a failing `{…}` prefix hides its line; nothing is
 raised to the engine. Operations, by contrast, raise `InvalidOperationError`.
 
