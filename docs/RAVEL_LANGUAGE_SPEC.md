@@ -207,22 +207,29 @@ effect:
 
 ### 5.1 Arithmetic Expressions
 
-Expressions support standard arithmetic with proper precedence:
+Expressions support standard arithmetic with two precedence tiers. Operators in the same tier are
+left-associative: they evaluate left to right.
 
-| Operator | Meaning | Precedence |
-|----------|---------|------------|
-| `+` | Addition | Low |
-| `-` | Subtraction | Low |
-| `*` | Multiplication | Medium |
-| `/` | Division | Medium |
-| `//` | Floor Division | Medium |
-| `%` | Modulo | Medium |
-| `()` | Grouping | Highest |
+| Operator | Meaning | Precedence | Associativity |
+|----------|---------|------------|---------------|
+| `+` | Addition | Low | Left |
+| `-` | Subtraction | Low | Left |
+| `*` | Multiplication | High | Left |
+| `/` | Division | High | Left |
+| `//` | Floor Division | High | Left |
+| `%` | Modulo | High | Left |
+| `()` | Grouping | Highest | n/a |
+
+`* / // %` share one tier and bind tighter than `+ -`, which share the other. Whitespace is optional
+around arithmetic operators.
 
 **Examples:**
 ```
 5 + 3           → 8
 10 - 4 * 2      → 2  (multiplication first)
+10 - 4 - 2        → 4
+8 / 4 / 2         → 1.0
+2 + 3 * 4         → 14
 (10 - 4) * 2    → 12 (parentheses override)
 7 // 2          → 3  (floor division)
 7 % 3           → 1  (modulo)
@@ -259,13 +266,16 @@ Expressions can include:
 Quality comparator Expression
 ```
 
+Whitespace is required around the comparator; it is optional around arithmetic operators in the expression.
+
 **Examples:**
 ```yaml
-- Location = "Foyer"
-- "Wearing Cloak" >= 1
-- Health > 0
-- Score <= 100
-- Visited != 0
+when:
+  - Location = "Foyer"
+  - "Wearing Cloak" >= 1
+  - Health > 0
+  - Score <= 100
+  - Visited != 0
 ```
 
 ### 6.3 Predicates in Rules
@@ -308,6 +318,8 @@ A condition that cannot be evaluated (for example `X > 10 / Y` with `Y` unset, o
 ```
 Quality operator Expression [constraint]
 ```
+
+Whitespace is required around the setter; it is optional around arithmetic operators in the expression.
 
 **Examples:**
 ```yaml
@@ -548,9 +560,11 @@ string          = '"' ~'[^"]*' '"' / "'" ~"[^']*" "'"
 
 # Expressions
 expression      = additive
-additive        = multiplicative (('+' / '-') multiplicative)*
-multiplicative  = primary (('*' / '/' / '//' / '%') primary)*
-primary         = value / '(' expression ')'
+additive          = multiplicative (ws? additive_op ws? multiplicative)*
+multiplicative    = primary (ws? multiplicative_op ws? primary)*
+additive_op       = '+' / '-'
+multiplicative_op = '*' / '//' / '/' / '%'
+primary           = value / ('(' ws? expression ws? ')')
 
 # Comparisons
 comparison      = quality comparator expression

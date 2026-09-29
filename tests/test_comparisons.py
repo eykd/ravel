@@ -95,7 +95,7 @@ class TestComparisonParser:
         expected = types.Comparison(
             "Man of Honor",
             ">",
-            types.Expression(3, "+", types.Expression(2, "+", 3)),
+            types.Expression(types.Expression(3, "+", 2), "+", 3),
         )
         result = parser.parse(statement)
         print("Got", result)
@@ -112,7 +112,11 @@ class TestComparisonParser:
             types.Expression(
                 3,
                 "+",
-                types.Expression(5, "*", types.Expression(2, "/", types.Expression(3, "-", 2))),
+                types.Expression(
+                    types.Expression(5, "*", 2),
+                    "/",
+                    types.Expression(3, "-", 2),
+                ),
             ),
         )
         result = parser.parse(statement)

@@ -41,13 +41,22 @@ class BaseExpressionParser(BaseParser):
         return types.VALUE
 
     def visit_expression(self, node, children):
-        expr = children[0]
-        if isinstance(expr, list):
-            return types.Expression(*expr)
-        else:
-            return expr
+        return children[0]
 
-    visit_multiplicative = visit_divisive = visit_additive = visit_expression
+    def _fold_left(self, node, children):
+        first, rest = children
+        if rest is None:
+            rest = []
+        elif isinstance(rest[0], str):
+            rest = [rest]
+        result = first
+        for operator, operand in rest:
+            result = types.Expression(result, operator, operand)
+        return result
+
+    visit_additive = visit_multiplicative = _fold_left
+
+    visit_additive_op = visit_multiplicative_op = BaseParser.get_text
 
     visit_add = visit_subtract = BaseParser.get_text
     visit_multiply = BaseParser.get_text
