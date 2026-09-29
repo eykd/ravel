@@ -228,9 +228,9 @@ type with the wrong signature) is a bug and propagates unwrapped.
 
 **Known limits.**
 
-- Nothing bounds a string's length. `X *= 2` on a string quality doubles it each time, and
-  `Qualities.set` checks the kind of a value, not its size. Memory can grow very large before
-  `MAX_SAVE_BYTES` refuses the save (RT-9).
+- String length is capped (`MAX_STRING_LENGTH`), enforced on concatenation before the result is built and
+  again on storage, so `X *= 2` on a string quality cannot double without bound. The value is in
+  `docs/RAVEL_LANGUAGE_SPEC.md` "### E. Limits", the single table of caps.
 
 ---
 
@@ -300,7 +300,9 @@ No in-memory `SaveStore` ships; any object with `write` and `read` satisfies the
 `FileSystemLoader(base_path, extension=".ravel")`, which refuses an include that resolves outside
 `base_path` (`RulebookNotFound`), and `MemoryLoader(sources)`, which serves a mapping. Both
 subclass `BaseLoader`. `Environment.load()` starts at `initializing_name` (default `begin`) and
-follows `include:` breadth-first.
+follows `include:` breadth-first. `Environment.compile_rulebook` gates every loader's
+source, shipped or custom: it refuses one over the byte cap (`MAX_RULEBOOK_BYTES`, `RulebookTooLargeError`)
+and one nested past `MAX_SOURCE_NESTING_DEPTH` indentation levels before parsing, both as `ParseError`.
 
 **`GameSession`** (`ravel.app.session`) is the one mutable holder. `GameSession(story, saves)`
 offers `new_game()`, `choose(location)`, `menu()`, `save(name)` and `load(name)`, and a `state`
@@ -310,12 +312,13 @@ property that raises `NoGameError` before any game exists. `load` is `saves.read
 new state only after the engine or decoder succeeds, so a failed call leaves the game as it was.
 `ConsoleUI` in `ravel.cli` is the shipped adapter that renders a session's outputs.
 
-**Story sources are trusted input.** The compiler is not hardened against hostile rulebooks.
-Choice nesting is capped (`MAX_CHOICE_NESTING_DEPTH`, 200) with a `ParseError`, but deeply nested
-parentheses in an expression hit Python's recursion limit inside the parser and raise
-`RecursionError`, and a long flat expression builds an equally deep tree. A host that compiles
-untrusted rulebooks must isolate compilation in a separate process with time and memory limits
-(RT-8).
+**Story sources are trusted input.** The compiler refuses oversized and deeply nested source with a typed
+`ParseError` rather than a raw `RecursionError`: source bytes, indentation nesting, expression length,
+operand count, parenthesis nesting, expression depth and choice nesting are all capped. See
+`docs/RAVEL_LANGUAGE_SPEC.md` "### E. Limits" for the caps and their errors. A `RecursionError` from the
+parser is only a residual backstop, converted to `ParseError` in `Environment.compile_rulebook`. The caps
+bound input size, not compile time, so a host that compiles untrusted rulebooks must still isolate
+compilation in a separate process with time and memory limits (RT-8).
 
 ---
 
