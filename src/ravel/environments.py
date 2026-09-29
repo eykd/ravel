@@ -16,6 +16,19 @@ from ravel.compiler import rulebooks
 # did not come through this text path.
 MAX_SOURCE_NESTING_DEPTH: Final = 128
 
+# The authoritative per-rulebook source cap. ``compile_rulebook`` enforces it for every loader, shipped or
+# custom; ``FileSystemLoader`` also uses it to bound its read to cap + 1 bytes (an early, memory-safe check).
+MAX_RULEBOOK_BYTES: Final = 1_048_576  # 1 MiB of UTF-8 source per rulebook
+
+
+def check_rulebook_size(name: str, size: int) -> None:
+    """Raise ``RulebookTooLargeError`` when ``size`` bytes of source for rulebook ``name`` exceed the cap."""
+    if size > MAX_RULEBOOK_BYTES:
+        raise exceptions.RulebookTooLargeError(
+            "%s: rulebook source exceeds %d bytes" % (exceptions.printable(name), MAX_RULEBOOK_BYTES)
+        )
+
+
 # The scan must see exactly the lines syml lexes, or it drifts from the parser it guards (ravel-h6v.30):
 # str.splitlines() also breaks on \x0b \x0c \x1c-\x1e \x85 \u2028 \u2029, and str.lstrip() eats every
 # Unicode space, so one such character per label used to reset the scan. It therefore reuses syml's own
@@ -117,6 +130,7 @@ class Environment:
 
     def compile_rulebook(self, source, name="", is_up_to_date=default_is_up_to_date):
         label = name or "<rulebook>"
+        check_rulebook_size(label, len(source.encode("utf-8", "surrogatepass")))
         try:
             depth = _source_nesting_depth(source, name)
             if depth > MAX_SOURCE_NESTING_DEPTH:

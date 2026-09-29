@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from ravel import exceptions, loaders
-from ravel.environments import Environment
+from ravel.environments import MAX_RULEBOOK_BYTES, Environment
 from ravel.types import Rule
 
 
@@ -162,7 +162,7 @@ class TestMemoryLoader:
 
 class TestRulebookSourceLimits:
     def test_fs_loader_rejects_oversize_file_reading_only_cap_plus_one(self, tempdir, fs_loader):
-        (tempdir / "big.ravel").write_bytes(b"a" * (loaders.MAX_RULEBOOK_BYTES + 5))
+        (tempdir / "big.ravel").write_bytes(b"a" * (MAX_RULEBOOK_BYTES + 5))
         real_open = Path.open
         reads = []
 
@@ -185,12 +185,12 @@ class TestRulebookSourceLimits:
 
         with patch.object(Path, "open", spy_open), pytest.raises(exceptions.RulebookTooLargeError, match="big"):
             fs_loader.get_source(None, "big")
-        assert reads == [loaders.MAX_RULEBOOK_BYTES + 1]
+        assert reads == [MAX_RULEBOOK_BYTES + 1]
 
     def test_fs_loader_accepts_file_at_cap(self, tempdir, fs_loader):
-        (tempdir / "ok.ravel").write_bytes(b"a" * loaders.MAX_RULEBOOK_BYTES)
+        (tempdir / "ok.ravel").write_bytes(b"a" * MAX_RULEBOOK_BYTES)
         source, _ = fs_loader.get_source(None, "ok")
-        assert len(source) == loaders.MAX_RULEBOOK_BYTES
+        assert len(source) == MAX_RULEBOOK_BYTES
 
     def test_fs_loader_maps_bad_utf8_to_parse_error(self, tempdir, fs_loader):
         (tempdir / "bad.ravel").write_bytes(b"\xff\xfe\x00")
@@ -219,20 +219,27 @@ class TestRulebookSourceLimits:
         with pytest.raises(exceptions.RulebookNotFound, match="escapes"):
             fs_loader.get_source(None, "../evil")
 
-    def test_memory_loader_rejects_oversize_source(self):
-        loader = loaders.MemoryLoader({"big": "a" * (loaders.MAX_RULEBOOK_BYTES + 1)})
-        with pytest.raises(exceptions.RulebookTooLargeError, match="big"):
-            loader.get_source(None, "big")
+    def test_custom_loader_oversize_source_is_refused_at_load(self):
+        class BigLoader(loaders.BaseLoader):
+            def get_source(self, environment, name):
+                return "a" * (2 * 1024 * 1024), lambda: True
 
-    def test_memory_loader_counts_bytes_not_characters(self):
-        loader = loaders.MemoryLoader({"wide": "é" * (loaders.MAX_RULEBOOK_BYTES // 2 + 1)})
+        with pytest.raises(exceptions.RulebookTooLargeError, match="begin"):
+            Environment(loader=BigLoader()).load()
+
+    def test_compile_rulebook_counts_bytes_not_characters(self):
         with pytest.raises(exceptions.RulebookTooLargeError):
-            loader.get_source(None, "wide")
+            Environment(loader=loaders.MemoryLoader({})).compile_rulebook("é" * (MAX_RULEBOOK_BYTES // 2 + 1), "wide")
 
-    def test_memory_loader_accepts_source_at_cap(self):
-        loader = loaders.MemoryLoader({"ok": "a" * loaders.MAX_RULEBOOK_BYTES})
-        source, _ = loader.get_source(None, "ok")
-        assert len(source) == loaders.MAX_RULEBOOK_BYTES
+    def test_memory_loader_oversize_source_is_refused_at_load(self):
+        env = Environment(loader=loaders.MemoryLoader({"begin": "a" * (MAX_RULEBOOK_BYTES + 1)}))
+        with pytest.raises(exceptions.RulebookTooLargeError, match="begin"):
+            env.load()
+
+    def test_compile_rulebook_accepts_source_at_cap(self):
+        env = Environment(loader=loaders.MemoryLoader({}))
+        source = "intro:\n  - Bye[.] now.\n"
+        env.compile_rulebook(source + "#" * (MAX_RULEBOOK_BYTES - len(source)), "ok")
 
     def test_memory_loader_counts_lone_surrogates(self):
         loader = loaders.MemoryLoader({"s": "\ud800"})
@@ -242,7 +249,7 @@ class TestRulebookSourceLimits:
     @pytest.mark.parametrize("kind", ["big", "bad_utf8", "directory", "nul"])
     def test_environment_load_raises_typed_errors(self, tempdir, kind):
         if kind == "big":
-            (tempdir / "begin.ravel").write_bytes(b"a" * (loaders.MAX_RULEBOOK_BYTES + 1))
+            (tempdir / "begin.ravel").write_bytes(b"a" * (MAX_RULEBOOK_BYTES + 1))
             expected = exceptions.RulebookTooLargeError
         elif kind == "bad_utf8":
             (tempdir / "begin.ravel").write_bytes(b"\xff\xfe")

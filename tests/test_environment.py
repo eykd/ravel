@@ -247,7 +247,7 @@ class TestSourceNestingDepth:
             MemoryStorySource({"begin": _nested_choice_source(190, separator)}).load()
 
     def test_it_should_raise_parse_error_naming_the_rulebook_for_deep_nesting(self, env):
-        source = _nested_choice_source(1000)
+        source = _nested_choice_source(300)
 
         with pytest.raises(exceptions.ParseError, match="'deep'.*maximum supported is 128"):
             env.compile_rulebook(source, "deep")

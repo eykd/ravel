@@ -1051,7 +1051,7 @@ exhausting memory or the interpreter stack.
 | String length (a quality's value, and the result of any `+` or `+=`) | 65,536 characters | `EvaluationError` |
 | Integer quality range | -2^63 to 2^63 - 1 | `InvalidQualityValueError` on store |
 | Save file size (applies on save and on load) | 1 MiB | `SaveTooLargeError` on save (nothing is written); `SaveCorruptError` on load |
-| Rulebook source size (one `.ravel` file or in-memory source; a file is read at most this many bytes plus one) | 1 MiB (1,048,576 bytes; `MAX_RULEBOOK_BYTES`) | `RulebookTooLargeError` (a `ParseError`) at load time |
+| Rulebook source size (any loader's source, shipped or custom, checked in `Environment.compile_rulebook`; `FileSystemLoader` also reads a file at most this many bytes plus one) | 1 MiB (1,048,576 bytes; `MAX_RULEBOOK_BYTES`) | `RulebookTooLargeError` (a `ParseError`) at load time |
 
 The string cap is checked on the combined length before two strings are concatenated, so the oversize
 result is never built. An `EvaluationError` in a `when:` predicate makes that predicate false; in an

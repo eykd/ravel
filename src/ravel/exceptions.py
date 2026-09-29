@@ -24,7 +24,7 @@ class OperationParseError(ParseError):
 
 
 class RulebookTooLargeError(ParseError):
-    """A rulebook source exceeds ``loaders.MAX_RULEBOOK_BYTES``."""
+    """A rulebook source exceeds ``environments.MAX_RULEBOOK_BYTES``."""
 
 
 class MissingBaggageError(Exception):

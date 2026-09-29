@@ -1,20 +1,11 @@
 import os.path
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Final
 
 import attr
 
 from . import exceptions
-
-MAX_RULEBOOK_BYTES: Final = 1_048_576  # 1 MiB of UTF-8 source per rulebook
-
-
-def _check_size(name: str, size: int) -> None:
-    if size > MAX_RULEBOOK_BYTES:
-        raise exceptions.RulebookTooLargeError(
-            "%s: rulebook source exceeds %d bytes" % (exceptions.printable(name), MAX_RULEBOOK_BYTES)
-        )
+from .environments import MAX_RULEBOOK_BYTES, check_rulebook_size
 
 
 class BaseLoader:
@@ -61,7 +52,7 @@ class FileSystemLoader(BaseLoader):
                 data = fi.read(MAX_RULEBOOK_BYTES + 1)
         except OSError:
             raise exceptions.RulebookNotFound(exceptions.printable(name)) from None
-        _check_size(name, len(data))
+        check_rulebook_size(name, len(data))
         try:
             source = data.decode("utf-8")
         except UnicodeDecodeError:
@@ -83,5 +74,4 @@ class MemoryLoader(BaseLoader):
             source = self.sources[name]
         except KeyError:
             raise exceptions.RulebookNotFound(exceptions.printable(name)) from None
-        _check_size(name, len(source.encode("utf-8", "surrogatepass")))
         return source, lambda: True
