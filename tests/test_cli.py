@@ -6,9 +6,20 @@ from unittest.mock import Mock
 import pytest
 from click.testing import CliRunner
 
-from ravel import cli
-from ravel.engine.outputs import ChoiceOption, ChoicesOffered, Halted, StoryChanged
-from ravel.engine.state import Status
+from ravel import cli, types
+from ravel.engine.engine import choose
+from ravel.engine.outputs import (
+    ChoiceOption,
+    ChoicesOffered,
+    Halted,
+    QualityChanged,
+    SituationEntered,
+    SituationExited,
+    StoryChanged,
+    TextShown,
+)
+from ravel.engine.state import GameState, Qualities, Status
+from ravel.engine.story import Story
 
 
 @pytest.fixture
@@ -89,6 +100,55 @@ class TestConsoleUI:
         ui.render((Halted("\x1bwon", False),))
 
         assert lines == ["*** The End (outcome: \\x1bwon) ***"]
+
+    def test_render_escapes_ansi_and_bel_in_story_text_but_collapses_only_by_the_existing_wrap(self):
+        lines = []
+        ui = cli.ConsoleUI(_StubSession(), echo=lines.append)
+
+        ui.render((TextShown("\x1b]0;pwned\x07hello next\x7f\x85 caf\u00e9"),))
+
+        assert lines == ["\\x1b]0;pwned\\x07hello next\\x7f\\x85 caf\u00e9", ""]
+        assert not any("\x1b" in line or "\x07" in line for line in lines)
+
+    def test_render_escapes_control_characters_in_labels_and_verbose_lines(self):
+        lines = []
+        ui = cli.ConsoleUI(_StubSession(), verbose=True, echo=lines.append)
+        choices = (ChoiceOption(location="s", label="Go\x1b[2J\nTab\there"),)
+
+        ui.render(
+            (
+                ChoicesOffered(choices),
+                QualityChanged("q\x07", 0, "a\x1b"),
+                SituationEntered("in\x1b"),
+                SituationExited("out\x07"),
+            )
+        )
+
+        assert lines == [
+            "1: Go\\x1b[2J\nTab\there",
+            "## q\\x07 was 0, now 'a\\x1b'",
+            "## Entering in\\x1b",
+            "## Exiting out\\x07",
+        ]
+
+    def test_engine_text_shown_still_carries_the_raw_text(self):
+        raw = "\x1b]0;pwned\x07hello"
+        rulebook: types.CompiledRulebook = {
+            "metadata": {},
+            "rulebook": {
+                "Situation": {
+                    "rules": [types.Rule("s", [])],
+                    "locations": {"s": types.Situation(intro=types.Text("S"), directives=[types.Text(raw)])},
+                }
+            },
+            "givens": [],
+        }
+
+        state = GameState(qualities=Qualities(), stack=(), status=Status.WAITING, offered=("s",), outcome=None)
+
+        step = choose(Story(rulebook=rulebook), state, "s")
+
+        assert TextShown(raw) in step.outputs
 
     def test_render_story_changed_with_a_non_empty_stack(self):
         lines = []
