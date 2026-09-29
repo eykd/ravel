@@ -26,13 +26,26 @@ MAX_PAREN_DEPTH: Final = 20
 # string-length cap. Only expression parsers are gated; long prose lines are legitimate and cheap.
 MAX_EXPRESSION_LENGTH: Final = 65_536
 
-# What the paren gate steps over, transcribed from the grammar: the leading quality (bracketed, quoted, or a
-# bare run of non-space characters, in that order), and inside the expression a string literal (triple form
-# first, all three quote characters, no quote character inside) or a bracketed quality name.
-_LEADING_QUALITY: Final = re.compile(r'\s*(?:\[[^\]]+\]|"[^"]+"|[^\s]+)')
-_STRING_OR_BRACKET: Final = re.compile(
-    r"""\"\"\"[^"]*\"\"\"|\'\'\'[^']*\'\'\'|```[^`]*```|"[^"]*"|'[^']*'|`[^`]*`|\[[^\]]+\]"""
-)
+
+def _gate_patterns() -> tuple[re.Pattern[str], re.Pattern[str]]:
+    """Build the paren gate's token patterns from the grammar's own rules, so they cannot drift from it.
+
+    The gate steps over the leading quality (the grammar's ``quality`` alternatives, in order) and, inside the
+    expression, a string literal (each ``string`` alternative: quote, body regex, quote) or a bracketed quality.
+    """
+    rules = Grammar(grammars.comparison_grammar)
+    bracketed = rules["bracketed_quality"].re.pattern
+    leading = "|".join(rules[name].re.pattern for name in ("bracketed_quality", "quoted_quality", "simple_quality"))
+    strings = [
+        "".join(
+            re.escape(part.literal) if hasattr(part, "literal") else part.re.pattern for part in alternative.members
+        )
+        for alternative in rules["string"].members
+    ]
+    return re.compile(r"\s*(?:%s)" % leading), re.compile("|".join([*strings, bracketed]))
+
+
+_LEADING_QUALITY, _STRING_OR_BRACKET = _gate_patterns()
 
 
 class BaseParser(NodeVisitor):

@@ -723,3 +723,10 @@ class TestParenGateDifferential:
                 parsers.ComparisonParser().parse("x == " + expr)
             else:
                 parsers.PlainTextParser().parse("{x == " + expr + "} prose")
+
+
+def test_paren_gate_patterns_derive_from_grammar():
+    """The gate's token patterns come from the grammar's rules, not a hand copy."""
+    assert parsers._LEADING_QUALITY.pattern == r"\s*(?:\[[^\]]+\]|" + r'"[^"]+"|[^\s]+)'
+    for literal in ('"""a"""', "'''a'''", "```a```", '"a"', "'a'", "`a`", "[a b]"):
+        assert parsers._STRING_OR_BRACKET.fullmatch(literal)
