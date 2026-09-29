@@ -1,10 +1,18 @@
 import os.path
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Final
 
 import attr
 
 from . import exceptions
+
+MAX_RULEBOOK_BYTES: Final = 1_048_576  # 1 MiB of UTF-8 source per rulebook
+
+
+def _check_size(name: str, size: int) -> None:
+    if size > MAX_RULEBOOK_BYTES:
+        raise exceptions.RulebookTooLargeError("%s: rulebook source exceeds %d bytes" % (name, MAX_RULEBOOK_BYTES))
 
 
 class BaseLoader:
@@ -37,15 +45,25 @@ class FileSystemLoader(BaseLoader):
         return is_up_to_date
 
     def get_source(self, environment, name):
+        if "\0" in name:
+            raise exceptions.RulebookNotFound("%r: invalid rulebook name" % name)
         base = Path(self.base_path).resolve()
         filepath = (base / (name + self.extension)).resolve()
         if not filepath.is_relative_to(base):
             raise exceptions.RulebookNotFound("%s: include escapes the story directory" % name)
-        if not filepath.exists():
+        if not filepath.is_file():
             raise exceptions.RulebookNotFound(name)
 
-        with filepath.open(encoding="utf-8") as fi:
-            source = fi.read()
+        try:
+            with filepath.open("rb") as fi:
+                data = fi.read(MAX_RULEBOOK_BYTES + 1)
+        except OSError:
+            raise exceptions.RulebookNotFound(name) from None
+        _check_size(name, len(data))
+        try:
+            source = data.decode("utf-8")
+        except UnicodeDecodeError:
+            raise exceptions.ParseError("%s: rulebook source is not valid UTF-8" % name) from None
 
         is_up_to_date = self.get_up_to_date_checker(filepath)
 
@@ -63,4 +81,5 @@ class MemoryLoader(BaseLoader):
             source = self.sources[name]
         except KeyError:
             raise exceptions.RulebookNotFound(name) from None
+        _check_size(name, len(source.encode("utf-8", "surrogatepass")))
         return source, lambda: True

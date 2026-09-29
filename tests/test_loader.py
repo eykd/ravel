@@ -158,3 +158,105 @@ class TestMemoryLoader:
         )
         names = {rule.name for rule in env.load()["rulebook"]["Situation"]["rules"]}
         assert names == {"begin::intro", "other::outro"}
+
+
+class TestRulebookSourceLimits:
+    def test_fs_loader_rejects_oversize_file_reading_only_cap_plus_one(self, tempdir, fs_loader):
+        (tempdir / "big.ravel").write_bytes(b"a" * (loaders.MAX_RULEBOOK_BYTES + 5))
+        real_open = Path.open
+        reads = []
+
+        class Spy:
+            def __init__(self, fh):
+                self._fh = fh
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                self._fh.close()
+
+            def read(self, n=-1):
+                reads.append(n)
+                return self._fh.read(n)
+
+        def spy_open(self, *args, **kwargs):
+            return Spy(real_open(self, *args, **kwargs))
+
+        with patch.object(Path, "open", spy_open), pytest.raises(exceptions.RulebookTooLargeError, match="big"):
+            fs_loader.get_source(None, "big")
+        assert reads == [loaders.MAX_RULEBOOK_BYTES + 1]
+
+    def test_fs_loader_accepts_file_at_cap(self, tempdir, fs_loader):
+        (tempdir / "ok.ravel").write_bytes(b"a" * loaders.MAX_RULEBOOK_BYTES)
+        source, _ = fs_loader.get_source(None, "ok")
+        assert len(source) == loaders.MAX_RULEBOOK_BYTES
+
+    def test_fs_loader_maps_bad_utf8_to_parse_error(self, tempdir, fs_loader):
+        (tempdir / "bad.ravel").write_bytes(b"\xff\xfe\x00")
+        with pytest.raises(exceptions.ParseError, match="bad") as info:
+            fs_loader.get_source(None, "bad")
+        assert str(tempdir) not in str(info.value)
+
+    def test_fs_loader_maps_directory_to_not_found(self, tempdir, fs_loader):
+        (tempdir / "x.ravel").mkdir()
+        with pytest.raises(exceptions.RulebookNotFound):
+            fs_loader.get_source(None, "x")
+
+    def test_fs_loader_maps_nul_name_to_not_found(self, fs_loader):
+        with pytest.raises(exceptions.RulebookNotFound):
+            fs_loader.get_source(None, "a\0b")
+
+    def test_fs_loader_maps_read_oserror_to_not_found(self, tempdir, fs_loader):
+        (tempdir / "z.ravel").write_text("x")
+        with (
+            patch.object(Path, "open", side_effect=PermissionError("nope")),
+            pytest.raises(exceptions.RulebookNotFound),
+        ):
+            fs_loader.get_source(None, "z")
+
+    def test_fs_loader_still_blocks_traversal(self, fs_loader):
+        with pytest.raises(exceptions.RulebookNotFound, match="escapes"):
+            fs_loader.get_source(None, "../evil")
+
+    def test_memory_loader_rejects_oversize_source(self):
+        loader = loaders.MemoryLoader({"big": "a" * (loaders.MAX_RULEBOOK_BYTES + 1)})
+        with pytest.raises(exceptions.RulebookTooLargeError, match="big"):
+            loader.get_source(None, "big")
+
+    def test_memory_loader_counts_bytes_not_characters(self):
+        loader = loaders.MemoryLoader({"wide": "é" * (loaders.MAX_RULEBOOK_BYTES // 2 + 1)})
+        with pytest.raises(exceptions.RulebookTooLargeError):
+            loader.get_source(None, "wide")
+
+    def test_memory_loader_accepts_source_at_cap(self):
+        loader = loaders.MemoryLoader({"ok": "a" * loaders.MAX_RULEBOOK_BYTES})
+        source, _ = loader.get_source(None, "ok")
+        assert len(source) == loaders.MAX_RULEBOOK_BYTES
+
+    def test_memory_loader_counts_lone_surrogates(self):
+        loader = loaders.MemoryLoader({"s": "\ud800"})
+        source, _ = loader.get_source(None, "s")
+        assert source == "\ud800"
+
+    @pytest.mark.parametrize("kind", ["big", "bad_utf8", "directory", "nul"])
+    def test_environment_load_raises_typed_errors(self, tempdir, kind):
+        if kind == "big":
+            (tempdir / "begin.ravel").write_bytes(b"a" * (loaders.MAX_RULEBOOK_BYTES + 1))
+            expected = exceptions.RulebookTooLargeError
+        elif kind == "bad_utf8":
+            (tempdir / "begin.ravel").write_bytes(b"\xff\xfe")
+            expected = exceptions.ParseError
+        elif kind == "directory":
+            (tempdir / "begin.ravel").mkdir()
+            expected = exceptions.RulebookNotFound
+        else:
+            (tempdir / "begin.ravel").write_text("x")
+            expected = exceptions.RulebookNotFound
+        env = Environment(loader=loaders.FileSystemLoader(base_path=tempdir))
+        if kind == "nul":
+            with pytest.raises(expected):
+                env.load_rulebook("a\0b")
+        else:
+            with pytest.raises(expected):
+                env.load()

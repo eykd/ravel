@@ -19,6 +19,10 @@ class OperationParseError(ParseError):
     pass
 
 
+class RulebookTooLargeError(ParseError):
+    """A rulebook source exceeds ``loaders.MAX_RULEBOOK_BYTES``."""
+
+
 class MissingBaggageError(Exception):
     pass
 
