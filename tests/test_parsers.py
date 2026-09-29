@@ -332,3 +332,36 @@ class TestOperationParserConstraintRules:
             parsers.OperationParser().parse(text)
 
         assert text in str(excinfo.value)
+
+
+class TestExpressionOperandLimit:
+    """Deep left-folded chains must fail at compile time, never as a raw RecursionError at runtime."""
+
+    @staticmethod
+    def _chain(count, operator="+"):
+        return operator.join(["1"] * count)
+
+    @pytest.mark.parametrize("operator", ["+", "*"])
+    def test_a_chain_at_the_limit_parses_and_evaluates(self, operator):
+        operation = parsers.OperationParser().parse("X = " + self._chain(parsers.MAX_EXPRESSION_OPERANDS, operator))
+
+        assert operation.evaluate(0) == (parsers.MAX_EXPRESSION_OPERANDS if operator == "+" else 1)
+
+    @pytest.mark.parametrize("operator", ["+", "*"])
+    def test_an_operation_over_the_limit_raises_a_parse_error_naming_the_limit(self, operator):
+        text = "X = " + self._chain(parsers.MAX_EXPRESSION_OPERANDS + 1, operator)
+
+        with pytest.raises(exceptions.OperationParseError, match=str(parsers.MAX_EXPRESSION_OPERANDS)):
+            parsers.OperationParser().parse(text)
+
+    def test_a_comparison_over_the_limit_raises_a_parse_error(self):
+        text = "X == " + self._chain(parsers.MAX_EXPRESSION_OPERANDS + 1)
+
+        with pytest.raises(exceptions.ComparisonParseError, match=str(parsers.MAX_EXPRESSION_OPERANDS)):
+            parsers.ComparisonParser().parse(text)
+
+    def test_nested_chains_at_the_limit_evaluate_without_recursion_error(self):
+        term = self._chain(parsers.MAX_EXPRESSION_OPERANDS, "*")
+        text = "X = " + "+".join([term] * parsers.MAX_EXPRESSION_OPERANDS)
+
+        assert parsers.OperationParser().parse(text).evaluate(0) == parsers.MAX_EXPRESSION_OPERANDS

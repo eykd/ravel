@@ -6,7 +6,8 @@ from ravel.adapters.story_source import FileSystemStorySource, MemoryStorySource
 from ravel.app.ports import StorySource
 from ravel.engine.engine import start
 from ravel.engine.story import Story
-from ravel.exceptions import RulebookNotFound
+from ravel.exceptions import ParseError, RulebookNotFound
+from ravel.parsers import MAX_EXPRESSION_OPERANDS
 
 
 def test_it_loads_a_compiled_story_from_a_path_directory(examples_path):
@@ -87,3 +88,19 @@ def test_memory_source_satisfies_the_story_source_port():
     source: StorySource = MemoryStorySource({"begin": SRC})
 
     assert isinstance(source.load(), Story)
+
+
+def test_memory_source_rejects_an_over_limit_when_predicate_at_load():
+    chain = "+".join(["1"] * (MAX_EXPRESSION_OPERANDS + 1))
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == %s\n  - Ready.\n" % chain
+
+    with pytest.raises(ParseError):
+        MemoryStorySource({"begin": src}).load()
+
+
+def test_memory_source_rejects_an_over_limit_effect_at_load():
+    chain = "+".join(["1"] * (MAX_EXPRESSION_OPERANDS + 1))
+    src = "given:\n  - X = 0\n\nstart:\n  - when:\n      - X == 0\n  - effect: X = %s\n  - Ready.\n" % chain
+
+    with pytest.raises(ParseError):
+        MemoryStorySource({"begin": src}).load()
