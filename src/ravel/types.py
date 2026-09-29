@@ -9,7 +9,6 @@ from syml.basetypes import Pos, Source  # noqa
 from ravel.exceptions import ConstraintError, EvaluationError
 from ravel.utils.data import evaluate_term
 
-# Mirrors ravel.engine.state.QualityValue (importing it here would be circular).
 type QualityValue = int | float | str
 
 

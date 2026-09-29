@@ -9,9 +9,8 @@ from typing import Final
 from attrs import frozen
 
 from ravel.engine.errors import InvalidQualityValueError
-from ravel.types import MAX_STRING_LENGTH
+from ravel.types import MAX_STRING_LENGTH, QualityValue
 
-type QualityValue = int | float | str
 type LocationId = str
 
 QUALITY_TYPES: Final = (int, float, str)
