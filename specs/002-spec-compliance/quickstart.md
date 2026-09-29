@@ -48,7 +48,7 @@ env = Environment(
     )
 )
 book = env.load()  # the begin <-> other cycle loads, each file once
-book["rulebook"]["Situation"]["locations"]["begin::declared"].intro  # Text('Here.')
+book["rulebook"]["Situation"]["locations"]["begin::declared"].intro  # Text(text='Here.')
 ```
 
 ## US4: embed the engine with no filesystem
@@ -58,14 +58,21 @@ from ravel import engine
 from ravel.adapters.story_source import MemoryStorySource
 from ravel.app.saves import decode_save, encode_save
 
+SOURCE = (
+    "given:\n  - Location = 'Start'\n  - Gold = 1\n\n"
+    "start:\n  - when:\n      - Location = 'Start'\n  - Ready.\n"
+    "  - choice:\n      - [Go]Going.\n      - effect:\n          - Gold = 2\n          - Location = 'Done'\n\n"
+    "done:\n  - when:\n      - Location = 'Done'\n  - Finished.\n"
+)
+
 story = MemoryStorySource({"begin": SOURCE}).load()
-step = engine.start(story)
+step = engine.start(story)  # step.state.offered == ('begin::start',)
 save = encode_save(story, step.state)
 
 # One stateless request: bytes in, bytes out, no session held between requests.
 step = engine.resume(story, decode_save(save))
 step = engine.choose(story, step.state, step.state.offered[0])
-save = encode_save(story, step.state)
+save = encode_save(story, step.state)  # bytes; step.state.offered == ('begin::start::go',)
 ```
 
 `Environment()` with no loader now raises `TypeError`; pass `FileSystemLoader(base_path=...)` or
@@ -85,7 +92,7 @@ uv run pytest tests/test_spec_examples.py -v   # one case per spec example, id n
 ```
 
 Change `10 - 4 - 2        → 4` in §5.1 to `→ 8` and rerun: the case
-`§5:<line>: 10 - 4 - 2 → 8` fails.
+`§5.1:<line>: 10 - 4 - 2 → 8` (e.g. `§5.1:248: 10 - 4 - 2 → 8`) fails.
 
 ## Cloak regression (SC-005)
 
