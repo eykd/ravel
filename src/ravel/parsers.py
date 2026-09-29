@@ -66,7 +66,7 @@ class BaseParser(NodeVisitor):
 
 class BaseExpressionParser(BaseParser):
     unwrapped_exceptions = (exceptions.ParseError,)
-    operand_limit_error: type[exceptions.ParseError] = exceptions.ParseError
+    expression_limit_error: type[exceptions.ParseError] = exceptions.ParseError
     max_length: int | None = MAX_EXPRESSION_LENGTH
     visit_setter = BaseParser.get_text
     visit_simple_quality = BaseParser.get_text
@@ -74,7 +74,7 @@ class BaseExpressionParser(BaseParser):
     def parse(self, text, pos=0):
         """Parse text, refusing over-long text or over-deep parentheses before the grammar can build a tree."""
         if self.max_length is not None and len(text) > self.max_length:
-            raise self.operand_limit_error(
+            raise self.expression_limit_error(
                 "Expression is %d characters long; the maximum supported is %d" % (len(text), self.max_length)
             )
         self._check_paren_depth(text)
@@ -107,7 +107,7 @@ class BaseExpressionParser(BaseParser):
                     continue
             i += 1
         if deepest > MAX_PAREN_DEPTH:
-            raise self.operand_limit_error(
+            raise self.expression_limit_error(
                 "Expression nests parentheses %d deep; the maximum supported is %d" % (deepest, MAX_PAREN_DEPTH)
             )
 
@@ -131,7 +131,7 @@ class BaseExpressionParser(BaseParser):
         try:
             return int(node.text)
         except ValueError as e:
-            raise self.operand_limit_error(
+            raise self.expression_limit_error(
                 "Integer literal has too many digits (%d); the maximum supported is %d"
                 % (len(node.text.lstrip("-")), sys.get_int_max_str_digits())
             ) from e
@@ -149,7 +149,7 @@ class BaseExpressionParser(BaseParser):
         elif isinstance(rest[0], str):
             rest = [rest]
         if len(rest) + 1 > MAX_EXPRESSION_OPERANDS:
-            raise self.operand_limit_error(
+            raise self.expression_limit_error(
                 "Expression has %d operands; the maximum supported is %d" % (len(rest) + 1, MAX_EXPRESSION_OPERANDS)
             )
         result = first
@@ -158,7 +158,7 @@ class BaseExpressionParser(BaseParser):
             result = types.Expression(result, operator, operand)
             depth = 1 + max(depth, self._depths.get(id(operand), 0))
         if depth > MAX_EXPRESSION_DEPTH:
-            raise self.operand_limit_error(
+            raise self.expression_limit_error(
                 "Expression is nested %d deep; the maximum supported is %d" % (depth, MAX_EXPRESSION_DEPTH)
             )
         self._depths[id(result)] = depth
@@ -174,7 +174,7 @@ class BaseExpressionParser(BaseParser):
 
 
 class ComparisonParser(BaseExpressionParser):
-    operand_limit_error = exceptions.ComparisonParseError
+    expression_limit_error = exceptions.ComparisonParseError
     grammar = Grammar(grammars.comparison_grammar)
 
     def visit_comparator(self, node, children):
@@ -276,7 +276,7 @@ class PlainTextParser(ComparisonParser):
 
 
 class OperationParser(BaseExpressionParser):
-    operand_limit_error = exceptions.OperationParseError
+    expression_limit_error = exceptions.OperationParseError
     grammar = Grammar(grammars.operation_grammar)
 
     def parse(self, text, pos=0):
