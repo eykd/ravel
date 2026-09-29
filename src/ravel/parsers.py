@@ -22,9 +22,10 @@ MAX_PAREN_DEPTH: Final = 20
 # The caps above run in the visitor, after Parsimonious has built the whole packrat parse tree, so they
 # bound evaluator recursion but not parser CPU or memory (a 200 KB chain cost seconds and hundreds of MB
 # before rejection). Refuse over-long expression text before parsing at all. 64 KiB comfortably admits a
-# full operand chain of 100 operands with 100-character quality names (about 10 KB) and matches the
-# string-length cap. Only expression parsers are gated; long prose lines are legitimate and cheap.
-MAX_EXPRESSION_LENGTH: Final = 65_536
+# full operand chain of 100 operands with 100-character quality names (about 10 KB). It is defined as the
+# string-length cap (types.MAX_STRING_LENGTH) so the two limits cannot drift apart.
+# Only expression parsers are gated; long prose lines are legitimate and cheap.
+MAX_EXPRESSION_LENGTH: Final = types.MAX_STRING_LENGTH
 
 
 def _gate_patterns() -> tuple[re.Pattern[str], re.Pattern[str]]:

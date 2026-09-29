@@ -35,6 +35,9 @@ from ravel.utils.excerpts import bounded_repr, printable
 SAVE_FORMAT: Final = "ravel-save"
 SAVE_FORMAT_VERSION: Final = 1
 MAX_SAVE_BYTES: Final = 1_048_576  # 1 MiB
+_MAX_SAVE_DESCRIPTION: Final = (
+    "%d MiB" % (MAX_SAVE_BYTES // 1_048_576) if MAX_SAVE_BYTES % 1_048_576 == 0 else "%d bytes" % MAX_SAVE_BYTES
+)
 MAX_LISTED_KEYS: Final = 5  # keys named in a key-mismatch error before "and N more"
 SAVE_MAGIC: Final = b'{"format":"ravel-save"'  # every canonical v1 save starts with this
 
@@ -115,7 +118,7 @@ def _frame_doc(frame: SavedFrame) -> dict[str, object]:
 
 
 def _too_large() -> SaveTooLargeError:
-    return SaveTooLargeError("save is too large to write (over 1 MiB)")
+    return SaveTooLargeError("save is too large to write (over %s)" % _MAX_SAVE_DESCRIPTION)
 
 
 def _check_quality_size(qualities: Qualities) -> None:
@@ -300,7 +303,7 @@ def _check_stack_consistency(stack: tuple[SavedFrame, ...]) -> None:
 
 def _decode_save(data: bytes) -> SavedGame:
     if len(data) > MAX_SAVE_BYTES:
-        raise SaveCorruptError("save file too large (over 1 MiB)")
+        raise SaveCorruptError("save file too large (over %s)" % _MAX_SAVE_DESCRIPTION)
 
     doc = _parse_json(data)
     if not isinstance(doc, dict):
