@@ -353,6 +353,15 @@ contracts/rulebook-compile.md lists the rejected order. No code change: US3's te
 compiling it raises `ravel.exceptions.ParseError` and that the message carries the `Source`
 position (`Line 4, Column 8` in the probe).
 
+### Soft-failing conditions stay visible to authors (RT-12)
+
+RT-10 turns a broken condition into a quiet `False`. The only signal is the `WARNING` on
+`ravel.query`, and a failing `when:` logs on every query, every turn. VM spec §6 and language spec
+§6.3 each get one sentence: a condition that can't be evaluated is false and logs a warning. The
+`ravel run` console adapter already configures logging at `WARNING` by default (`cli.main`), so
+authors see these on stderr with no flag; no dedup or rate limit is added (log volume is the
+host's policy). Low; docs only.
+
 ### Spec examples must use the raising path (RT-11)
 
 RT-10 makes `Comparison.check`/`__call__` return `False` on an evaluation error. The US6 runner
