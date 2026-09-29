@@ -242,8 +242,8 @@ repo). Their results are quoted where they settle a question.
 - **Decision**: Pin the shipped behavior. No code change.
 - **Probe**: a choice `[Go]You go.` with `text: Extra words.` offers `Go`, and taking it shows
   `You go.` then `Extra words.`, then the choice's effects. The menu label isn't changed. That's
-  what §9.2 already calls "(optional additional text)". US3-AS4's word "override" is read as that
-  documented behavior; the test asserts the exact output sequence.
+  what §9.2 already calls "(optional additional text)". US3-AS4 was reworded to say the same
+  (`583eb86`); the test asserts the exact output sequence in contracts/rulebook-compile.md.
 
 ### PD-11. In-memory story sources (FR-012)
 

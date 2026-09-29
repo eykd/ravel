@@ -41,7 +41,7 @@ methods, 3 new types (`QualityRef`, `Value`, `MemoryLoader`) and 1 new adapter
 (`MemoryStorySource`), 3 new errors, 1 compiler branch, 2 spec docs revised, ~6 acceptance test
 files, 1 spec-examples test module
 
-No NEEDS CLARIFICATION remains; see research.md.
+No open clarifications remain; see research.md.
 
 ## Brainstorm Context
 
@@ -225,6 +225,23 @@ public surfaces only: `ravel.parsers` + `ravel.types` for expression semantics, 
 | US4: embedding | `tests/acceptance/spec_compliance/test_us04_embedding.py` (AS1, AS2, AS3, AS5), `test_us04_determinism_property.py` (AS4; hypothesis, `max_examples=200`, `deadline=None`, `derandomize=True`, `database=None`) | `MemoryStorySource`, filesystem calls patched to raise; stateless handler | 5 |
 | US5: docs | `tests/acceptance/spec_compliance/test_us05_docs.py` | reads both docs and `CLAUDE.md`: versions are 0.2; §5.1 has the precedence table; each ruling's key sentence is present; §12 shows **all five** `examples/cloak/*.ravel` files and each listing equals its file's text (today it shows three, and its `begin.ravel` is out of date); VM spec names `start`/`choose`/`present`/`resume`, all seven output types, the three host recipes, and has a design-history appendix | 3 |
 | US6: spec can't drift | `tests/acceptance/spec_compliance/test_us06_spec_examples.py` | runs the extractor over the real spec (AS1) and over a copy with one result edited (AS2), asserting the failure names the example | 2 |
+
+**§12 listing check (US5), pinned.** Today §12 (`docs/RAVEL_LANGUAGE_SPEC.md` lines 666–741) has
+three `### <file>.ravel` headings (`begin`, `foyer`, `cloakroom`), each followed directly by one
+` ```yaml ` fenced block; `examples/cloak/` has five files, each ending in exactly one `\n`. The
+test in `test_us05_docs.py`:
+
+1. Slices the text from the `## 12.` heading to the next `## ` heading.
+2. Collects the `### ` headings in that slice, in order, and asserts they equal
+   `["begin.ravel", "foyer.ravel", "cloakroom.ravel", "bar-dark.ravel", "bar-light.ravel"]`
+   (the `include:` order in `begin.ravel`). It also asserts the set equals
+   `{p.name for p in Path("examples/cloak").glob("*.ravel")}`, so a sixth file fails the test.
+3. For each heading, takes the first fenced block after it: the lines strictly between its opening
+   fence and the next line that is exactly ` ``` `. It asserts `"\n".join(lines) + "\n" ==
+   (CLOAK / name).read_text()`. No other normalization, so drift in whitespace fails too.
+
+This check is separate from the US6 extractor, which ignores §12 (contracts/spec-examples.md,
+Scope). The §12 edit and this test land together in one US5 task.
 
 **Regression checks folded into the gate**: SC-005 (Cloak plays to both endings) is 001's
 `tests/acceptance/test_us06_end_to_end.py`, which must stay green through the grammar rewrite.
