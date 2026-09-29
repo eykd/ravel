@@ -378,6 +378,19 @@ repo). Their results are quoted where they settle a question.
   contracts in `specs/001-reentrant-vm/contracts/` are the detailed source; the VM spec summarizes
   and links rather than duplicating byte-level detail.
 
+### PD-19. Caps bound input size, not compute; common `when:` compiled once (ravel-h6v.18; 2026-09-28, David)
+
+- **Decision**: Threat-model ruling, 2026-09-28. The Limits caps bound *input size*, not total
+  compile or per-turn compute. Fix the K x M load cost by compiling a file's top-level `when:`
+  predicates once per file and sharing one pre-sorted sequence across that file's rules
+  (`compile_rulebook`). Do **not** add a cap on total compiled predicate references; this overrides
+  the review finding's suggestion (ravel-h6v.18). Hosts running untrusted stories wrap load and each
+  engine call in their own timeout or sandbox, stated in `docs/RAVEL_VM_SPEC.md` beside the
+  save-integrity note.
+- **Rationale**: Query-time cost stays K x M predicate checks per turn; a compute cap is the host's
+  policy, not the language's.
+- **Alternatives**: a 100,000 total-reference cap with a typed `ParseError` (rejected by David).
+
 ---
 
 ## Prior decisions this plan relies on

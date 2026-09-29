@@ -1,3 +1,4 @@
+import heapq
 import itertools as it
 from collections import defaultdict
 from collections.abc import Mapping
@@ -90,6 +91,10 @@ def compile_rulebook(environment, rulebook, prefix=""):
 
     preamble = compile_preamble(environment, rulebook)
 
+    # The file's top-level `when:` predicates are compiled and sorted once, then shared by reference
+    # with every rule that adds none of its own (parsing them per rule made load cost K x M).
+    common_predicates = compile_ruleset(environment, "", "", preamble["common_predicates"])
+
     for rule_name, data in preamble["rulesets"]:
         if is_when(data[0]):
             concept = "Situation"
@@ -111,17 +116,11 @@ def compile_rulebook(environment, rulebook, prefix=""):
         rule_name = prefix + get_text(rule_name)
         concept = get_text(concept)
 
-        rules[concept]["rules"].append(
-            types.Rule(
-                rule_name,
-                compile_ruleset(
-                    environment,
-                    concept,
-                    rule_name,
-                    preamble["common_predicates"] + ruleset_predicates,
-                ),
-            )
-        )
+        own_predicates = compile_ruleset(environment, concept, rule_name, ruleset_predicates)
+        # Merging two sorted runs equals sorting their concatenation, common predicates first on ties.
+        predicates = list(heapq.merge(common_predicates, own_predicates)) if own_predicates else common_predicates
+
+        rules[concept]["rules"].append(types.Rule(rule_name, predicates))
         rules[concept]["locations"].update(concepts.compile_baggage(environment, concept, rule_name, baggage_data))
 
     for ruleset in rules.values():

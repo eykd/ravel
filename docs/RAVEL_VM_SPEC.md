@@ -359,6 +359,11 @@ do one of two things:
 2. **Authenticate the bytes**: HMAC the save with a key only the server holds, and verify the tag
    before calling `decode_save`.
 
+**The Limits caps are not a compute budget.** The §E Limits caps bound input size (source bytes,
+nesting, counts of things), not total compile time or per-turn compute: a story within every cap can
+still be slow to load or slow to evaluate. A host running untrusted stories must wrap `Environment.load`
+and each engine call (`start`, `choose`, `present`, `resume`) in its own timeout or sandbox.
+
 The engine ships neither. `choose` still refuses a location that isn't in `state.offered`
 (`NotOfferedError`), so a forged location can't skip the menu, but a forged save can.
 

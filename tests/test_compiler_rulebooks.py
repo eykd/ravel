@@ -120,6 +120,46 @@ class TestCompileRulebook:
         result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml), prefix)
         assert "prefix-intro" in result["rulebook"]["Situation"]["locations"]
 
+    def test_it_should_compile_each_common_predicate_once_regardless_of_rule_count(self, env, monkeypatch):
+        from ravel.compiler import predicates
+
+        calls = []
+        real = predicates.compile_predicate
+
+        def counting(environment, target):
+            calls.append(target)
+            return real(environment, target)
+
+        monkeypatch.setattr(predicates, "compile_predicate", counting)
+        rulebook_syml = textwrap.dedent(
+            """
+            when:
+              - Alpha == 1
+              - Beta == 2
+
+            first:
+              - Some text.
+
+            second:
+              - when:
+                  - Gamma == 3
+
+              - Some text.
+
+            third:
+              - Some text.
+        """
+        )
+        result = rulebooks.compile_rulebook(env, syml.loads(rulebook_syml))
+        compiled = {rule.name: rule.predicates for rule in result["rulebook"]["Situation"]["rules"]}
+
+        # Two common predicates plus the one rule-local predicate; three rules do not multiply the commons.
+        assert len(calls) == 3
+        assert len(compiled["first"]) == 2
+        assert len(compiled["second"]) == 3
+        # Rules that add no predicates share the one pre-sorted sequence.
+        assert compiled["first"] is compiled["third"]
+
     def test_it_should_fail_to_compile_an_unknown_directive(self, env):
         bad_rulebook_syml = textwrap.dedent(
             """
