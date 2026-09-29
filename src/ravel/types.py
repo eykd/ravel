@@ -175,6 +175,24 @@ class VALUE:
 
 
 @attr.s(slots=True)
+class Value:
+    """The ``VALUE`` placeholder: evaluates to the current quality value."""
+
+    def evaluate(self, **kwargs: Any) -> Any:
+        raise NotImplementedError
+
+
+@attr.s(slots=True)
+class QualityRef:
+    """A reference to a quality by name, evaluated against the current qualities."""
+
+    name: str = attr.ib()
+
+    def evaluate(self, **kwargs: Any) -> Any:
+        raise NotImplementedError
+
+
+@attr.s(slots=True)
 class Rule:
     name: Any = attr.ib()
     predicates: Any = attr.ib()

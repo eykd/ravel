@@ -172,3 +172,39 @@ class TestPredicate:
 
         assert predicate.check({"Foo": 5}) is True
         assert predicate.check({"Foo": 1}) is False
+
+
+class TestQualityRef:
+    def test_it_should_evaluate_to_the_quality_value(self):
+        assert types.QualityRef("Health").evaluate(qualities={"Health": 7}) == 7
+
+    def test_it_should_evaluate_to_zero_when_the_quality_is_unset(self):
+        assert types.QualityRef("Health").evaluate(qualities={}) == 0
+
+
+class TestValue:
+    def test_it_should_evaluate_to_the_current_qvalue(self):
+        assert types.VALUE.evaluate(qvalue=10) == 10
+
+    def test_it_should_be_a_value_instance(self):
+        assert isinstance(types.VALUE, types.Value)
+
+    def test_it_should_equal_any_value_instance(self):
+        assert types.Value() == types.VALUE
+
+
+class TestExpressionContextThreading:
+    def test_it_should_evaluate_a_quality_ref_term_against_qualities(self):
+        exp = types.Expression(types.QualityRef("Health"), "+", 1)
+        assert exp.evaluate(qualities={"Health": 7}) == 8
+
+    def test_it_should_evaluate_value_against_qvalue(self):
+        assert types.Expression(types.VALUE, "*", 2).evaluate(qvalue=10) == 20
+
+    def test_it_should_pass_the_context_to_nested_expressions(self):
+        inner = types.Expression(types.QualityRef("Health"), "*", types.VALUE)
+        outer = types.Expression(inner, "+", 1)
+        assert outer.evaluate(qualities={"Health": 7}, qvalue=2) == 15
+
+    def test_it_should_still_evaluate_without_context(self):
+        assert types.Expression(3, "+", 2).evaluate() == 5
