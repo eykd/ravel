@@ -1,26 +1,10 @@
 [
   {
-    "category": "resource-limits",
+    "category": "recursion-depth",
     "file": "src/ravel/environments.py",
-    "title": "Remediate: indentation nesting cap bypassed via Unicode line separators",
-    "severity": "MAJOR",
-    "line": 23,
-    "task_id": "ravel-h6v.30"
-  },
-  {
-    "category": "data-integrity",
-    "file": "src/ravel/compiler/directives.py",
-    "title": "Remediate: sibling choices whose labels slugify alike silently overwrite each other's bodies",
+    "title": "Remediate: one-line list-marker chains within the 128 nesting cap overflow syml to the RecursionError backstop",
     "severity": "MINOR",
-    "line": 104,
-    "task_id": "ravel-h6v.31"
-  },
-  {
-    "category": "input-validation",
-    "file": "src/ravel/parsers.py",
-    "title": "Remediate: parenthesis depth pre-check counts parens inside string literals and prose",
-    "severity": "MINOR",
-    "line": 61,
-    "task_id": "ravel-h6v.32"
+    "line": 45,
+    "task_id": "ravel-h6v.34"
   }
 ]
