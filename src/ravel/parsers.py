@@ -1,3 +1,4 @@
+import re
 import sys
 from typing import Final
 
@@ -168,8 +169,25 @@ class IntroTextParser(BaseParser):
 
 
 class PlainTextParser(ComparisonParser):
-    max_length = None  # prose lines are not expressions; only the {...} predicate is
+    # Prose is not an expression, so the whole line is exempt from the length cap; only the leading
+    # {...} predicate prefix is an expression, and parse() gates its length before the grammar runs.
+    max_length = None
     grammar = Grammar(grammars.plain_text_grammar)
+
+    # The prefix text after the opening brace: runs to the first "}" outside a quoted string (strings may
+    # hold a "}"), or to the end of the line when the brace is never closed. Each branch starts on a
+    # different character and the star cannot fail, so the scan is linear with no backtracking.
+    _prefix_span = re.compile(r"""\{((?:"[^"]*"|'[^']*'|`[^`]*`|[^}])*)""")
+
+    def parse(self, text, pos=0):
+        """Parse a text line, refusing an over-long {...} prefix (or unclosed brace) before the grammar runs."""
+        match = self._prefix_span.match(text, pos)
+        if match is not None and len(match.group(1)) > MAX_EXPRESSION_LENGTH:
+            raise exceptions.ComparisonParseError(
+                "Predicate is %d characters long; the maximum supported is %d"
+                % (len(match.group(1)), MAX_EXPRESSION_LENGTH)
+            )
+        return super().parse(text, pos=pos)
 
     def visit_text(self, node, children):
         return node.text

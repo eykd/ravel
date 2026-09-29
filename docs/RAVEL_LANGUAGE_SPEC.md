@@ -1040,7 +1040,7 @@ exhausting memory or the interpreter stack.
 | Limit | Value | Error |
 |-------|-------|-------|
 | Operands in one expression chain (`a + b + c ...`) | 100 | `ParseError` at compile time |
-| Text length of one expression (checked before parsing; plain text lines are exempt) | 65,536 characters | `ParseError` at compile time |
+| Text length of one expression (checked before parsing; the prose of a text line is exempt, but its `{…}` predicate prefix is not, and neither is an unclosed `{` running past the cap) | 65,536 characters | `ParseError` at compile time |
 | Parenthesis nesting in one expression | 20 | `ParseError` at compile time |
 | Total expression tree depth | 200 | `ParseError` at compile time |
 | Digits in an integer literal | 4300 (Python's `sys.get_int_max_str_digits()` default) | `ParseError` at compile time |
