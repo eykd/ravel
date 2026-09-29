@@ -4,6 +4,9 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from ravel import exceptions, parsers, types
+from ravel.types import QualityValue
+
 
 @dataclass(frozen=True)
 class SpecExample:
@@ -111,5 +114,73 @@ def extract_examples(markdown: str) -> list[SpecExample]:
     return examples
 
 
+def _parse_literal(text: str) -> QualityValue | bool:
+    """Parse an expected-result literal: a quoted string, ``true``/``false``, an int or a float."""
+    if text in ("true", "false"):
+        return text == "true"
+    if len(text) >= 2 and text[0] == text[-1] == '"':
+        return text[1:-1]
+    try:
+        return int(text)
+    except ValueError:
+        return float(text)
+
+
+def _show(value: object) -> str:
+    """Render a result the way the spec writes it."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return '"%s"' % value
+    return str(value)
+
+
+def _apply_operation(operation: types.Operation, qualities: dict[str, QualityValue]) -> QualityValue:
+    """Apply ``operation`` to ``qualities`` in place and return the subject's new value."""
+    value = operation.evaluate(qualities.get(operation.quality), qualities=qualities)
+    qualities[operation.quality] = value
+    return value
+
+
+def _final_value(item: str, qualities: dict[str, QualityValue]) -> QualityValue | bool:
+    """Evaluate a result line's final item as an operation, a comparison, or an expression."""
+    try:
+        return _apply_operation(parsers.OperationParser().parse(item), qualities)
+    except exceptions.OperationParseError:
+        pass
+    try:
+        comparison = parsers.ComparisonParser().parse(item)
+    except exceptions.ParsimoniousParseError:
+        return _apply_operation(parsers.OperationParser().parse("_ = " + item), qualities)
+    return comparison.evaluate(qualities.get(comparison.quality), qualities=qualities)
+
+
+def _run_result(text: str) -> None:
+    """Run a ``setup ; final → expected`` line, raising AssertionError on a wrong result."""
+    left, _, right = text.partition(" → ")
+    expected = _parse_literal(right.strip())
+    *setup, final = left.split(" ; ")
+    qualities: dict[str, QualityValue] = {}
+    for step in setup:
+        _apply_operation(parsers.OperationParser().parse(step.strip()), qualities)
+    got = _final_value(final.strip(), qualities)
+    if type(got) is not type(expected) or got != expected:
+        raise AssertionError("%s: expected %s, got %s" % (text, _show(expected), _show(got)))
+
+
 def run_example(example: SpecExample) -> None:
     """Run ``example`` against the real implementation, raising AssertionError on mismatch."""
+    try:
+        if example.kind == "result":
+            _run_result(example.text)
+        elif example.kind == "operation":
+            parsers.OperationParser().parse(example.text).evaluate(None)
+        else:
+            comparison = parsers.ComparisonParser().parse(example.text)
+            comparison.evaluate(None, qualities={})
+    except AssertionError:
+        raise
+    except Exception as error:
+        raise AssertionError(
+            "%s (§%s, line %d): %s: %s" % (example.text, example.section, example.line, type(error).__name__, error)
+        ) from error

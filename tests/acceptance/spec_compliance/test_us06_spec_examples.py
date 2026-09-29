@@ -29,7 +29,6 @@ def test_us06_as1_every_scoped_spec_example_runs_and_passes() -> None:
         run_example(example)
 
 
-@pytest.mark.xfail(strict=True, reason="US6 not yet implemented; remove when this scenario passes")
 def test_us06_as2_a_wrong_expected_result_fails_naming_the_example() -> None:
     """US6-AS2: editing one example to a wrong expected result fails a test naming that example."""
     from tests.spec_examples import extract_examples, run_example

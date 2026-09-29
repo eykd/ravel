@@ -515,8 +515,8 @@ Choices present options to the player within a situation:
     - [Choice Text]Description after choosing
     - text: (optional additional text)
     - effect:
-        - operation1
-        - operation2
+        - Gold -= 5
+        - Location = "Bar"
 ```
 
 **Choice Text**: The bracketed text `[...]` appears as the selectable option.
