@@ -1,5 +1,8 @@
 """Unit tests for the spec-example extractor (specs/002-spec-compliance/contracts/spec-examples.md)."""
 
+from collections import Counter
+from pathlib import Path
+
 import pytest
 
 from tests.spec_examples import SpecExample, extract_examples, run_example
@@ -127,3 +130,36 @@ def test_run_example_wrong_result_raises_naming_example_and_expected_vs_got() ->
 
     with pytest.raises(AssertionError, match=r"(?s)1 \+ 1 → 3.*expected 3, got 2"):
         run_example(example)
+
+
+SPEC_PATH = Path(__file__).resolve().parent.parent / "docs" / "RAVEL_LANGUAGE_SPEC.md"
+SPEC_EXAMPLES = extract_examples(SPEC_PATH.read_text(encoding="utf-8"))
+
+EXPECTED_COUNTS = {
+    "4.1": 1,
+    "4.3": 3,
+    "5.1": 10,
+    "6.2": 5,
+    "6.3": 2,
+    "7.2": 4,
+    "7.3": 6,
+    "9.1": 5,
+    "9.2": 5,
+    "9.3": 3,
+    "9.4": 2,
+    "11.4": 3,
+}
+
+
+def example_id(example: SpecExample) -> str:
+    """Name an example by section, line and text so a failure identifies it."""
+    return f"\u00a7{example.section}:{example.line}: {' '.join(example.text.split())}"
+
+
+@pytest.mark.parametrize("example", SPEC_EXAMPLES, ids=example_id)
+def test_spec_example(example: SpecExample) -> None:
+    run_example(example)
+
+
+def test_extraction_counts() -> None:
+    assert dict(Counter(e.section for e in SPEC_EXAMPLES)) == EXPECTED_COUNTS
