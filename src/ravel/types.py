@@ -59,17 +59,15 @@ class Comparison:
         except (TypeError, ArithmeticError) as error:
             raise EvaluationError("%r: %s" % (self, error)) from error
 
-    def check(self, qualities: QualityLookup) -> bool:
-        try:
-            return self.evaluate(qualities.get(self.quality), qualities=qualities)
-        except EvaluationError:
-            return False
-
     def __call__(self, qvalue: QualityValue | None, *, qualities: QualityLookup = EMPTY_QUALITIES) -> bool:
+        """Evaluate, treating an unevaluable condition as false."""
         try:
             return self.evaluate(qvalue, qualities=qualities)
         except EvaluationError:
             return False
+
+    def check(self, qualities: QualityLookup) -> bool:
+        return self(qualities.get(self.quality), qualities=qualities)
 
     def __repr__(self) -> str:
         return "(%r %s %r)" % (self.quality, self.comparator, self.expression)
