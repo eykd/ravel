@@ -1,7 +1,6 @@
 [
-  {"category": "security", "file": "src/ravel/engine/state.py", "title": "Remediate: string qualities grow without bound through + concatenation", "severity": "CRITICAL", "line": 29, "task_id": "ravel-h6v.12"},
-  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: expression parsing amplifies long lines before any size gate", "severity": "MAJOR", "line": 43, "task_id": "ravel-h6v.13"},
-  {"category": "security", "file": "src/ravel/environments.py", "title": "Remediate: deeply nested rulebook blocks raise untyped RecursionError from Environment.load", "severity": "MAJOR", "line": 70, "task_id": "ravel-h6v.14"},
-  {"category": "security", "file": "src/ravel/loaders.py", "title": "Remediate: FileSystemLoader reads rulebooks without a size bound or typed read errors", "severity": "MAJOR", "line": 48, "task_id": "ravel-h6v.15"},
-  {"category": "security", "file": "src/ravel/engine/state.py", "title": "Remediate: unstorable-value error formatting raises raw ValueError on huge computed ints", "severity": "MINOR", "line": 45, "task_id": "ravel-h6v.16"}
+  {"category": "security", "file": "src/ravel/parsers.py", "title": "Remediate: plain-text {...} predicate prefix bypasses the expression length gate", "severity": "MAJOR", "line": 171, "task_id": "ravel-h6v.17"},
+  {"category": "security", "file": "src/ravel/compiler/rulebooks.py", "title": "Remediate: common when predicates are recompiled per rule giving quadratic load cost", "severity": "MAJOR", "line": 121, "task_id": "ravel-h6v.18"},
+  {"category": "security", "file": "src/ravel/environments.py", "title": "Remediate: syml syntax errors escape the ravel ParseError hierarchy", "severity": "MINOR", "line": 103, "task_id": "ravel-h6v.19"},
+  {"category": "security", "file": "src/ravel/exceptions.py", "title": "Remediate: parse error messages echo unbounded rulebook source text", "severity": "MINOR", "line": 35, "task_id": "ravel-h6v.20"}
 ]
