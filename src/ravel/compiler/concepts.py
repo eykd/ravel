@@ -39,4 +39,4 @@ def compile_baggage(environment, concept, rule_name, baggage_data):
 
 def is_registered(concept: str) -> bool:
     """Return whether a handler is registered for the given concept (exact match)."""
-    raise NotImplementedError
+    return concept in _HANDLERS
