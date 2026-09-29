@@ -70,3 +70,18 @@ class TestSourcePositions:
         assert position.text == "this is not a comparison at all"
         assert "broken" in message
         assert "Line 2" in message
+
+
+class TestInjectedLoader:
+    def test_it_should_require_a_loader(self):
+        with pytest.raises(TypeError):
+            environments.Environment()  # type: ignore[call-arg]
+
+    def test_it_should_reject_a_loader_without_a_callable_load(self):
+        with pytest.raises(TypeError) as excinfo:
+            environments.Environment(loader=object())
+
+        assert str(excinfo.value) == "Environment loader must have a callable load(); got object"
+
+    def test_it_should_not_import_the_loaders_module(self):
+        assert "loaders" not in vars(environments)
