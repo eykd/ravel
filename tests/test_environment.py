@@ -3,6 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from ravel import environments, exceptions, loaders
+from ravel.engine.engine import start
+from ravel.engine.story import Story
 
 
 @pytest.fixture
@@ -85,3 +87,58 @@ class TestInjectedLoader:
 
     def test_it_should_not_import_the_loaders_module(self):
         assert "loaders" not in vars(environments)
+
+
+class CountingLoader(loaders.MemoryLoader):
+    """A ``MemoryLoader`` that records each rulebook name it is asked to load, in order."""
+
+    def __init__(self, sources):
+        super().__init__(sources)
+        self.loaded: list[str] = []
+
+    def get_source(self, environment, name):
+        self.loaded.append(name)
+        return super().get_source(environment, name)
+
+
+def include_rulebook(*names, body="intro:\n  - Hi[.] there.\n"):
+    return "include:\n%s\n%s" % ("".join("  - %s\n" % n for n in names), body)
+
+
+class TestIncludeOrder:
+    """FR-010 / R1: cycles are allowed, each rulebook loads once, breadth-first."""
+
+    def test_it_should_compile_a_two_rulebook_cycle_once_each(self):
+        loader = CountingLoader({"A": include_rulebook("B"), "B": include_rulebook("A")})
+        environments.Environment(loader=loader, initializing_name="A").load()
+        assert loader.loaded == ["A", "B"]
+
+    def test_it_should_compile_a_three_rulebook_cycle_once_each_in_order(self):
+        loader = CountingLoader(
+            {"A": include_rulebook("B"), "B": include_rulebook("C"), "C": include_rulebook("A")},
+        )
+        environments.Environment(loader=loader, initializing_name="A").load()
+        assert loader.loaded == ["A", "B", "C"]
+
+    def test_it_should_load_breadth_first(self):
+        loader = CountingLoader(
+            {
+                "A": include_rulebook("B", "C"),
+                "B": include_rulebook("D"),
+                "C": "intro:\n  - Hi[.] there.\n",
+                "D": "intro:\n  - Hi[.] there.\n",
+            },
+        )
+        environments.Environment(loader=loader, initializing_name="A").load()
+        assert loader.loaded == ["A", "B", "C", "D"]
+
+    def test_it_should_concatenate_givens_in_load_order_so_later_values_win(self):
+        loader = CountingLoader(
+            {
+                "A": "include:\n  - B\ngiven:\n  - Mood = 1\nintro:\n  - Hi[.] there.\n",
+                "B": "given:\n  - Mood = 2\nintro:\n  - Hi[.] there.\n",
+            },
+        )
+        rulebook = environments.Environment(loader=loader, initializing_name="A").load()
+        state = start(Story.from_rulebook(rulebook)).state
+        assert state.qualities.get("Mood") == 2

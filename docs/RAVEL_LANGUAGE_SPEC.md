@@ -89,7 +89,7 @@ By convention, the entry rulebook is named `begin.ravel`. The runtime loads this
 
 ### 3.1 `include`
 
-Imports other rulebook files into the current rulebook. Included files are merged, with rules from later includes taking precedence for same-named locations.
+Imports other rulebook files into the current rulebook. Included files are merged into one rulebook.
 
 ```yaml
 include:
@@ -100,8 +100,10 @@ include:
 ```
 
 - File extension (`.ravel`) is implied
-- Include order matters for rule ordering
-- Circular includes are not permitted
+- Includes are loaded breadth-first from the entry rulebook, and each rulebook loads once
+- Circular includes are allowed: a rulebook that is already loaded is not loaded again
+- Include order does not order rules. Matching rules are ranked by score, then by location name,
+  descending (see 11.4); no include takes precedence over another
 
 ### 3.2 `given`
 
@@ -116,7 +118,7 @@ given:
 ```
 
 - Qualities not in `given` default to `0` when first tested
-- Multiple rulebooks can contribute `given` values (later values override)
+- Multiple rulebooks can contribute `given` values; they apply in load order, so later-loaded values win
 - String values must be quoted
 
 ### 3.3 `when`
@@ -459,7 +461,7 @@ This produces two forms:
 **Examples:**
 ```yaml
 - You enter the bar[.]  # Intro: "You enter the bar."
-                        # Tail: "You enter the bar."
+                        # Tail: "You enter the bar"
 
 - The room is dark[!], almost pitch black.
                         # Intro: "The room is dark!"
@@ -522,6 +524,10 @@ Choices present options to the player within a situation:
 **Post-Choice Text**: Text after the bracket is displayed when the choice is selected.
 
 **Effects**: Quality modifications that occur when this choice is selected.
+
+The bracketed line must be the choice's first item. The items after the bracketed line run in the
+order written; a `text:` line may carry a `{...}` condition, and one placed after an `effect:` sees
+that effect.
 
 #### Multiple Choices
 

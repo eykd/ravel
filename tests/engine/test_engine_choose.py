@@ -26,7 +26,7 @@ from ravel.engine.state import Frame, GameState, Outcome, Qualities, Status
 from ravel.engine.story import Story
 from ravel.environments import Environment
 from ravel.exceptions import ConstraintError, EvaluationError
-from ravel.loaders import FileSystemLoader
+from ravel.loaders import FileSystemLoader, MemoryLoader
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stories"
 
@@ -324,3 +324,35 @@ def test_effect_constraint_on_a_string_result_raises_invalid_operation_from_cons
         choose(story, state, "s")
 
     assert isinstance(excinfo.value.__cause__, ConstraintError)
+
+
+def _play_go_choice(*items):
+    """Load an intro whose ``Go`` choice holds ``items`` and return the outputs of choosing it."""
+    body = "".join("      - %s\n" % item for item in items)
+    source = "intro:\n  - Hello[.] there.\n  - choice:\n      - [Go]You go.\n%s" % body
+    story = Story.from_rulebook(Environment(loader=MemoryLoader({"begin": source})).load())
+    state = start(story).state
+    state = choose(story, state, "begin::intro").state
+    return choose(story, state, "begin::intro::go").outputs
+
+
+def test_text_in_a_choice_shows_after_the_chosen_line_and_before_a_later_effect():
+    outputs = _play_go_choice("text: Extra words.", "effect: X += 1")
+    assert outputs[:4] == (
+        SituationEntered("begin::intro::go"),
+        TextShown("You go."),
+        TextShown("Extra words."),
+        QualityChanged("X", None, 1),
+    )
+    assert outputs[4:6] == (SituationExited("begin::intro::go"), SituationExited("begin::intro"))
+
+
+def test_text_in_a_choice_placed_after_an_effect_sees_that_effect():
+    outputs = _play_go_choice("effect: X += 1", "text: {X == 1}After effect.")
+    assert outputs[:4] == (
+        SituationEntered("begin::intro::go"),
+        TextShown("You go."),
+        QualityChanged("X", None, 1),
+        TextShown("After effect."),
+    )
+    assert outputs[4:6] == (SituationExited("begin::intro::go"), SituationExited("begin::intro"))
